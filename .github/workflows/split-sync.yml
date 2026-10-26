@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   split-and-sync:
-    if: "!contains(github.event.head_commit.message, '[skip ci]') && !endsWith(github.repository, '/admin') && github.repository != (vars.GITHUB_ADMIN_REPO || secrets.GITHUB_ADMIN_REPO || '')"
+    if: "!endsWith(github.repository, '/admin') && (github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]'))"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Source
@@ -34,8 +34,8 @@ jobs:
           PAT: ${{ secrets.PAT || secrets.GITHUB_PAT || secrets.GH_PAT || secrets.PERSONAL_ACCESS_TOKEN || secrets.ADMIN_SYNC_TOKEN || '' }}
           PUBLIC_REPO: ${{ secrets.GITHUB_PUBLIC_REPO || vars.GITHUB_PUBLIC_REPO || '' }}
           ADMIN_REPO: ${{ secrets.GITHUB_ADMIN_REPO || vars.GITHUB_ADMIN_REPO || '' }}
-          COMMIT_MSG: ${{ github.event.head_commit.message }}
-          AUTHOR_NAME: ${{ github.event.head_commit.author.name || 'github-actions[bot]' }}
+          COMMIT_MSG: ${{ github.event.head_commit.message || '' }}
+          AUTHOR_NAME: ${{ github.event.head_commit.author.name || github.actor || 'github-actions[bot]' }}
         run: |
           set -e
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
@@ -250,6 +250,11 @@ jobs:
           # Auto-detect target repositories if not explicitly provided
           ADMIN_TARGET="${ADMIN_REPO:-${GITHUB_REPOSITORY_OWNER}/admin}"
           PUBLIC_TARGET="${PUBLIC_REPO:-${GITHUB_REPOSITORY}}"
+
+          if [ "$GITHUB_REPOSITORY" = "$ADMIN_TARGET" ]; then
+            echo "Notice: Current repository ($GITHUB_REPOSITORY) is already the Admin target. Skipping split-sync."
+            exit 0
+          fi
 
           echo "=========================================================="
           echo "🔄 Dual-Repo Split-Sync Engine Active"
