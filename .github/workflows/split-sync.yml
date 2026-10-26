@@ -19,25 +19,27 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install Dependencies
         run: npm install
 
       - name: Sync and Split Repositories
         env:
-          PAT: ${{ secrets.PAT || secrets.GITHUB_PAT || secrets.GH_PAT || secrets.PERSONAL_ACCESS_TOKEN || secrets.ADMIN_SYNC_TOKEN || '' }}
+          PAT: ${{ secrets.PAT || secrets.GITHUB_PAT || secrets.GH_PAT || secrets.PERSONAL_ACCESS_TOKEN || secrets.ADMIN_SYNC_TOKEN || secrets.SYNC_TOKEN || secrets.ADMIN_PAT || secrets.ACCESS_TOKEN || '' }}
           PUBLIC_REPO: ${{ secrets.GITHUB_PUBLIC_REPO || vars.GITHUB_PUBLIC_REPO || '' }}
           ADMIN_REPO: ${{ secrets.GITHUB_ADMIN_REPO || vars.GITHUB_ADMIN_REPO || '' }}
           COMMIT_MSG: ${{ github.event.head_commit.message || '' }}
           AUTHOR_NAME: ${{ github.event.head_commit.author.name || github.actor || 'github-actions[bot]' }}
         run: |
           set -e
+          # Clear any lingering GITHUB_TOKEN extraheader from actions/checkout
+          git config --global --unset-all http.https://github.com/.extraheader 2>/dev/null || true
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "$AUTHOR_NAME"
 
@@ -301,17 +303,21 @@ jobs:
               echo "Pushing stripped public release to branch '$TARGET_BRANCH' so 'main' is preserved for AI Studio sync."
             fi
 
-            if git clone "https://x-access-token:${PAT}@github.com/${REPO_URL}.git" "${REPO_NAME}_repo"; then
+            AUTH_REPO_URL="https://x-access-token:${PAT}@github.com/${REPO_URL}.git"
+
+            if git clone "$AUTH_REPO_URL" "${REPO_NAME}_repo"; then
               cd "${REPO_NAME}_repo"
-              git checkout -b "$TARGET_BRANCH" 2>/dev/null || git checkout "$TARGET_BRANCH" 2>/dev/null || git checkout -b "$TARGET_BRANCH"
+              git config --local --unset-all http.https://github.com/.extraheader 2>/dev/null || true
+              git checkout -B "$TARGET_BRANCH" 2>/dev/null || true
               # Mirror workspace files
               rsync -rv $RSYNC_EXCLUDES --delete "$SOURCE_DIR/" .
             else
               mkdir -p "${REPO_NAME}_repo"
               cd "${REPO_NAME}_repo"
               git init
-              git remote add origin "https://x-access-token:${PAT}@github.com/${REPO_URL}.git"
-              git checkout -b "$TARGET_BRANCH"
+              git config --local --unset-all http.https://github.com/.extraheader 2>/dev/null || true
+              git remote add origin "$AUTH_REPO_URL" 2>/dev/null || git remote set-url origin "$AUTH_REPO_URL"
+              git checkout -B "$TARGET_BRANCH"
               rsync -rv $RSYNC_EXCLUDES "$SOURCE_DIR/" .
             fi
             
@@ -419,15 +425,55 @@ jobs:
             git add -A
             if [ -n "$(git status --porcelain)" ]; then
               git commit -m "Auto-sync ($TYPE) [$(date -u +'%Y-%m-%d %H:%M:%S UTC')] [skip ci]"
-              git push -u origin "$TARGET_BRANCH"
-              echo "✅ Successfully synced to $REPO_URL ($TARGET_BRANCH)!"
+
+              # Re-ensure origin URL with token and clear any conflicting local extraheader
+              git remote set-url origin "$AUTH_REPO_URL" 2>/dev/null || true
+              git config --local --unset-all http.https://github.com/.extraheader 2>/dev/null || true
+
+              PUSH_SUCCESS=false
+              if git push -u origin "$TARGET_BRANCH"; then
+                PUSH_SUCCESS=true
+              elif git push -u origin "$TARGET_BRANCH" --force; then
+                PUSH_SUCCESS=true
+              fi
+
+              if [ "$PUSH_SUCCESS" = "true" ]; then
+                echo "✅ Successfully synced to $REPO_URL ($TARGET_BRANCH)!"
+              else
+                echo "::error title=Sync Failed for $REPO_NAME::Failed to push to $REPO_URL ($TARGET_BRANCH)."
+                echo ""
+                echo "=========================================================================="
+                echo "❌ Cross-Repository Push to '$REPO_URL' was denied (403 Forbidden)."
+                echo "=========================================================================="
+                echo "Why GitHub returned 403:"
+                echo "Your Personal Access Token ('PAT') secret in '$GITHUB_REPOSITORY' does not"
+                echo "have write permission to '$REPO_URL'."
+                echo ""
+                echo "👉 HOW TO FIX IN 1 MINUTE ON GITHUB:"
+                echo "1. If using Fine-Grained Token (https://github.com/settings/tokens?type=beta):"
+                echo "   - Click on your active token"
+                echo "   - Under 'Repository access': Select 'All repositories' (or add '$REPO_URL' explicitly)"
+                echo "   - Under 'Repository permissions': Set 'Contents' to 'Read and write'"
+                echo "   - Click 'Update token'"
+                echo ""
+                echo "2. If using Classic Token (https://github.com/settings/tokens):"
+                echo "   - Ensure 'repo' checkbox is checked (Full control of repositories)"
+                echo "   - Update token in $GITHUB_REPOSITORY -> Settings -> Secrets -> Actions -> PAT"
+                echo "=========================================================================="
+                return 1
+              fi
             else
               echo "No changes detected for $REPO_NAME ($TARGET_BRANCH)."
             fi
           }
 
           # 1. Transfer Admin codebase to Admin repository (masterclonezip/admin)
-          sync_repo "admin" "$ADMIN_TARGET" "admin"
+          sync_repo "admin" "$ADMIN_TARGET" "admin" || ADMIN_SYNC_FAILED=1
 
           # 2. Sync clean Public release (if separate public repo configured or to production branch)
-          sync_repo "public" "$PUBLIC_TARGET" "public"
+          sync_repo "public" "$PUBLIC_TARGET" "public" || PUBLIC_SYNC_FAILED=1
+
+          if [ "${ADMIN_SYNC_FAILED:-0}" = "1" ] || [ "${PUBLIC_SYNC_FAILED:-0}" = "1" ]; then
+            echo "::error::One or more sync targets failed. Check diagnostics above."
+            exit 1
+          fi
