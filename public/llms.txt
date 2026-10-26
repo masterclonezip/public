@@ -1,0 +1,9 @@
+# Application Directory
+
+> Digital platform providing a verified application catalog, technical specifications, industry news, and developer information.
+
+## Core Pages
+- [Home](/): Primary application directory and search.
+- [News](/news): Industry news and platform updates.
+- [Developers](/developers): Developer portal and submission guidelines.
+- [About Us](/about): Information about the platform.

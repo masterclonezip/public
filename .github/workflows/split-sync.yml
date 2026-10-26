@@ -1,0 +1,428 @@
+name: Dual Repo Split & Sync
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: split-sync-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  split-and-sync:
+    if: "!contains(github.event.head_commit.message, '[skip ci]') && !endsWith(github.repository, '/admin') && github.repository != (vars.GITHUB_ADMIN_REPO || secrets.GITHUB_ADMIN_REPO || '')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Sync and Split Repositories
+        env:
+          PAT: ${{ secrets.PAT || secrets.GITHUB_PAT || secrets.GH_PAT || secrets.PERSONAL_ACCESS_TOKEN || secrets.ADMIN_SYNC_TOKEN || '' }}
+          PUBLIC_REPO: ${{ secrets.GITHUB_PUBLIC_REPO || vars.GITHUB_PUBLIC_REPO || '' }}
+          ADMIN_REPO: ${{ secrets.GITHUB_ADMIN_REPO || vars.GITHUB_ADMIN_REPO || '' }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          AUTHOR_NAME: ${{ github.event.head_commit.author.name || 'github-actions[bot]' }}
+        run: |
+          set -e
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "$AUTHOR_NAME"
+
+          # List of files that should ONLY exist in Masterworld (Admin)
+          ADMIN_ONLY_FILES=(
+            "src/components/admin/"
+            "src/pages/AdminDashboard.tsx"
+            "src/pages/AdminLogin.tsx"
+            "src/components/AdminLogin.tsx"
+            "src/components/NewsTab.tsx"
+            "src/components/SecurityTab.tsx"
+            "src/components/FirebaseStatusPanel.tsx"
+            "src/components/FirebaseStatusIndicator.tsx"
+            "src/components/AppsTab.tsx"
+            "src/components/ImageUpload.tsx"
+            "src/hooks/useAdminAuth.ts"
+            "src/hooks/useAdminApps.ts"
+            "src/hooks/useAdminSettings.ts"
+            "src/hooks/useAppForm.ts"
+            "src/hooks/useAppFilters.ts"
+            "src/hooks/useGitHubSync.ts"
+            "src/hooks/useDataSync.ts"
+            "src/hooks/useDataActions.ts"
+            "src/contexts/DataContext.tsx"
+            "src/services/adminAuthService.ts"
+            "src/services/firestoreSyncService.ts"
+            "src/services/dataService.ts"
+            "src/server/routes/adminAuthRoutes.ts"
+            "src/server/routes/adminVaultRoutes.ts"
+            "src/server/routes/githubSyncRoutes.ts"
+            "src/server/routes/uploadRoutes.ts"
+            "src/server/services/geminiServerService.ts"
+            "src/lib/githubSync.ts"
+            "src/lib/appPdfExport.ts"
+            "src/lib/totp.ts"
+            "src/lib/secureStorage.ts"
+            "src/lib/vaultNode.ts"
+            "src/lib/sessionStore.ts"
+            "src/lib/firebase.ts"
+            "src/lib/adminCommunityFirebase.ts"
+            ".aistudio/"
+            "src/lib/secure_links_backup.json"
+            "src/lib/autopilot_checkpoint.json"
+            "src/server/secure_vault.json"
+            "community_local_backup.json"
+            "mock-2fa-state.json"
+            "server.ts"
+            "firestore.rules"
+            "firebase.json"
+            ".firebaserc"
+            "bun.lock"
+            "docs/"
+            "scripts/verify-architecture.ts"
+            "scripts/sync-firestore.ts"
+            "scripts/update-vault-data.ts"
+            "scripts/gen-vault.js"
+            "scripts/count-apps.ts"
+            "DATABASE_WORKFLOW.md"
+            "ADMIN_TO_PUBLIC_SYNC_ARCHITECTURE.md"
+            "FIREBASE_QUOTA_AND_COMMUNITY_ARCHITECTURE.md"
+            "COMMUNITY_FIREBASE_README.md"
+            "AI_PITFALLS.md"
+            "DUAL_DATABASE_RATING_SYSTEM.md"
+            "MORE_INFO_SECURITY_ARCHITECTURE.md"
+            "SEO_MAP.md"
+            "AI_SEO_CHEAT_SHEET.md"
+            "add-admin-rest.ts"
+            "add-admin.ts"
+            "add_save_button.js"
+            "check-env.ts"
+            "debug-db.js"
+            "dom.html"
+            "extract.js"
+            "fetch_git_cfg.js"
+            "fetch_real_git_cfg.js"
+            "fetch_rest.js"
+            "find_app_cache.js"
+            "fix-admin.ts"
+            "fix-aes.ts"
+            "fix-api.ts"
+            "fix-dashboard.ts"
+            "fix-download.ts"
+            "fix-missing-urls.cjs"
+            "fix-seo.js"
+            "fix-seo.ts"
+            "fix_admin_dashboard.js"
+            "fix_app_layout.js"
+            "fix_appstab.js"
+            "fix_css.js"
+            "fix_css_performance.js"
+            "fix_h2.js"
+            "fix_header.js"
+            "fix_home.js"
+            "fix_home_layout.js"
+            "fix_lazy.js"
+            "fix_lenis.js"
+            "fix_lenis_easing.js"
+            "fix_lenis_settings.js"
+            "fix_lenis_ultra.js"
+            "fix_lenis_ultra2.js"
+            "fix_loading.js"
+            "fix_loading_all.js"
+            "fix_loading_home.js"
+            "fix_menu.js"
+            "fix_news_published_at.js"
+            "fix_news_seo.js"
+            "fix_news_tab.js"
+            "fix_newsdetail_date.js"
+            "fix_newspage_date.js"
+            "fix_routes.js"
+            "fix_scroll.js"
+            "fix_secrets.sh"
+            "fix_server.js"
+            "fix_server2.js"
+            "fix_server3.js"
+            "format.js"
+            "get_git_config.ts"
+            "insert_screenshots.js"
+            "live_app.html"
+            "metadata.json"
+            "output.html"
+            "patch.js"
+            "patch2.js"
+            "patch3.js"
+            "patch4.js"
+            "patch5.js"
+            "patch6.js"
+            "patch7.js"
+            "patch8.js"
+            "patch_menu.js"
+            "print-env.ts"
+            "remove_chatbot.js"
+            "replace-color.mjs"
+            "restore_app.js"
+            "restore_header_footer.js"
+            "temp_news_tab.txt"
+            "test-admin-encrypt.js"
+            "test-admin.js"
+            "test-chat.ts"
+            "test-chunk-item.cjs"
+            "test-curl.ts"
+            "test-fetch.ts"
+            "test-firestore.ts"
+            "test-gemini.ts"
+            "test-models-all.ts"
+            "test-payload.mjs"
+            "test-pow.mjs"
+            "test-secure-links.ts"
+            "test.js"
+            "test_pull.js"
+            "update_app.js"
+            "update_app_home.js"
+            "update_appdetails.js"
+            "update_dashboard.patch"
+            "update_gateway.js"
+            "update_home.js"
+            "update_html.js"
+            "update_loading.js"
+            "update_vite.js"
+            "verify-db.js"
+            "verify-rules.js"
+            "write_files.js"
+            "src/lib/public_backup.json"
+          )
+
+          # List of files that should ONLY exist in Dex (Public)
+          PUBLIC_ONLY_FILES=(
+            "public-api/"
+            "src/components/public/"
+            "src/pages/About.tsx"
+            "src/pages/AppDetails.tsx"
+            "src/pages/Contact.tsx"
+            "src/pages/Developers.tsx"
+            "src/pages/Disclaimer.tsx"
+            "src/pages/Ethics.tsx"
+            "scripts/prerender.ts"
+            "src/pages/GatewayPage.tsx"
+            "src/pages/Home.tsx"
+            "src/pages/NewsDetailPage.tsx"
+            "src/pages/NewsPage.tsx"
+            "src/pages/Notice.tsx"
+            "src/pages/Privacy.tsx"
+            "src/pages/ReportRemoval.tsx"
+            "src/pages/Responsibility.tsx"
+            "src/pages/SafetyStatus.tsx"
+            "src/pages/Terms.tsx"
+            "src/pages/VideoDetailPage.tsx"
+            "src/pages/VideosPage.tsx"
+            "src/components/AccordionItem.tsx"
+            "src/components/FallbackRouteMatcher.tsx"
+            "src/components/LanguageSelector.tsx"
+            "src/components/PlayStoreRatingSection.tsx"
+            "src/components/PlayStoreUI.tsx"
+            "src/components/playstore/"
+            "src/components/ReportAppModal.tsx"
+            "src/components/ClearanceButton.tsx"
+            "src/components/LightSearch.tsx"
+            "src/components/NeutralSyncButton.tsx"
+            "src/components/SupportWidget.tsx"
+            "src/components/Ticker.tsx"
+            "src/components/UserReviews.tsx"
+            "src/components/WebsiteTitleHero.tsx"
+            "src/lib/routePreloader.ts"
+            "src/lib/pageComponents.ts"
+          )
+
+          SOURCE_DIR=$(pwd)
+          PARENT_DIR=$(dirname "$SOURCE_DIR")
+
+          # Auto-detect target repositories if not explicitly provided
+          ADMIN_TARGET="${ADMIN_REPO:-${GITHUB_REPOSITORY_OWNER}/admin}"
+          PUBLIC_TARGET="${PUBLIC_REPO:-${GITHUB_REPOSITORY}}"
+
+          echo "=========================================================="
+          echo "🔄 Dual-Repo Split-Sync Engine Active"
+          echo "Source Repository: $GITHUB_REPOSITORY"
+          echo "Target Public:     $PUBLIC_TARGET"
+          echo "Target Admin:      $ADMIN_TARGET"
+          echo "=========================================================="
+
+          if [ -z "$PAT" ]; then
+            echo "⚠️ WARNING: 'PAT' (Personal Access Token) secret not found in repository secrets."
+            echo "GitHub Actions built-in token cannot push cross-repository to '$ADMIN_TARGET'."
+            echo "To enable automated code transfer to '$ADMIN_TARGET':"
+            echo "1. Create a GitHub Personal Access Token at https://github.com/settings/tokens with 'repo' scope."
+            echo "2. In '$GITHUB_REPOSITORY', go to Settings -> Secrets and variables -> Actions."
+            echo "3. Add a New repository secret named 'PAT' and paste the token."
+            echo "Skipping cross-repo push until PAT is added."
+            exit 0
+          fi
+
+          sync_repo() {
+            REPO_NAME=$1
+            REPO_URL=$2
+            TYPE=$3 # "public" or "admin"
+
+            echo ""
+            echo "--- Preparing $REPO_NAME sync to $REPO_URL ($TYPE) ---"
+            cd "$PARENT_DIR"
+            rm -rf "${REPO_NAME}_repo"
+            
+            # Common excludes - strictly prevent secrets/backups from leaking anywhere unvetted
+            RSYNC_EXCLUDES="--exclude=.git --exclude=.github --exclude=node_modules --exclude=dist --exclude=*.tmp --exclude=*.log --exclude=api_temp.ts --exclude=mock-2fa-state.json --exclude=autopilot_checkpoint.json* --exclude=community_local_backup.json* --exclude=src/lib/public_backup.json* --exclude=src/lib/secure_links_backup.json* --exclude=.env* --exclude=bun.lock* --exclude=bun.lockb --exclude=yarn.lock --exclude=pnpm-lock.yaml"
+
+            if [ -z "$REPO_URL" ]; then
+              echo "Skipping $REPO_NAME sync: repository target not configured."
+              return 0
+            fi
+
+            # Determine target branch
+            # If public target is the source repository itself (AI Studio connected repo), push to 'production' branch to protect AI Studio main branch
+            TARGET_BRANCH="main"
+            if [ "$TYPE" = "public" ] && [ "$REPO_URL" = "$GITHUB_REPOSITORY" ]; then
+              TARGET_BRANCH="production"
+              echo "Notice: Public target matches current AI Studio source ($GITHUB_REPOSITORY)."
+              echo "Pushing stripped public release to branch '$TARGET_BRANCH' so 'main' is preserved for AI Studio sync."
+            fi
+
+            if git clone "https://x-access-token:${PAT}@github.com/${REPO_URL}.git" "${REPO_NAME}_repo"; then
+              cd "${REPO_NAME}_repo"
+              git checkout -b "$TARGET_BRANCH" 2>/dev/null || git checkout "$TARGET_BRANCH" 2>/dev/null || git checkout -b "$TARGET_BRANCH"
+              # Mirror workspace files
+              rsync -rv $RSYNC_EXCLUDES --delete "$SOURCE_DIR/" .
+            else
+              mkdir -p "${REPO_NAME}_repo"
+              cd "${REPO_NAME}_repo"
+              git init
+              git remote add origin "https://x-access-token:${PAT}@github.com/${REPO_URL}.git"
+              git checkout -b "$TARGET_BRANCH"
+              rsync -rv $RSYNC_EXCLUDES "$SOURCE_DIR/" .
+            fi
+            
+            # Explicitly purge any rogue lockfiles that trigger non-npm build runners on Cloudflare/Vercel
+            rm -f bun.lock bun.lockb yarn.lock pnpm-lock.yaml
+            
+            # Ensure .npmrc is always present
+            if [ -f "$SOURCE_DIR/.npmrc" ]; then
+              cp "$SOURCE_DIR/.npmrc" .npmrc
+            fi
+            
+            # Explicitly remove .github to prevent workflow nesting/looping
+            rm -rf .github
+            git rm -rf --ignore-unmatch .github 2>/dev/null || true
+
+            if [ "$TYPE" = "public" ]; then
+              echo "Enforcing Public-Only Dex Isolation..."
+              if [ -f "$SOURCE_DIR/vercel.json" ]; then
+                cp "$SOURCE_DIR/vercel.json" vercel.json
+              fi
+              
+              # Build the public-only API from the latest source BEFORE stripping server files
+              echo "Building clean public API..."
+              (cd "$SOURCE_DIR" && node scripts/build-api.js || echo "API build failed")
+              mkdir -p public-api
+              if [ -f "$SOURCE_DIR/api/index.js" ]; then
+                cp "$SOURCE_DIR/api/index.js" public-api/index.js
+              fi
+
+              for file in "${ADMIN_ONLY_FILES[@]}"; do
+                rm -rf "$file"
+              done
+              
+              # Force remove old files to prevent Vercel conflicts
+              rm -f api/index.ts
+              rm -f api/index.js
+
+              # Restore prerender and compress scripts for Vercel
+              mkdir -p scripts
+              if [ -f "$SOURCE_DIR/scripts/prerender.ts" ]; then
+                cp "$SOURCE_DIR/scripts/prerender.ts" scripts/prerender.ts
+              fi
+              if [ -f "$SOURCE_DIR/scripts/compress-dist.ts" ]; then
+                cp "$SOURCE_DIR/scripts/compress-dist.ts" scripts/compress-dist.ts
+              fi
+              
+              # Strip any residual maintenance, test, or config files from root
+              find . -maxdepth 1 -name "*.js" ! -name "eslint.config.mjs" ! -name "eslint.config.cjs" ! -name "postcss.config.js" ! -name "tailwind.config.js" -exec rm -f {} +
+              find . -maxdepth 1 -name "*.ts" ! -name "vite.config.ts" -exec rm -f {} +
+              find . -maxdepth 1 -name "*.sh" -exec rm -f {} +
+              find . -maxdepth 1 -name "*.patch" -exec rm -f {} +
+              find . -maxdepth 1 -name "*.html" ! -name "index.html" -exec rm -f {} +
+              find . -maxdepth 1 -name "*.md" ! -name "README.md" -exec rm -f {} +
+
+              rm -rf api/
+              mkdir -p api
+              if [ -f "public-api/index.js" ]; then
+                mv public-api/index.js api/index.js
+                rm -rf public-api
+              elif [ -f "public-api/index.ts" ]; then
+                mv public-api/index.ts api/index.ts
+                rm -rf public-api
+              fi
+              if [ -f "src/AppPublic.tsx" ]; then
+                cp -f src/AppPublic.tsx src/App.tsx
+                rm -f src/AppPublic.tsx src/AppAdmin.tsx
+              fi
+              if [ -f "vite.config.ts" ]; then
+                sed -i 's/__ADMIN_ENABLED__:.*/__ADMIN_ENABLED__: false,/g' vite.config.ts 2>/dev/null || true
+              fi
+              rm -f strip-admin-from-dex.js
+              rm -f strip-public-from-masterworld.js
+            fi
+
+            if [ "$TYPE" = "admin" ]; then
+              echo "Enforcing Admin-Only Masterworld Isolation..."
+              # 1. Strip all explicit public-only files
+              for file in "${PUBLIC_ONLY_FILES[@]}"; do
+                rm -rf "$file"
+              done
+              
+              # Force remove api/index.ts to prevent Vercel conflicts
+              rm -f api/index.ts
+              
+              # 2. Strict Allowlist enforcement for pages and components
+              echo "Purging non-admin pages..."
+              find src/pages -type f ! -name "AdminDashboard.tsx" ! -name "AdminLogin.tsx" -delete
+              # 3. Swap App to Admin
+              if [ -f "src/AppAdmin.tsx" ]; then
+                cp -f src/AppAdmin.tsx src/App.tsx
+                rm -f src/AppAdmin.tsx src/AppPublic.tsx
+              fi
+              rm -f strip-public-from-masterworld.js
+              rm -f strip-admin-from-dex.js
+            fi
+
+            # Guarantee Cloudflare Pages SPA Routing in both public and admin repos
+            mkdir -p public
+            echo "/*    /index.html   200" > public/_redirects
+
+            # Write sync metadata to guarantee git changes on every sync run
+            mkdir -p src
+            echo "{\"last_sync\": \"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\", \"target\": \"$REPO_NAME\", \"branch\": \"$TARGET_BRANCH\"}" > src/sync-meta.json
+
+            git add -A
+            if [ -n "$(git status --porcelain)" ]; then
+              git commit -m "Auto-sync ($TYPE) [$(date -u +'%Y-%m-%d %H:%M:%S UTC')] [skip ci]"
+              git push -u origin "$TARGET_BRANCH"
+              echo "✅ Successfully synced to $REPO_URL ($TARGET_BRANCH)!"
+            else
+              echo "No changes detected for $REPO_NAME ($TARGET_BRANCH)."
+            fi
+          }
+
+          # 1. Transfer Admin codebase to Admin repository (masterclonezip/admin)
+          sync_repo "admin" "$ADMIN_TARGET" "admin"
+
+          # 2. Sync clean Public release (if separate public repo configured or to production branch)
+          sync_repo "public" "$PUBLIC_TARGET" "public"

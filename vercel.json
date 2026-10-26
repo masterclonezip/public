@@ -1,0 +1,227 @@
+{
+  "version": 2,
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "outputDirectory": "dist",
+  "buildCommand": "npm run build",
+  "regions": ["bom1"],
+  "rewrites": [
+    {
+      "source": "/public/backup-data",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/(moreinfo|gateway|info|moredetail|download)/(.*)",
+      "destination": "/"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/ping",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, no-cache, must-revalidate, max-age=0"
+        },
+        {
+          "key": "Pragma",
+          "value": "no-cache"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept-Encoding"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains; preload"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
+        },
+        {
+          "key": "X-Robots-Tag",
+          "value": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+        }
+      ]
+    },
+    {
+      "source": "/(app|news|category|categories|videos|about|contact|privacy|terms|responsibility|notice|ethics|disclaimer|report-removal|new-apps|developers|faq|faqs)(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
+        },
+        {
+          "key": "CDN-Cache-Control",
+          "value": "public, max-age=3600, stale-while-revalidate=86400"
+        },
+        {
+          "key": "Cloudflare-CDN-Cache-Control",
+          "value": "public, max-age=3600, stale-while-revalidate=86400"
+        },
+        {
+          "key": "X-Robots-Tag",
+          "value": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+        }
+      ]
+    },
+    {
+      "source": "/(moreinfo|gateway|download|info|moredetail|s|dl|out|admin|login|masterworld|safety|safety-status)(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, no-cache, must-revalidate, private, max-age=0"
+        },
+        {
+          "key": "CDN-Cache-Control",
+          "value": "no-store, private"
+        },
+        {
+          "key": "Cloudflare-CDN-Cache-Control",
+          "value": "no-store, private"
+        },
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow, noarchive, nosnippet"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "no-referrer"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        },
+        {
+          "key": "Expires",
+          "value": "Thu, 31 Dec 2037 23:59:59 GMT"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept-Encoding"
+        }
+      ]
+    },
+    {
+      "source": "/(.*\\.(?:ico|png|svg|webp|jpg|jpeg|gif))",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=604800, stale-while-revalidate=2592000"
+        },
+        {
+          "key": "Expires",
+          "value": "Thu, 31 Dec 2026 23:59:59 GMT"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept-Encoding"
+        }
+      ]
+    },
+    {
+      "source": "/site.webmanifest",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/manifest+json; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
+        },
+        {
+          "key": "Expires",
+          "value": "Thu, 31 Dec 2026 23:59:59 GMT"
+        }
+      ]
+    },
+    {
+      "source": "/robots.txt",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/plain; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, stale-while-revalidate=86400"
+        }
+      ]
+    },
+    {
+      "source": "/(sitemap.*\\.xml|rss\\.xml|opensearch\\.xml)",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/xml; charset=utf-8"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=60, s-maxage=60, stale-while-revalidate=600"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept-Encoding"
+        }
+      ]
+    }
+  ],
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "src/lib/*.json"
+    }
+  }
+}

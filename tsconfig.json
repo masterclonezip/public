@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "target": "ES2022",
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "module": "ESNext",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "allowJs": true,
+    "jsx": "react-jsx",
+    "resolveJsonModule": true,
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
+    "noEmit": true
+  }
+,
+  "exclude": ["dist", "node_modules", "public-api", "api", "api_temp.ts"]
+}

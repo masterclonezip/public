@@ -1,0 +1,133 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ID checking helpers
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidAdminId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-@.]+$');
+    }
+
+    // Helper to verify if user is authorized as an admin (via database index lookup)
+    function isAdmin() {
+      return request.auth != null && 
+             (request.auth.token.email.lower() == 'defentechscholar@gmail.com' ||
+              exists(/databases/$(database)/documents/admins/$(request.auth.uid)) || 
+              (request.auth.token.email != null && exists(/databases/$(database)/documents/admins/$(request.auth.token.email))));
+    }
+
+    // Comprehensive payload validation for reviews
+    function isValidReview(data) {
+      return data.keys().hasAny(['appId', 'app_id']) &&
+             data.keys().hasAny(['userName', 'username']) &&
+             data.keys().hasAny(['rating']) &&
+             data.keys().hasAny(['reviewText', 'comment']) &&
+             data.rating is number && data.rating >= 1 && data.rating <= 5;
+    }
+
+    // Comprehensive payload validation for website feedback
+    function isValidFeedback(data) {
+      return data.keys().hasAll(['username', 'rating', 'comment', 'created_at', 'source']) &&
+             data.keys().size() == 5 &&
+             data.username is string && data.username.size() <= 200 &&
+             data.rating is number && data.rating >= 1 && data.rating <= 5 &&
+             data.comment is string && data.comment.size() <= 2000 &&
+             data.created_at is string && data.created_at.size() <= 64 &&
+             data.source is string && data.source.size() <= 128;
+    }
+
+    // Comprehensive payload validation for support tickets
+    function isValidTicket(data) {
+      return data.keys().hasAll(['username', 'email', 'comment', 'created_at', 'status', 'source']) &&
+             data.keys().size() == 6 &&
+             data.username is string && data.username.size() <= 200 &&
+             data.email is string && data.email.size() <= 200 &&
+             data.comment is string && data.comment.size() <= 3000 &&
+             data.created_at is string && data.created_at.size() <= 64 &&
+             data.status is string && data.status.size() <= 64 &&
+             data.source is string && data.source.size() <= 128;
+    }
+
+    // 1. Admins collection
+    match /admins/{adminId} {
+      allow read, write: if isAdmin();
+    }
+
+    // 2. Reviews collection
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isValidReview(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+
+    // 2b. Community Store chunks & Stats
+    match /community_store/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /app_stats/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /app_rating_stats/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 3. Website feedback collection
+    match /website_feedback/{feedbackId} {
+      allow read: if isAdmin();
+      allow create: if isValidFeedback(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+
+    // 4. Support tickets collection
+    match /support_tickets/{ticketId} {
+      allow read: if isAdmin();
+      allow create: if isValidTicket(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+
+    // 5b. Reports collection
+    match /reports/{reportId} {
+      allow read: if isAdmin();
+      allow create: if request.resource.data.keys().hasAny(['appId', 'app_id', 'type', 'reason']);
+      allow update, delete: if isAdmin();
+    }
+
+    // 5. Store data collection (app catalog, public settings, news, videos, secure links vault)
+    match /store_data/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 6. Secure Git Configuration collection
+    match /sec_git/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // 8. 2FA State collection
+    match /admins_2fa/{docId} {
+      allow read, write: if false; // Server-side only via Admin SDK
+    }
+
+    // 7. Spent Tokens collection (Token replay protection)
+    match /spent_tokens/{tokenId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll(['usedAt']) &&
+                    request.resource.data.keys().size() == 1 &&
+                    request.resource.data.usedAt is string;
+      allow update, delete: if false;
+    }
+
+    // Default catch-all deny rule
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

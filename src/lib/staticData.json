@@ -1,0 +1,31 @@
+{
+  "apps": [],
+  "news": [],
+  "videos": [],
+  "quickLinks": [],
+  "websiteFaqs": [],
+  "developers": [],
+  "settings": {
+    "site_title": "",
+    "site_description": "",
+    "site_tagline": "",
+    "logo_url": "",
+    "favicon_url": "",
+    "primary_color": "#10b981",
+    "contact_email": "",
+    "telegram_url": "",
+    "youtube_url": "",
+    "twitter_url": "",
+    "facebook_url": "",
+    "instagram_url": "",
+    "footer_text": "",
+    "copyright_text": "",
+    "seo_title": "",
+    "seo_description": "",
+    "seo_keywords": "",
+    "og_image": "",
+    "custom_head_scripts": "",
+    "maintenance_mode": false
+  },
+  "lastUpdated": ""
+}

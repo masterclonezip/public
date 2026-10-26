@@ -1,0 +1,40 @@
+{
+  "specVersion": "1.0",
+  "name": "",
+  "description": "",
+  "version": "1.0.0",
+  "url": "/",
+  "catalog_url": "/.well-known/ai-catalog.json",
+  "host": {
+    "displayName": "",
+    "identifier": "",
+    "documentationUrl": "/about",
+    "logoUrl": "/logo.png"
+  },
+  "entries": [
+    {
+      "identifier": "api:catalog",
+      "displayName": "Public Catalog API",
+      "type": "application/json",
+      "url": "/api/v1/public/apps",
+      "description": "Browse catalog of verified applications."
+    },
+    {
+      "identifier": "api:community-stats",
+      "displayName": "Community Ratings & Reviews Stats",
+      "type": "application/json",
+      "url": "/api/v1/public/community/stats",
+      "description": "Retrieve rating and reviews aggregation statistics."
+    }
+  ],
+  "capabilities": {
+    "search": {
+      "endpoint": "/api/v1/public/apps",
+      "method": "GET"
+    },
+    "apps": {
+      "endpoint": "/api/v1/public/backup-data",
+      "method": "GET"
+    }
+  }
+}
