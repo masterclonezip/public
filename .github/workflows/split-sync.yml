@@ -471,27 +471,25 @@ jobs:
               else
                 echo "::error title=Sync Failed for $REPO_NAME::Failed to push to $REPO_URL ($TARGET_BRANCH)."
                 if [ -n "$GITHUB_STEP_SUMMARY" ]; then
-                  cat << EOF >> "$GITHUB_STEP_SUMMARY"
-### 🚨 GitHub Push Notice: Authorization Required for \`$REPO_URL\`
-
-The automatic split-sync engine prepared the admin codebase, but GitHub returned **HTTP 403 Forbidden** when pushing to \`$REPO_URL\`.
-
-#### Why this happens:
-Your Personal Access Token (\`PAT\`) secret in \`$GITHUB_REPOSITORY\` does not have write access to repository \`$REPO_URL\`.
-
-#### 🔑 30-Second Fix on GitHub:
-1. **Fine-Grained Token (Beta)**:
-   - Go to: https://github.com/settings/tokens?type=beta
-   - Tap your active token
-   - Under **Repository access**, choose **All repositories** (or add \`$REPO_URL\` to the list)
-   - Under **Repository permissions** -> **Contents**, select **Read and write**
-   - Tap **Update token**
-
-2. **Classic Token**:
-   - Go to: https://github.com/settings/tokens
-   - Ensure the **repo** checkbox is checked (Full control of repositories)
-   - Update the secret \`PAT\` in https://github.com/$GITHUB_REPOSITORY/settings/secrets/actions
-EOF
+                  echo "### 🚨 GitHub Push Notice: Authorization Required for \`$REPO_URL\`" >> "$GITHUB_STEP_SUMMARY"
+                  echo "" >> "$GITHUB_STEP_SUMMARY"
+                  echo "The automatic split-sync engine prepared the admin codebase, but GitHub returned **HTTP 403 Forbidden** when pushing to \`$REPO_URL\`." >> "$GITHUB_STEP_SUMMARY"
+                  echo "" >> "$GITHUB_STEP_SUMMARY"
+                  echo "#### Why this happens:" >> "$GITHUB_STEP_SUMMARY"
+                  echo "Your Personal Access Token (\`PAT\`) secret in \`$GITHUB_REPOSITORY\` does not have write access to repository \`$REPO_URL\`." >> "$GITHUB_STEP_SUMMARY"
+                  echo "" >> "$GITHUB_STEP_SUMMARY"
+                  echo "#### 🔑 30-Second Fix on GitHub:" >> "$GITHUB_STEP_SUMMARY"
+                  echo "1. **Fine-Grained Token (Beta)**:" >> "$GITHUB_STEP_SUMMARY"
+                  echo "   - Go to: https://github.com/settings/tokens?type=beta" >> "$GITHUB_STEP_SUMMARY"
+                  echo "   - Tap your active token" >> "$GITHUB_STEP_SUMMARY"
+                  echo "   - Under **Repository access**, choose **All repositories** (or add \`$REPO_URL\` to the list)" >> "$GITHUB_STEP_SUMMARY"
+                  echo "   - Under **Repository permissions** -> **Contents**, select **Read and write**" >> "$GITHUB_STEP_SUMMARY"
+                  echo "   - Tap **Update token**" >> "$GITHUB_STEP_SUMMARY"
+                  echo "" >> "$GITHUB_STEP_SUMMARY"
+                  echo "2. **Classic Token**:" >> "$GITHUB_STEP_SUMMARY"
+                  echo "   - Go to: https://github.com/settings/tokens" >> "$GITHUB_STEP_SUMMARY"
+                  echo "   - Ensure the **repo** checkbox is checked (Full control of repositories)" >> "$GITHUB_STEP_SUMMARY"
+                  echo "   - Update the secret \`PAT\` in https://github.com/$GITHUB_REPOSITORY/settings/secrets/actions" >> "$GITHUB_STEP_SUMMARY"
                 fi
                 return 1
               fi
