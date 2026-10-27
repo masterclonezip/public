@@ -444,41 +444,55 @@ jobs:
               git config --local --unset-all http.https://github.com/.extraheader 2>/dev/null || true
 
               PUSH_SUCCESS=false
-              if git push -u origin "$TARGET_BRANCH"; then
-                PUSH_SUCCESS=true
-              elif git push -u origin "$TARGET_BRANCH" --force; then
-                PUSH_SUCCESS=true
-              elif [ -n "$PUSH_AUTH_FALLBACK" ]; then
-                echo "Attempting fallback authentication URL..."
-                git remote set-url origin "$PUSH_AUTH_FALLBACK" 2>/dev/null || true
-                if git push -u origin "$TARGET_BRANCH" --force; then
-                  PUSH_SUCCESS=true
-                fi
+              AUTH_URLS=(
+                "https://${CLEAN_PAT}@github.com/${REPO_URL}.git"
+                "https://${GITHUB_ACTOR}:${CLEAN_PAT}@github.com/${REPO_URL}.git"
+                "https://x-access-token:${CLEAN_PAT}@github.com/${REPO_URL}.git"
+                "https://oauth2:${CLEAN_PAT}@github.com/${REPO_URL}.git"
+              )
+
+              if [ "$REPO_URL" = "$GITHUB_REPOSITORY" ]; then
+                AUTH_URLS=("https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO_URL}.git")
               fi
+
+              for auth_url in "${AUTH_URLS[@]}"; do
+                git remote set-url origin "$auth_url" 2>/dev/null || true
+                if git push -u origin "$TARGET_BRANCH"; then
+                  PUSH_SUCCESS=true
+                  break
+                elif git push -u origin "$TARGET_BRANCH" --force; then
+                  PUSH_SUCCESS=true
+                  break
+                fi
+              done
 
               if [ "$PUSH_SUCCESS" = "true" ]; then
                 echo "✅ Successfully synced to $REPO_URL ($TARGET_BRANCH)!"
               else
                 echo "::error title=Sync Failed for $REPO_NAME::Failed to push to $REPO_URL ($TARGET_BRANCH)."
-                echo ""
-                echo "=========================================================================="
-                echo "❌ Cross-Repository Push to '$REPO_URL' was denied (403 Forbidden)."
-                echo "=========================================================================="
-                echo "Why GitHub returned 403:"
-                echo "Your Personal Access Token ('PAT') secret in '$GITHUB_REPOSITORY' does not"
-                echo "have write permission to '$REPO_URL'."
-                echo ""
-                echo "👉 HOW TO FIX IN 1 MINUTE ON GITHUB:"
-                echo "1. If using Fine-Grained Token (https://github.com/settings/tokens?type=beta):"
-                echo "   - Click on your active token"
-                echo "   - Under 'Repository access': Select 'All repositories' (or add '$REPO_URL' explicitly)"
-                echo "   - Under 'Repository permissions': Set 'Contents' to 'Read and write'"
-                echo "   - Click 'Update token'"
-                echo ""
-                echo "2. If using Classic Token (https://github.com/settings/tokens):"
-                echo "   - Ensure 'repo' checkbox is checked (Full control of repositories)"
-                echo "   - Update token in $GITHUB_REPOSITORY -> Settings -> Secrets -> Actions -> PAT"
-                echo "=========================================================================="
+                if [ -n "$GITHUB_STEP_SUMMARY" ]; then
+                  cat << EOF >> "$GITHUB_STEP_SUMMARY"
+### 🚨 GitHub Push Notice: Authorization Required for \`$REPO_URL\`
+
+The automatic split-sync engine prepared the admin codebase, but GitHub returned **HTTP 403 Forbidden** when pushing to \`$REPO_URL\`.
+
+#### Why this happens:
+Your Personal Access Token (\`PAT\`) secret in \`$GITHUB_REPOSITORY\` does not have write access to repository \`$REPO_URL\`.
+
+#### 🔑 30-Second Fix on GitHub:
+1. **Fine-Grained Token (Beta)**:
+   - Go to: https://github.com/settings/tokens?type=beta
+   - Tap your active token
+   - Under **Repository access**, choose **All repositories** (or add \`$REPO_URL\` to the list)
+   - Under **Repository permissions** -> **Contents**, select **Read and write**
+   - Tap **Update token**
+
+2. **Classic Token**:
+   - Go to: https://github.com/settings/tokens
+   - Ensure the **repo** checkbox is checked (Full control of repositories)
+   - Update the secret \`PAT\` in https://github.com/$GITHUB_REPOSITORY/settings/secrets/actions
+EOF
+                fi
                 return 1
               fi
             else
