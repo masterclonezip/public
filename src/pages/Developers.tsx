@@ -19,7 +19,7 @@ export default function Developers() {
         <div className="min-h-screen pt-32 px-4 pb-20 flex flex-col items-center justify-center text-center">
           <Meta 
             title={settings?.developers_meta_title || "Developer Profiles"}
-            description={settings?.developers_meta_description || (settings?.site_title ? `Browse profiles of top app developers featured on ${settings.site_title}.` : "Browse profiles of top app developers.")}
+            description={settings?.developers_meta_description || "Browse profiles of top app developers."}
             canonical={window.location.origin + "/developers"}
           />
           <div className="bg-white/50 dark:bg-zinc-900/50  border border-black/5 dark:border-white/5 p-12 rounded-[3rem] max-w-lg mx-auto shadow-2xl">
@@ -36,7 +36,7 @@ export default function Developers() {
       <div className="min-h-screen pt-32 px-4 pb-20">
         <Meta 
           title={settings?.developers_meta_title || "Developer Profiles"}
-          description={settings?.developers_meta_description || (settings?.site_title ? `Browse profiles of top app developers featured on ${settings.site_title}.` : "Browse profiles of top app developers.")}
+          description={settings?.developers_meta_description || "Browse profiles of top app developers."}
           canonical={window.location.origin + "/developers"}
         />
 
@@ -46,7 +46,7 @@ export default function Developers() {
               Meet Our Team
             </h1>
             <p className="text-lg md:text-xl text-slate-600 dark:text-slate-400 font-medium max-w-2xl mx-auto">
-              The creative minds and technical experts building the future{settings.site_title ? ` of ${settings.site_title}` : ''}.
+              The creative minds and technical experts building the future.
             </p>
           </div>
 

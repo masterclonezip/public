@@ -64,7 +64,7 @@ const AppsTab = React.memo(({ appsList, editingAppId, setEditingAppId, handleDel
           { id: 'synced', label: '🌐 Live Web', count: syncedCount, color: 'emerald' },
           { id: 'admin_only', label: '🔒 Admin Only', count: adminOnlyCount, color: 'amber' },
           { id: 'Verified', label: '🟢 Verified', count: verifiedCount, color: 'emerald' },
-          { id: 'Caution', label: '🖕 Caution', count: cautionCount, color: 'amber' },
+          { id: 'Caution', label: '🟡 Caution', count: cautionCount, color: 'amber' },
           { id: 'Unsafe', label: '🔴 Unsafe', count: unsafeCount, color: 'rose' },
           { id: 'is_new', label: '✨ New Tag', count: newCount, color: 'blue' },
           { id: 'is_hot', label: '🔥 Hot Tag', count: hotCount, color: 'rose' },

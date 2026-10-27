@@ -33,7 +33,7 @@ export default function ReportRemoval() {
       </div>
       <Meta 
         title={mockSettings?.report_removal_meta_title || "Report & Removal"}
-        description={mockSettings?.report_removal_meta_description || (mockSettings?.site_title ? `Report content or request removal of specific applications on ${mockSettings.site_title}.` : "Report content or request removal of specific applications.")}
+        description={mockSettings?.report_removal_meta_description || "Report content or request removal of specific applications."}
         canonical={window.location.origin + "/report-removal"}
       />
 

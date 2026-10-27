@@ -49,8 +49,9 @@ function getMergedData() {
 }
 
 function writeMergedData(data: any) {
+  const siteTitle = typeof data.settings?.site_title === 'string' ? data.settings.site_title.trim() : '';
   const canonicalNews = Array.isArray(data.news)
-    ? data.news.map((item: any) => compileCanonicalNews(item))
+    ? data.news.map((item: any) => compileCanonicalNews(item, siteTitle))
     : [];
 
   const updatedSettings = cleanSettingsMetaTitles({
@@ -61,7 +62,7 @@ function writeMergedData(data: any) {
   const publicApps = Array.isArray(data.apps)
     ? data.apps
         .filter((app: any) => app && app.sync_to_public !== false)
-        .map((app: any) => compileCanonicalApp(app, { stripDownloadLinks: true }))
+        .map((app: any) => compileCanonicalApp(app, { stripDownloadLinks: true, siteTitle }))
     : [];
 
   const publicNews = canonicalNews.filter((item: any) => item && item.sync_to_public !== false);
@@ -191,18 +192,19 @@ adminVaultRouter.post('/api/v1/admin/save-news', (req, res) => {
         if (prev?.slug) existingBySlug.set(String(prev.slug).trim().toLowerCase(), prev);
       }
 
+      const siteTitle = typeof current.settings?.site_title === 'string' ? current.settings.site_title.trim() : '';
       current.news = news.map((n: any) => {
         const idKey = String(n?.id || '').trim();
         const slugKey = String(n?.slug || '').trim().toLowerCase();
         const prev = (idKey && existingById.get(idKey)) || (slugKey && existingBySlug.get(slugKey));
-        const normalizedPrev = prev ? compileCanonicalNews(prev) : null;
-        const normalizedNext = compileCanonicalNews(n);
+        const normalizedPrev = prev ? compileCanonicalNews(prev, siteTitle) : null;
+        const normalizedNext = compileCanonicalNews(n, siteTitle);
         const changed = hasItemContentChanged(normalizedPrev, normalizedNext);
         const preservedDate = prev?.updated_at || n?.updated_at || n?.published_at || n?.publish_date || n?.created_at || now;
         return compileCanonicalNews({
           ...n,
           updated_at: changed ? now : preservedDate
-        });
+        }, siteTitle);
       });
 
       writeMergedData(current);
@@ -220,7 +222,8 @@ adminVaultRouter.post('/api/v1/admin/app/save', async (req, res) => {
     if (app && (app.id || app.slug)) {
       const now = new Date().toISOString();
       const current = getMergedData();
-      const appWithTime = compileCanonicalApp({ ...app, updated_at: now }, { stripDownloadLinks: false });
+      const siteTitle = typeof current.settings?.site_title === 'string' ? current.settings.site_title.trim() : '';
+      const appWithTime = compileCanonicalApp({ ...app, updated_at: now }, { stripDownloadLinks: false, siteTitle });
       const idx = current.apps.findIndex((a: any) => a.id === appWithTime.id || (appWithTime.slug && a.slug === appWithTime.slug));
       if (idx >= 0) {
         current.apps[idx] = { ...current.apps[idx], ...appWithTime, updated_at: now };
@@ -290,18 +293,19 @@ adminVaultRouter.post('/api/v1/admin/save-apps', (req, res) => {
         if (prev?.slug) existingBySlug.set(String(prev.slug).trim().toLowerCase(), prev);
       }
 
+      const siteTitle = typeof current.settings?.site_title === 'string' ? current.settings.site_title.trim() : '';
       current.apps = apps.map((a: any) => {
         const idKey = String(a?.id || '').trim();
         const slugKey = String(a?.slug || '').trim().toLowerCase();
         const prev = (idKey && existingById.get(idKey)) || (slugKey && existingBySlug.get(slugKey));
-        const normalizedPrev = prev ? compileCanonicalApp(prev, { stripDownloadLinks: false }) : null;
-        const normalizedNext = compileCanonicalApp(a, { stripDownloadLinks: false });
+        const normalizedPrev = prev ? compileCanonicalApp(prev, { stripDownloadLinks: false, siteTitle }) : null;
+        const normalizedNext = compileCanonicalApp(a, { stripDownloadLinks: false, siteTitle });
         const changed = hasItemContentChanged(normalizedPrev, normalizedNext);
         const preservedDate = prev?.updated_at || a?.updated_at || a?.publish_date || a?.created_at || now;
         return compileCanonicalApp({
           ...a,
           updated_at: changed ? now : preservedDate
-        }, { stripDownloadLinks: false });
+        }, { stripDownloadLinks: false, siteTitle });
       });
 
       writeMergedData(current);

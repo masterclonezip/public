@@ -36,7 +36,7 @@ export function renderCategoriesList(categoriesList: Array<{ name: string; slug:
       </nav>
       <div class="text-center py-8 mb-6 bg-white dark:bg-zinc-900 rounded-[28px] border border-black/5 p-6 shadow-sm">
         <h1 class="text-3xl sm:text-4xl font-extrabold text-zinc-900 dark:text-white mb-2">Application Categories</h1>
-        <p class="text-sm text-zinc-500 dark:text-zinc-400 max-w-2xl mx-auto">Browse apps by category${siteTitle ? ` on ${escapeHtml(siteTitle)}` : ''}.</p>
+        <p class="text-sm text-zinc-500 dark:text-zinc-400 max-w-2xl mx-auto">Browse apps by category.</p>
       </div>
       <div class="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
         ${catsHtml || '<p class="text-center text-zinc-400 py-10 col-span-full">No categories available.</p>'}
@@ -96,7 +96,7 @@ export function renderDevelopersList(developers: any[], settings: any): string {
         <div class="max-w-6xl mx-auto">
           <div class="text-center mb-16 animate-fade-in">
             <h1 class="text-4xl md:text-6xl font-black mb-6 bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-violet-500 dark:from-pink-400 dark:to-violet-400 tracking-tighter italic">Meet Our Team</h1>
-            <p class="text-lg md:text-xl text-slate-600 dark:text-slate-400 font-medium max-w-2xl mx-auto">The creative minds and technical experts building our platform${siteTitle ? ` at ${escapeHtml(siteTitle)}` : ''}.</p>
+            <p class="text-lg md:text-xl text-slate-600 dark:text-slate-400 font-medium max-w-2xl mx-auto">The creative minds and technical experts building our platform.</p>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">${cards}</div>
         </div>
@@ -260,7 +260,7 @@ export function render404(urlPath: string, settings: any): string {
     <div class="py-16 text-center max-w-2xl mx-auto px-4 min-h-[60vh]">
       <div class="inline-flex items-center justify-center w-20 h-20 bg-red-500/10 text-red-600 dark:text-red-400 rounded-3xl mb-6 font-extrabold text-3xl">404</div>
       <h1 class="text-4xl sm:text-5xl font-extrabold text-zinc-900 dark:text-white mb-4">404 - Page Not Found</h1>
-      <h2 class="text-lg font-bold text-zinc-600 dark:text-zinc-400 mb-6">The requested resource could not be found${siteTitle ? ` on ${escapeHtml(siteTitle)}` : ''}</h2>
+      <h2 class="text-lg font-bold text-zinc-600 dark:text-zinc-400 mb-6">The requested resource could not be found</h2>
       <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-8 leading-relaxed">
         The URL <code class="bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded text-red-500 font-mono text-sm">${escapeHtml(urlPath)}</code> does not match any application listing, news bulletin, or page.
       </p>
@@ -284,7 +284,7 @@ export function renderFaqPage(settings: any): string {
         Frequently Asked Questions
       </h1>
       <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-8">
-        Everything you need to know about ${siteTitle ? `${escapeHtml(siteTitle)}, ` : ''}app downloads, verification, and safety.
+        Everything you need to know about app downloads, verification, and safety.
       </p>
       <div class="space-y-4 border-t border-zinc-200 dark:border-zinc-800 pt-6">
         ${siteFaqs.map((faq: any) => `

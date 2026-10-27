@@ -30,9 +30,10 @@ export const useAdminSettings = (settings: any, news: any[], videos: any[]) => {
               content = staticFallback.content || staticFallback.description_html;
             }
           }
-          const cleanTitle = n.title ? formatPageTitle(n.title, '') : '';
+          const brand = settings?.site_title || '';
+          const cleanTitle = n.title ? formatPageTitle(n.title, '', brand) : '';
           const rawSeoTitle = n.seo_title || n.meta_title || '';
-          const cleanSeoTitle = rawSeoTitle ? formatPageTitle(rawSeoTitle, '') : '';
+          const cleanSeoTitle = rawSeoTitle ? formatPageTitle(rawSeoTitle, '', brand) : '';
           return {
             ...n,
             title: cleanTitle || n.title || '',
@@ -44,14 +45,27 @@ export const useAdminSettings = (settings: any, news: any[], videos: any[]) => {
         });
       setNewsList(mapped);
     }
-  }, [news]);
+  }, [news, settings?.site_title]);
 
   // Synchronize videos directly when fresh server data arrives
   useEffect(() => {
     if (Array.isArray(videos) && videos.length > 0) {
-      setVideosList(videos.filter(v => !deletedVideoIdsRef.current.has(v.id)));
+      const brand = settings?.site_title || '';
+      setVideosList(
+        videos
+          .filter(v => !deletedVideoIdsRef.current.has(v.id))
+          .map(v => {
+            const rawSeoTitle = v.seo_title || v.meta_title || '';
+            const cleanSeoTitle = rawSeoTitle ? formatPageTitle(rawSeoTitle, '', brand) : '';
+            return {
+              ...v,
+              title: v.title ? formatPageTitle(v.title, v.title, brand) : '',
+              ...(rawSeoTitle ? { seo_title: cleanSeoTitle, meta_title: cleanSeoTitle } : {})
+            };
+          })
+      );
     }
-  }, [videos]);
+  }, [videos, settings?.site_title]);
 
   // Synchronize settings (banners, categories, faqs, quicklinks, developers)
   useEffect(() => {
@@ -215,7 +229,21 @@ export const useAdminSettings = (settings: any, news: any[], videos: any[]) => {
   };
 
   const handleVideosChange = (id: string, field: string, value: any) => {
-    setVideosList(prev => prev.map(v => v.id === id ? { ...v, [field]: value, updated_at: new Date().toISOString() } : v));
+    setVideosList(prev => prev.map(v => {
+      if (v.id !== id) return v;
+      const updated: any = { ...v, [field]: value, updated_at: new Date().toISOString() };
+      if (field === 'seo_title') {
+        updated.meta_title = value;
+      } else if (field === 'meta_title') {
+        updated.seo_title = value;
+      }
+      if (field === 'seo_description') {
+        updated.meta_description = value;
+      } else if (field === 'meta_description') {
+        updated.seo_description = value;
+      }
+      return updated;
+    }));
   };
 
   // Website FAQs

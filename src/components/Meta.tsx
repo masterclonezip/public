@@ -42,7 +42,7 @@ const Meta: React.FC<MetaProps> = ({
 }) => {
   const { settings } = useData();
   const siteTitle = settings?.site_title || '';
-  const fullTitle = formatPageTitle(title, '');
+  const fullTitle = formatPageTitle(title, '', siteTitle);
   const metaDescription = description || settings?.meta_description || '';
   const metaKeywords = keywords || settings?.seo_keywords || '';
   

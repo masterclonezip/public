@@ -24,7 +24,7 @@ export default function FaqPage() {
   }, [settings?.website_faqs]);
 
   const pageTitle = settings?.faq_meta_title || "Frequently Asked Questions";
-  const pageDesc = settings?.faq_meta_description || (siteTitle ? `Everything you need to know about ${siteTitle}, app verification, and downloads.` : "Everything you need to know about app verification and downloads.");
+  const pageDesc = settings?.faq_meta_description || "Everything you need to know about app verification and downloads.";
   const webPageSchema = useMemo(() => ({
     "@context": "https://schema.org",
     "@type": "WebPage",
@@ -65,7 +65,7 @@ export default function FaqPage() {
               Frequently Asked Questions
             </h1>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-              {siteTitle ? `Everything you need to know about ${siteTitle}, app downloads, and verification.` : 'Everything you need to know about app downloads and verification.'}
+              Everything you need to know about app downloads and verification.
             </p>
           </div>
         </div>

@@ -2,11 +2,79 @@ import { getOgImageUrl } from '../seo/utils';
 
 export { getOgImageUrl };
 
-export function formatPageTitle(rawTitle?: string, fallbackTitle: string = ''): string {
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function getBrandCandidates(dynamicBrand?: string): string[] {
+  const candidates = new Set<string>([
+    'Yonodirect',
+    'Yono Direct',
+    'Yono Store',
+    'Rummy Store',
+    'MasterWorld'
+  ]);
+
+  if (dynamicBrand && typeof dynamicBrand === 'string' && dynamicBrand.trim()) {
+    candidates.add(dynamicBrand.trim());
+  }
+
+  try {
+    if (typeof window !== 'undefined' && (window as any).__INITIAL_DATA__?.settings?.site_title) {
+      const st = String((window as any).__INITIAL_DATA__.settings.site_title).trim();
+      if (st) candidates.add(st);
+    }
+  } catch {}
+
+  try {
+    if (typeof process !== 'undefined' && process.env?.VITE_SITE_NAME) {
+      const envSite = String(process.env.VITE_SITE_NAME).trim();
+      if (envSite) candidates.add(envSite);
+    }
+  } catch {}
+
+  try {
+    if (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SITE_NAME) {
+      const metaSite = String((import.meta as any).env.VITE_SITE_NAME).trim();
+      if (metaSite) candidates.add(metaSite);
+    }
+  } catch {}
+
+  return Array.from(candidates).filter(b => b.length >= 2);
+}
+
+export function stripBrandSuffix(rawTitle: string, dynamicBrand?: string): string {
+  if (!rawTitle) return '';
+  let result = rawTitle.trim();
+  const brands = getBrandCandidates(dynamicBrand);
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const brand of brands) {
+      const escaped = escapeRegex(brand);
+      const suffixPattern = new RegExp(`(?:\\s*[\\-|–—•:]\\s*${escaped})+$`, 'i');
+      if (suffixPattern.test(result)) {
+        const stripped = result.replace(suffixPattern, '').trim();
+        if (stripped.length > 0) {
+          result = stripped;
+          changed = true;
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+export function formatPageTitle(rawTitle?: string, fallbackTitle: string = '', dynamicBrand?: string): string {
   if (!rawTitle || !rawTitle.trim()) return fallbackTitle;
   // If title contains multiple lines or linebreaks, take only the primary first line
   const firstLine = rawTitle.split(/\r?\n/)[0] || rawTitle;
   let clean = firstLine.trim().replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+
+  // Strip any automatically appended trailing brand suffix (e.g. "| Brand", "- Brand")
+  clean = stripBrandSuffix(clean, dynamicBrand);
 
   // Clean any leading or trailing stray separator punctuation without removing Admin-authored words
   clean = clean.replace(/^[:\s\-|–—•]+/, '').replace(/[:\s\-|–—•]+$/, '').trim();
@@ -38,9 +106,10 @@ const SETTINGS_META_TITLE_KEYS = [
 export function cleanSettingsMetaTitles<T extends Record<string, any>>(settings: T): T {
   if (!settings || typeof settings !== 'object') return settings;
   const copy: any = { ...settings };
+  const brand = typeof copy.site_title === 'string' ? copy.site_title.trim() : '';
   for (const key of SETTINGS_META_TITLE_KEYS) {
     if (typeof copy[key] === 'string' && copy[key].trim()) {
-      copy[key] = formatPageTitle(copy[key], '');
+      copy[key] = formatPageTitle(copy[key], '', brand);
     }
   }
   return copy as T;

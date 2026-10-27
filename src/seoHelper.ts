@@ -199,7 +199,7 @@ export async function injectSeoTags(template: string, urlPath: string, hostUrl?:
   let videos = data.videos || [];
   const siteTitle = getField(settings, 'site_title') || (process.env.VITE_SITE_NAME || '').trim();
   const baseOrigin = (hostUrl || process.env.PUBLIC_DOMAIN || process.env.VITE_PUBLIC_DOMAIN || '').trim().replace(/\/+$/, '');
-  let title = getField(settings, 'seo_title') || getField(settings, 'meta_title') || siteTitle;
+  let title = getField(settings, 'seo_title') || getField(settings, 'meta_title') || '';
   let description = getField(settings, 'seo_description') || getField(settings, 'meta_description', '');
   const keywords = getField(settings, 'seo_keywords', '');
 
@@ -469,7 +469,7 @@ export async function injectSeoTags(template: string, urlPath: string, hostUrl?:
       isNotFound = true;
       pageType = '404';
       title = `404 - Page Not Found`;
-      description = siteTitle ? `The requested page could not be found on ${siteTitle}.` : `The requested page could not be found.`;
+      description = `The requested page could not be found.`;
     }
   } else {
     const appSlug = cleanPathLower.replace(/^\/|\/$/g, '');
@@ -497,7 +497,7 @@ export async function injectSeoTags(template: string, urlPath: string, hostUrl?:
       isNotFound = true;
       pageType = '404';
       title = `404 - Page Not Found`;
-      description = siteTitle ? `The requested page could not be found on ${siteTitle}.` : `The requested page could not be found.`;
+      description = `The requested page could not be found.`;
     }
   }
 
@@ -506,7 +506,7 @@ export async function injectSeoTags(template: string, urlPath: string, hostUrl?:
     description = `The requested page ${cleanPath} could not be found.`;
   }
 
-  title = formatPageTitle(title, '');
+  title = formatPageTitle(title, '', siteTitle);
 
   let canonicalPath = urlPath;
   if (pageType === 'app' && targetApp) {

@@ -28,7 +28,7 @@ export default function Ethics() {
       </div>
       <Meta 
         title={mockSettings.ethics_meta_title || mockSettings.ethics_heading || 'Ethics & Safety'}
-        description={mockSettings.ethics_meta_description || (mockSettings.site_title ? `Our commitment to ethics, safety, and transparent reviews at ${mockSettings.site_title}.` : "Our commitment to ethics, safety, and transparent reviews.")}
+        description={mockSettings.ethics_meta_description || "Our commitment to ethics, safety, and transparent reviews."}
         canonical={(typeof window !== 'undefined' ? window.location.origin : '') + "/ethics"}
       />
 

@@ -27,7 +27,7 @@ export default function Notice() {
       </div>
       <Meta 
         title={mockSettings?.notice_meta_title || mockSettings?.important_notice_heading || 'Legal Notice'}
-        description={mockSettings?.notice_meta_description || (mockSettings?.site_title ? `Important legal notices and compliance information for ${mockSettings.site_title}.` : "Important legal notices and compliance information.")}
+        description={mockSettings?.notice_meta_description || "Important legal notices and compliance information."}
         canonical={window.location.origin + "/notice"}
       />
 

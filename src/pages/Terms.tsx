@@ -34,7 +34,7 @@ export default function Terms() {
       </div>
       <Meta 
         title={mockSettings?.terms_meta_title || "Terms of Service"}
-        description={mockSettings?.terms_meta_description || (mockSettings?.site_title ? `Review the Terms of Service and usage guidelines for ${mockSettings.site_title}.` : "Review the Terms of Service and usage guidelines.")}
+        description={mockSettings?.terms_meta_description || "Review the Terms of Service and usage guidelines."}
         canonical={window.location.origin + "/terms"}
       />
 

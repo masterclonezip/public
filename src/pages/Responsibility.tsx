@@ -34,7 +34,7 @@ export default function Responsibility() {
       </div>
       <Meta 
         title={mockSettings?.responsibility_meta_title || "Responsible Gaming"}
-        description={mockSettings?.responsibility_meta_description || (mockSettings?.site_title ? `Information and resources for responsible gaming and app usage on ${mockSettings.site_title}.` : "Information and resources for responsible gaming and app usage.")}
+        description={mockSettings?.responsibility_meta_description || "Information and resources for responsible gaming and app usage."}
         canonical={window.location.origin + "/responsibility"}
       />
 

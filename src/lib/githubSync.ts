@@ -44,7 +44,7 @@ export function encryptUrlIfNeeded(url: string, existingCiphertext?: string): st
  * Preserves 100% of Admin's exact copy while normalizing embedded HTML headings (<h1> -> <h2>),
  * stripping inline style pollution, removing auto-appended brand suffixes, and optionally sealing/stripping download URLs for public bundles.
  */
-export function compileCanonicalApp(app: any, options?: { stripDownloadLinks?: boolean }): any {
+export function compileCanonicalApp(app: any, options?: { stripDownloadLinks?: boolean; siteTitle?: string }): any {
   if (!app || typeof app !== 'object') return app;
   const copy = JSON.parse(JSON.stringify(app));
   if (typeof copy.slug === 'string') {
@@ -83,7 +83,7 @@ export function compileCanonicalApp(app: any, options?: { stripDownloadLinks?: b
 
   // Keep seo_title and meta_title clean and strictly synchronized without trailing brand suffixes
   const rawTitle = (copy.seo_title !== undefined ? copy.seo_title : (copy.meta_title || '')).trim();
-  const cleanTitle = rawTitle ? formatPageTitle(rawTitle, '') : '';
+  const cleanTitle = rawTitle ? formatPageTitle(rawTitle, '', options?.siteTitle) : '';
   copy.seo_title = cleanTitle;
   copy.meta_title = cleanTitle;
 
@@ -124,7 +124,7 @@ export function compileCanonicalApp(app: any, options?: { stripDownloadLinks?: b
  * Canonical News Hygiene & Pre-Computed Metadata Compiler
  * Normalizes embedded HTML headings/styles and pre-computes deterministic UTC dates, reading time, and excerpt.
  */
-export function compileCanonicalNews(item: any): any {
+export function compileCanonicalNews(item: any, siteTitle?: string): any {
   if (!item || typeof item !== 'object') return item;
   const copy = JSON.parse(JSON.stringify(item));
   if (typeof copy.slug === 'string') {
@@ -134,7 +134,7 @@ export function compileCanonicalNews(item: any): any {
     copy.id = copy.id.trim();
   }
   if (typeof copy.title === 'string' && copy.title.trim()) {
-    copy.title = formatPageTitle(copy.title, copy.title.trim());
+    copy.title = formatPageTitle(copy.title, copy.title.trim(), siteTitle);
   }
   const rawBody = copy.content || copy.description_html || copy.description || '';
   if (typeof rawBody === 'string' && rawBody.trim()) {
@@ -143,7 +143,7 @@ export function compileCanonicalNews(item: any): any {
     copy.description_html = cleanHtml;
   }
   const rawSeoTitle = (copy.seo_title !== undefined ? copy.seo_title : (copy.meta_title || '')).trim();
-  const cleanSeoTitle = rawSeoTitle ? formatPageTitle(rawSeoTitle, '') : '';
+  const cleanSeoTitle = rawSeoTitle ? formatPageTitle(rawSeoTitle, '', siteTitle) : '';
   copy.seo_title = cleanSeoTitle;
   copy.meta_title = cleanSeoTitle;
 
@@ -292,8 +292,9 @@ export function generateStaticDataFileCode(
   news: any[] = [],
   videos: any[] = []
 ): string {
+  const siteTitle = typeof settings?.site_title === 'string' ? settings.site_title.trim() : '';
   // Compile canonical public apps with zero download link leakage (links live exclusively in sealed server vault)
-  const cleanApps = (apps || []).map((app: any) => compileCanonicalApp(app, { stripDownloadLinks: true }));
+  const cleanApps = (apps || []).map((app: any) => compileCanonicalApp(app, { stripDownloadLinks: true, siteTitle }));
   const defaultSettings = {
     site_title: "",
     meta_description: "",
@@ -315,8 +316,19 @@ export function generateStaticDataFileCode(
   const cleanSettings = sanitizePublicSettings(
     cleanSettingsMetaTitles(ensureDefaultSettings({ ...defaultSettings, ...JSON.parse(JSON.stringify(settings || {})) }))
   );
-  const cleanNews = (news || []).map((item: any) => compileCanonicalNews(item));
-  const cleanVideos = JSON.parse(JSON.stringify(videos || []));
+  const cleanNews = (news || []).map((item: any) => compileCanonicalNews(item, siteTitle));
+  const cleanVideos = JSON.parse(JSON.stringify(videos || [])).map((v: any) => {
+    if (!v || typeof v !== 'object') return v;
+    const rawSeoTitle = (v.seo_title !== undefined ? v.seo_title : (v.meta_title || '')).trim();
+    const cleanVideoSeoTitle = rawSeoTitle ? formatPageTitle(rawSeoTitle, '', siteTitle) : '';
+    return {
+      ...v,
+      ...(typeof v.title === 'string' && v.title.trim() ? { title: formatPageTitle(v.title, v.title.trim(), siteTitle) } : {}),
+      ...(rawSeoTitle || v.seo_title !== undefined || v.meta_title !== undefined
+        ? { seo_title: cleanVideoSeoTitle, meta_title: cleanVideoSeoTitle }
+        : {})
+    };
+  });
 
   return `// No secureStorage import to avoid Vercel build errors when secureStorage is stripped
 

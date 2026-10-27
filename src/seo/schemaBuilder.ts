@@ -233,7 +233,7 @@ export async function buildJsonLdSchema(params: BuildSchemaParams): Promise<stri
   } else if (params.pageType === 'news' && params.newsItem) {
     const item = params.newsItem;
     const rawHeading = getField(item, 'title');
-    const exactTitle = formatPageTitle(params.title || getField(item, 'seo_title') || getField(item, 'meta_title') || rawHeading, rawHeading);
+    const exactTitle = formatPageTitle(params.title || getField(item, 'seo_title') || getField(item, 'meta_title') || rawHeading, rawHeading, params.siteTitle);
     const desc = cleanSeoDescription(
       getField(item, 'seo_description') || 
       getField(item, 'meta_description') || 

@@ -37,8 +37,9 @@ export function useDataActions(
 ) {
 
   const saveAppSingle = useCallback(async (singleApp: any) => {
+    const brand = settings?.site_title || '';
     const rawTitle = (singleApp.seo_title || singleApp.meta_title || '').trim();
-    const exactAdminTitle = rawTitle ? formatPageTitle(rawTitle, '') : '';
+    const exactAdminTitle = rawTitle ? formatPageTitle(rawTitle, '', brand) : '';
     const normalizedApp = {
       ...singleApp,
       seo_title: exactAdminTitle,
@@ -299,7 +300,7 @@ export function useDataActions(
       const slugKey = String(a?.slug || '').trim().toLowerCase();
       const prev = (idKey && existingById.get(idKey)) || (slugKey && existingBySlug.get(slugKey));
       const rawTitle = (a?.seo_title || a?.meta_title || '').trim();
-      const exactTitle = rawTitle ? formatPageTitle(rawTitle, '') : '';
+      const exactTitle = rawTitle ? formatPageTitle(rawTitle, '', settings?.site_title || '') : '';
       const candidate = {
         ...a,
         slug: typeof a?.slug === 'string' ? a.slug.trim().replace(/^\/+|\/+$/g, '') : a?.slug,
@@ -489,10 +490,11 @@ export function useDataActions(
       const idKey = String(n?.id || '').trim();
       const slugKey = String(n?.slug || '').trim().replace(/^\/+|\/+$/g, '').toLowerCase();
       const prev = (idKey && existingById.get(idKey)) || (slugKey && existingBySlug.get(slugKey));
+      const brand = settings?.site_title || '';
       const rawSeoTitle = (n?.seo_title || n?.meta_title || '').trim();
-      const exactTitle = rawSeoTitle ? formatPageTitle(rawSeoTitle, '') : '';
+      const exactTitle = rawSeoTitle ? formatPageTitle(rawSeoTitle, '', brand) : '';
       const rawHeading = (n?.title || '').trim();
-      const exactHeading = rawHeading ? formatPageTitle(rawHeading, '') : '';
+      const exactHeading = rawHeading ? formatPageTitle(rawHeading, '', brand) : '';
       const candidate = {
         ...n,
         slug: typeof n.slug === 'string' ? n.slug.trim().replace(/^\/+|\/+$/g, '') : n.slug,
@@ -571,8 +573,17 @@ export function useDataActions(
       const idKey = String(v?.id || '').trim();
       const slugKey = String(v?.slug || '').trim().replace(/^\/+|\/+$/g, '').toLowerCase();
       const prev = (idKey && existingById.get(idKey)) || (slugKey && existingBySlug.get(slugKey));
+      const brand = settings?.site_title || '';
+      const rawSeoTitle = (v?.seo_title || v?.meta_title || '').trim();
+      const exactSeoTitle = rawSeoTitle ? formatPageTitle(rawSeoTitle, '', brand) : '';
+      const rawTitle = (v?.title || '').trim();
+      const exactTitle = rawTitle ? formatPageTitle(rawTitle, '', brand) : '';
       const candidate = {
         ...v,
+        title: exactTitle || v?.title || '',
+        ...(rawSeoTitle || v?.seo_title !== undefined || v?.meta_title !== undefined
+          ? { seo_title: exactSeoTitle, meta_title: exactSeoTitle }
+          : {}),
         slug: typeof v?.slug === 'string' ? v.slug.trim().replace(/^\/+|\/+$/g, '') : v?.slug,
         created_at: v?.created_at || prev?.created_at || now
       };

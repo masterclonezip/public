@@ -28,7 +28,7 @@ export default function Disclaimer() {
       </div>
       <Meta 
         title={mockSettings.disclaimer_meta_title || mockSettings.disclaimer_heading || 'Disclaimer'}
-        description={mockSettings.disclaimer_meta_description || (mockSettings.site_title ? `Read the official disclaimer regarding the content and apps on ${mockSettings.site_title}.` : "Read the official disclaimer regarding the content and apps.")}
+        description={mockSettings.disclaimer_meta_description || "Read the official disclaimer regarding the content and apps."}
         canonical={(typeof window !== 'undefined' ? window.location.origin : '') + "/disclaimer"}
       />
 
