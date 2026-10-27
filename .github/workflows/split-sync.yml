@@ -10,6 +10,9 @@ concurrency:
   group: split-sync-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   split-and-sync:
     if: "!endsWith(github.repository, '/admin') && (github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]'))"
@@ -31,6 +34,7 @@ jobs:
 
       - name: Sync and Split Repositories
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PAT: ${{ secrets.PAT || secrets.GITHUB_PAT || secrets.GH_PAT || secrets.PERSONAL_ACCESS_TOKEN || secrets.ADMIN_SYNC_TOKEN || secrets.SYNC_TOKEN || secrets.ADMIN_PAT || secrets.ACCESS_TOKEN || '' }}
           PUBLIC_REPO: ${{ secrets.GITHUB_PUBLIC_REPO || vars.GITHUB_PUBLIC_REPO || '' }}
           ADMIN_REPO: ${{ secrets.GITHUB_ADMIN_REPO || vars.GITHUB_ADMIN_REPO || '' }}
@@ -265,7 +269,8 @@ jobs:
           echo "Target Admin:      $ADMIN_TARGET"
           echo "=========================================================="
 
-          if [ -z "$PAT" ]; then
+          CLEAN_PAT=$(echo -n "$PAT" | tr -d '[:space:]')
+          if [ -z "$CLEAN_PAT" ]; then
             echo "⚠️ WARNING: 'PAT' (Personal Access Token) secret not found in repository secrets."
             echo "GitHub Actions built-in token cannot push cross-repository to '$ADMIN_TARGET'."
             echo "To enable automated code transfer to '$ADMIN_TARGET':"
@@ -303,7 +308,15 @@ jobs:
               echo "Pushing stripped public release to branch '$TARGET_BRANCH' so 'main' is preserved for AI Studio sync."
             fi
 
-            AUTH_REPO_URL="https://x-access-token:${PAT}@github.com/${REPO_URL}.git"
+            # For the current repository (public), use native GITHUB_TOKEN which has write permissions.
+            # For cross-repository target (admin), use the personal access token.
+            if [ "$REPO_URL" = "$GITHUB_REPOSITORY" ]; then
+              AUTH_REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO_URL}.git"
+              PUSH_AUTH_FALLBACK=""
+            else
+              AUTH_REPO_URL="https://${CLEAN_PAT}@github.com/${REPO_URL}.git"
+              PUSH_AUTH_FALLBACK="https://x-access-token:${CLEAN_PAT}@github.com/${REPO_URL}.git"
+            fi
 
             if git clone "$AUTH_REPO_URL" "${REPO_NAME}_repo"; then
               cd "${REPO_NAME}_repo"
@@ -435,6 +448,12 @@ jobs:
                 PUSH_SUCCESS=true
               elif git push -u origin "$TARGET_BRANCH" --force; then
                 PUSH_SUCCESS=true
+              elif [ -n "$PUSH_AUTH_FALLBACK" ]; then
+                echo "Attempting fallback authentication URL..."
+                git remote set-url origin "$PUSH_AUTH_FALLBACK" 2>/dev/null || true
+                if git push -u origin "$TARGET_BRANCH" --force; then
+                  PUSH_SUCCESS=true
+                fi
               fi
 
               if [ "$PUSH_SUCCESS" = "true" ]; then
