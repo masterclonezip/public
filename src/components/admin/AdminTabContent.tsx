@@ -296,9 +296,26 @@ export const AdminTabContent = ({
           />
         );
       case 'reviews':
-        return <AdminReviewsTab appsList={appsList} onNavigateToAIStudio={() => onTabChange?.('ai-reviews')} />;
+        return (
+          <AdminReviewsTab
+            appsList={appsList}
+            onNavigateToAIStudio={() => onTabChange?.('ai-reviews')}
+            pushAllToGitHub={pushAllToGitHub}
+            gitConfig={gitConfig}
+          />
+        );
       case 'ai-reviews':
-        return <AdminAIReviewStudioTab appsList={appsList} />;
+        return (
+          <AdminAIReviewStudioTab
+            appsList={appsList}
+            newsList={newsList}
+            videosList={videosList}
+            faqsList={websiteFaqsList}
+            developersList={developersList}
+            settings={settings}
+            handleSaveSettings={handleSaveSettings}
+          />
+        );
       case 'reports':
         return <AdminReportsTab appsList={appsList} />;
       case 'security':
@@ -346,14 +363,27 @@ export const AdminTabContent = ({
             updatedSettings.logo_url = cleanFavicon;
           }
 
-          if (updatedSettings.gemini_api_key !== undefined) {
+          if (updatedSettings.gemini_api_key !== undefined || updatedSettings.gemini_model !== undefined) {
             try {
-              const currentConfig = JSON.parse(localStorage.getItem('admin_ai_studio_config') || '{}');
-              currentConfig.apiKey = (updatedSettings.gemini_api_key || '').trim();
+              const currentConfig = JSON.parse(
+                localStorage.getItem('ai_review_studio_config_v1') ||
+                localStorage.getItem('admin_ai_studio_config') ||
+                '{}'
+              );
+              if (updatedSettings.gemini_api_key !== undefined) {
+                currentConfig.apiKey = (updatedSettings.gemini_api_key || '').trim();
+              }
               if (updatedSettings.gemini_model) {
                 currentConfig.model = updatedSettings.gemini_model;
               }
+              currentConfig.updatedAt = Date.now();
+              localStorage.setItem('ai_review_studio_config_v1', JSON.stringify(currentConfig));
               localStorage.setItem('admin_ai_studio_config', JSON.stringify(currentConfig));
+              fetch('/api/v1/admin/community/aistudio-settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ config: currentConfig })
+              }).catch(() => {});
             } catch (_) {}
           }
 

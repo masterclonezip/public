@@ -204,13 +204,13 @@ The Community Review System operates on a **completely independent live data cha
 ## 8. Aggregate Rating Synchronization & Google Search Raw HTML Pre-Rendering
 
 ### A. How Google Search Displays 5-Star Rich Snippets
-When Googlebot indexes an app URL (e.g. `/app/rummy-nabob`), it parses the pre-rendered Raw HTML `<head>` containing Schema.org JSON-LD:
+When Googlebot indexes an app URL (e.g. `/app/sample-app`), it parses the pre-rendered Raw HTML `<head>` containing Schema.org JSON-LD:
 
 ```json
 {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  "name": "Rummy Nabob",
+  "name": "Sample App",
   "aggregateRating": {
     "@type": "AggregateRating",
     "ratingValue": 4.7,

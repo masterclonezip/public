@@ -15,7 +15,7 @@ import { CommunityFirebaseStatusIndicator } from '../components/admin/CommunityF
 import { AdminWelcomeOverlay } from '../components/admin/AdminWelcomeOverlay';
 import { getAdminPath } from '../lib/utils';
 import { safeEncrypt, safeDecrypt } from '../lib/cryptoUtils';
-import { fetchAdminAppReviewCounts } from '../lib/communityFirebase';
+import { fetchAdminAppReviewCounts, registerCatalogAppsForReviews } from '../lib/communityFirebase';
 
 export default function AdminDashboard() {
   const { 
@@ -108,6 +108,12 @@ export default function AdminDashboard() {
   const { 
     appsList, setAppsList, fetchFailed, cachedSecureMapRef, syncSecureVault, recordAppDeletion
   } = useAdminApps(apps, loading, isAdminUser);
+
+  useEffect(() => {
+    if (Array.isArray(appsList) && appsList.length > 0) {
+      registerCatalogAppsForReviews(appsList);
+    }
+  }, [appsList]);
 
   const {
     newsList, setNewsList,

@@ -1,5 +1,5 @@
 /**
- * Yono Transparency - Proof-of-Work Utility
+ * Platform Security - Proof-of-Work Utility
  * Handles the client-side solving of SHA-256 challenges.
  */
 

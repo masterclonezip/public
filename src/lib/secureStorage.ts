@@ -9,7 +9,7 @@ async function getDerivedKey(password: string): Promise<CryptoKey> {
   return window.crypto.subtle.deriveKey(
     {
       name: "PBKDF2",
-      salt: enc.encode("rummy-store-salt-fixed"),
+      salt: enc.encode("platform-vault-salt-v1"),
       iterations: 100000,
       hash: "SHA-256"
     },

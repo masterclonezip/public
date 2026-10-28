@@ -427,7 +427,7 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
     return badge === 'new' || badge === 'hot';
   };
 
-  const mainCatClean = (mainCat || 'Yono Apps').toLowerCase();
+  const mainCatClean = (mainCat || 'All Apps').toLowerCase();
   const isAllCat = mainCatClean === 'all' || mainCatClean === 'all apps';
 
   const newApps: any[] = [];

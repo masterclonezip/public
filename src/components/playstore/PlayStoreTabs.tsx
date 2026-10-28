@@ -65,8 +65,8 @@ export const PlayStoreTabs = React.memo(({ activeTab, onTabChange, hideOnSearch 
             className={cn(
               "whitespace-nowrap px-2.5 xxs:px-3 xs:px-4 py-1 xxs:py-1.5 xs:py-2 text-[11px] xxs:text-xs xs:text-sm font-medium transition-all rounded-full border no-underline inline-flex items-center cursor-pointer",
               activeTab === tab 
-                ? "bg-blue-500 text-white border-blue-500 shadow-sm" 
-                : "bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-black/5 dark:border-white/5 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                ? "bg-blue-600 text-white border-blue-600 shadow-sm" 
+                : "bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border-zinc-200/80 dark:border-white/10 hover:bg-zinc-200/70 dark:hover:bg-zinc-800"
             )}
           >
             {tab}

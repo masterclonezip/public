@@ -178,9 +178,9 @@ To prevent reading hundreds of individual review documents when an app page is v
 ### Chunk Document Schema: `app_reviews_<appId>_0`
 ```json
 {
-  "appId": "rummy-wealth",
-  "appSlug": "rummy-wealth",
-  "appName": "Rummy Wealth",
+  "appId": "sample-app",
+  "appSlug": "sample-app",
+  "appName": "Sample App",
   "chunkIndex": 0,
   "totalChunks": 1,
   "totalReviewsInChunk": 50,
@@ -305,7 +305,7 @@ To ensure that Google Search displays **5-Star Gold Aggregate Ratings & Review C
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │                          GOOGLEBOT CRAWLS APP PAGE (RAW HTML)                          │
-│                                  (e.g., /app/rummy-wealth)                             │
+│                                  (e.g., /app/sample-app)                               │
 └───────────────────────────────────────────┬────────────────────────────────────────────┘
                                             │
                                             ▼
@@ -323,7 +323,7 @@ To ensure that Google Search displays **5-Star Gold Aggregate Ratings & Review C
 │  {                                                                                     │
 │    "@context": "https://schema.org",                                                   │
 │    "@type": "SoftwareApplication",                                                     │
-│    "name": "Rummy Wealth",                                                             │
+│    "name": "Sample App",                                                               │
 │    "aggregateRating": {                                                                │
 │      "@type": "AggregateRating",                                                       │
 │      "ratingValue": 4.8,                                                               │
@@ -339,7 +339,7 @@ To ensure that Google Search displays **5-Star Gold Aggregate Ratings & Review C
                                             ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │                     GOOGLE SEARCH RESULT DISPLAY (RICH SNIPPETS)                       │
-│  Rummy Wealth APK Download - Official Latest Version                                   │
+│  Sample App Download - Official Latest Version                                         │
 │  ⭐⭐⭐⭐⭐ Rating: 4.8 · 142 reviews · Free · Android                                │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```

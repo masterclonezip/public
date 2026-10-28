@@ -247,7 +247,7 @@ export function renderNewsDetail(slug: string, news: any[], settings: any, apps:
   // 16 Category Similar Apps (2-row horizontal scroll carousel matching AppSimilarCarousel.tsx 1:1)
   let recommendedAppsHtml = '';
   if (Array.isArray(apps) && apps.length > 0) {
-    const targetCategory = (relatedApp ? getField(relatedApp, 'category') : (getField(item, 'category') || 'Yono Apps')).trim();
+    const targetCategory = (relatedApp ? getField(relatedApp, 'category') : (getField(item, 'category') || 'All Apps')).trim();
     const cleanTargetCat = targetCategory.toLowerCase();
     const isAll = cleanTargetCat === 'all' || cleanTargetCat === 'all apps';
     const relAppId = relatedApp ? (getField(relatedApp, 'id') || '').toLowerCase() : '';

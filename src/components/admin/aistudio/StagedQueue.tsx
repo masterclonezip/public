@@ -327,7 +327,12 @@ export const StagedQueue: React.FC<StagedQueueProps> = ({
                   )}
                   <span className="font-bold text-slate-900 dark:text-slate-200 truncate">{r.appName}</span>
                   <span className="text-slate-400">•</span>
-                  <span className="text-slate-600 dark:text-slate-400 font-medium truncate">{r.userName}</span>
+                  <span className="text-slate-600 dark:text-slate-400 font-medium truncate">{(r as any).userName || r.authorName}</span>
+                  {r.personaTag && (
+                    <span className="hidden sm:inline-flex px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 text-[9px] font-bold whitespace-nowrap">
+                      {r.personaTag}
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2 flex-shrink-0">

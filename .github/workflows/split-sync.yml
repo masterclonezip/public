@@ -498,7 +498,7 @@ jobs:
             fi
           }
 
-          # 1. Transfer Admin codebase to Admin repository (masterclonezip/admin)
+          # 1. Transfer Admin codebase to target Admin repository
           sync_repo "admin" "$ADMIN_TARGET" "admin" || ADMIN_SYNC_FAILED=1
 
           # 2. Sync clean Public release (if separate public repo configured or to production branch)

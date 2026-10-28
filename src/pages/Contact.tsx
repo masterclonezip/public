@@ -135,7 +135,7 @@ export default function Contact() {
               </div>
               <div>
                 <label htmlFor="contact-message" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">Message</label>
-                <textarea id="contact-message" required value={msgText} onChange={(e) => setMsgText(e.target.value)} className="w-full p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-black/5 dark:border-white/5 h-44 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white text-zinc-900 dark:text-zinc-100 font-medium resize-none" placeholder="How can we help?"></textarea>
+                <textarea id="contact-message" required value={msgText} onChange={(e) => setMsgText(e.target.value)} className="w-full p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-black/5 dark:border-white/5 h-44 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium resize-none" placeholder="How can we help?"></textarea>
               </div>
 
               {errorText && (

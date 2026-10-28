@@ -1,6 +1,5 @@
-import { DateDistributionMode } from './types';
+import { DateDistributionMode, StudioConfig } from './types';
 
-// Authentic, natural Indian player persona names
 const INDIAN_FIRST_NAMES = [
   'Rahul', 'Rohit', 'Amit', 'Vikas', 'Deepak', 'Sanjay', 'Pooja', 'Sunil',
   'Ankit', 'Manish', 'Kunal', 'Rohan', 'Neeraj', 'Arjun', 'Priya', 'Kavita',
@@ -20,26 +19,91 @@ export function generateRealisticUserName(): string {
   return `${first} ${last}`;
 }
 
+export function getDefaultStartDate(): string {
+  const d = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+  return d.toISOString().slice(0, 10);
+}
+
+export function getDefaultEndDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export function formatReviewDatePreview(isoStr?: string): string {
+  if (!isoStr) return 'Just now';
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return String(isoStr);
+    return d.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (_) {
+    return String(isoStr);
+  }
+}
+
+export function generateReviewTimestamp(
+  config: StudioConfig,
+  indexInBatch: number,
+  totalInBatch: number,
+  previousIso?: string
+): string {
+  const now = Date.now();
+  let windowMs = 7 * 24 * 60 * 60 * 1000;
+
+  if (config.dateRangeMode === 'custom_days') {
+    windowMs = Math.max(1, config.customDays || 14) * 24 * 60 * 60 * 1000;
+  } else if (config.dateRangeMode === 'custom_months') {
+    windowMs = Math.max(1, config.customMonths || 2) * 30 * 24 * 60 * 60 * 1000;
+  } else if (config.dateRangeMode === 'specific_range' && config.startDate && config.endDate) {
+    const startMs = new Date(config.startDate).getTime();
+    const endMs = Math.min(now, new Date(config.endDate).getTime() + 23 * 3600 * 1000);
+    if (!isNaN(startMs) && !isNaN(endMs) && endMs > startMs) {
+      const slotSpan = (endMs - startMs) / Math.max(1, totalInBatch);
+      const base = endMs - indexInBatch * slotSpan - Math.random() * slotSpan * 0.85;
+      const d = new Date(Math.max(startMs, Math.min(now - 60000, base)));
+      return d.toISOString();
+    }
+  }
+
+  const startMs = now - windowMs;
+  const slotSpan = windowMs / Math.max(1, totalInBatch);
+  let targetMs = now - indexInBatch * slotSpan - Math.random() * slotSpan * 0.85;
+
+  if (previousIso) {
+    const prevMs = new Date(previousIso).getTime();
+    if (!isNaN(prevMs) && Math.abs(targetMs - prevMs) < 12 * 60 * 1000) {
+      targetMs -= (15 + Math.floor(Math.random() * 90)) * 60 * 1000;
+    }
+  }
+
+  const finalDate = new Date(Math.max(startMs, Math.min(now - 120000, targetMs)));
+  // Keep realistic active Indian mobile hours (07:30 to 23:45)
+  const hr = finalDate.getHours();
+  if (hr >= 1 && hr <= 6) {
+    finalDate.setHours(8 + Math.floor(Math.random() * 14));
+  }
+  return finalDate.toISOString();
+}
+
 export interface GeneratedDateResult {
   isoTimestamp: string;
   dateTag: 'Today' | 'Yesterday' | '2 Days Ago' | '3 Days Ago' | 'Custom';
   formattedDisplay: string;
 }
 
-/**
- * Generates an authentically randomized date timestamp based on the chosen mode.
- * Spreads hours/minutes naturally between 8:00 AM and 11:45 PM.
- */
 export function generateRealisticTimestamp(
   mode: DateDistributionMode,
   indexInBatch: number,
-  totalInBatch: number
+  _totalInBatch: number
 ): GeneratedDateResult {
   const now = new Date();
   let targetDate = new Date(now.getTime());
   let dateTag: 'Today' | 'Yesterday' | '2 Days Ago' | '3 Days Ago' | 'Custom' = 'Today';
 
-  // Determine which day to target
   let isMorningOnly = false;
   let isEveningOnly = false;
 
@@ -54,16 +118,7 @@ export function generateRealisticTimestamp(
   } else if (mode === 'yesterday_only') {
     targetDate.setDate(now.getDate() - 1);
     dateTag = 'Yesterday';
-  } else if (mode === 'today_and_yesterday') {
-    // Alternate or distribute 50% Today, 50% Yesterday
-    const isYesterday = indexInBatch % 2 === 1;
-    if (isYesterday) {
-      targetDate.setDate(now.getDate() - 1);
-      dateTag = 'Yesterday';
-    } else {
-      dateTag = 'Today';
-    }
-  } else if (mode === 'last_2_days') {
+  } else if (mode === 'today_and_yesterday' || mode === 'last_2_days') {
     const isYesterday = indexInBatch % 2 === 1;
     if (isYesterday) {
       targetDate.setDate(now.getDate() - 1);
@@ -96,19 +151,13 @@ export function generateRealisticTimestamp(
   } else if (mode === 'last_15_days') {
     const dayOffset = Math.floor(Math.random() * 15);
     targetDate.setDate(now.getDate() - dayOffset);
-    if (dayOffset === 0) dateTag = 'Today';
-    else if (dayOffset === 1) dateTag = 'Yesterday';
-    else dateTag = 'Custom';
+    dateTag = dayOffset === 0 ? 'Today' : dayOffset === 1 ? 'Yesterday' : 'Custom';
   } else if (mode === 'last_30_days') {
     const dayOffset = Math.floor(Math.random() * 30);
     targetDate.setDate(now.getDate() - dayOffset);
-    if (dayOffset === 0) dateTag = 'Today';
-    else if (dayOffset === 1) dateTag = 'Yesterday';
-    else dateTag = 'Custom';
+    dateTag = dayOffset === 0 ? 'Today' : dayOffset === 1 ? 'Yesterday' : 'Custom';
   }
 
-  // Randomize time naturally (e.g. between 08:00 and 23:30)
-  // If target is today, ensure the hour isn't in the future
   let minHour = 8;
   let maxHour = dateTag === 'Today' ? Math.max(9, now.getHours()) : 23;
 
@@ -128,7 +177,6 @@ export function generateRealisticTimestamp(
 
   targetDate.setHours(randomHour, randomMinute, randomSecond, 0);
 
-  // If accidentally in the future for today, pull back by 15-45 minutes
   if (targetDate.getTime() > now.getTime()) {
     targetDate = new Date(now.getTime() - (Math.floor(Math.random() * 45) + 10) * 60000);
   }

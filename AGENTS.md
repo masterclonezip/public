@@ -1,6 +1,6 @@
 # Project Architecture & Developer Guide: Platform Transparency System
 
-This repository serves as the **Source of Truth** for **Platform** ([https://example.com](https://example.com)), an all-in-one transparency platform, app store catalog, news portal, and review hub for Rummy, Teen Patti, Yono, and casual card/arcade applications.
+This repository serves as the **Source of Truth** for **Platform** ([https://example.com](https://example.com)), an all-in-one transparency platform, app store catalog, news portal, and review hub for mobile and web applications.
 
 ---
 
@@ -286,7 +286,7 @@ Ensure any newly created files strictly follow repo-isolation boundaries:
 > **MANDATORY INSTRUCTION:** The AI agent is **STRICTLY FORBIDDEN** from writing, generating, or editing any website content, app descriptions, meta descriptions, SEO titles, or marketing copy.
 
 - **Admin is the Single Source of Truth:** ALL content (titles, meta descriptions, H1 tags, app details, faqs, etc.) MUST be written manually by the Admin via the Admin Dashboard and stored in the database.
-- **No Placeholder Content:** The AI must never invent or inject placeholder SEO text (e.g., "Platform - Download Rummy Apps...") into the code. 
+- **No Placeholder Content:** The AI must never invent or inject placeholder SEO text (e.g., "Platform - Download Mobile Apps...") into the code. 
 - **SEO Strategy:** The AI's role in SEO is purely structural and architectural. The AI handles server-side HTML injection (`seoHelper.ts`), `sitemap.xml` index architecture, and canonical/OG tag logic, ensuring the platform cleanly serves the *Admin's database content* to web crawlers (like Googlebot and Ahrefs). The AI must NEVER alter the actual words being served.
 
 

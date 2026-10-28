@@ -7,13 +7,7 @@ function escapeRegex(str: string): string {
 }
 
 function getBrandCandidates(dynamicBrand?: string): string[] {
-  const candidates = new Set<string>([
-    'Yonodirect',
-    'Yono Direct',
-    'Yono Store',
-    'Rummy Store',
-    'MasterWorld'
-  ]);
+  const candidates = new Set<string>();
 
   if (dynamicBrand && typeof dynamicBrand === 'string' && dynamicBrand.trim()) {
     candidates.add(dynamicBrand.trim());

@@ -214,7 +214,7 @@ export default function NewsDetailPage() {
   const similarCategoryApps = useMemo(() => {
     if (!apps || apps.length === 0) return { list: [], category: '', totalCount: 0 };
 
-    const targetCategory = (relatedApp?.category || newsItem?.category || 'Yono Apps').trim();
+    const targetCategory = (relatedApp?.category || newsItem?.category || 'All Apps').trim();
     const cleanTargetCat = targetCategory.toLowerCase();
     const isAll = cleanTargetCat === 'all' || cleanTargetCat === 'all apps';
     const relAppId = relatedApp ? String(relatedApp.id || '') : '';

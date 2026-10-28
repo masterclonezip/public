@@ -1,797 +1,1363 @@
-import { 
-  StudioConfig, 
-  BrainMemoryDirective, 
-  ChatMessage, 
-  StagedReview, 
-  RatingMixMode, 
-  LanguageToneMode,
-  LikesRateMode 
+import {
+  StudioConfig,
+  StagedReview,
+  ChatMessage,
+  BrainDirective,
+  AIConnectionStatus,
+  MarketplaceStyle,
+  ReviewLengthMix,
+  ReviewLanguageMix,
+  ReviewFocusTopic
 } from './types';
-import { generateRealisticUserName, generateRealisticTimestamp } from './dateEngine';
-import { mockApps } from '../../../lib/staticData';
+import { generateReviewTimestamp } from './dateEngine';
+import {
+  normalizeClientModelId,
+  isValidClientApiKey,
+  maskClientApiKey,
+  loadStudioConfig
+} from './storage';
+import siteBrainSnapshot from '../../../lib/aiStudioBrain.json';
 
-export function stripHtml(html?: string): string {
-  if (!html) return '';
-  return html.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+export const SUPPORTED_GEMINI_MODELS = [
+  {
+    id: 'gemini-2.5-flash',
+    label: 'Gemini 2.5 Flash (Recommended • Instant & Reliable)',
+    badge: 'Fastest & Best',
+    desc: 'Sub-second response speed, high human nuance, and generous free-tier rate limits.'
+  },
+  {
+    id: 'gemini-3-flash-preview',
+    label: 'Gemini 3 Flash Preview (Next-Gen Crowd Psychology)',
+    badge: 'Next-Gen',
+    desc: 'Latest Gemini 3 low-latency reasoning for ultra-authentic Play Store, Amazon & Flipkart personas.'
+  },
+  {
+    id: 'gemini-2.5-flash-lite',
+    label: 'Gemini 2.5 Flash-Lite (Ultra-High Quota • Bulk Speed)',
+    badge: 'Max Quota',
+    desc: 'Lowest latency and highest requests-per-minute for generating across many apps.'
+  },
+  {
+    id: 'gemini-3.1-flash-lite-preview',
+    label: 'Gemini 3.1 Flash-Lite Preview (Fast High-Volume)',
+    badge: 'Fast Lite',
+    desc: 'Next-gen lightweight model optimized for rapid batch generation.'
+  },
+  {
+    id: 'gemini-2.5-pro',
+    label: 'Gemini 2.5 Pro (Deep Analytical & Strategy)',
+    badge: 'Pro Reasoning',
+    desc: 'Deepest content comprehension for complex app dossiers and nuanced critiques.'
+  },
+  {
+    id: 'gemini-flash-latest',
+    label: 'Gemini Flash Latest (Auto-Updated Alias)',
+    badge: 'Auto Alias',
+    desc: 'Automatically points to Google’s current rolling Flash release.'
+  }
+];
+
+export const MARKETPLACE_STYLE_OPTIONS: {
+  id: MarketplaceStyle;
+  label: string;
+  shortLabel: string;
+  desc: string;
+}[] = [
+  {
+    id: 'blended_authentic',
+    label: 'All-in-One Crowd Mix (Play Store + Flipkart/Amazon + Hinglish)',
+    shortLabel: 'Crowd Mix (Best)',
+    desc: 'Realistic blend of Play Store users, Flipkart/Amazon value reviewers, casual Hinglish, and quick one-liners.'
+  },
+  {
+    id: 'play_store',
+    label: 'Google Play Store Native (Device, Update & Daily Usage)',
+    shortLabel: 'Play Store Style',
+    desc: 'Focuses on app features, version updates, phone models (Redmi/Realme/Samsung/Vivo), and 4G/5G performance.'
+  },
+  {
+    id: 'amazon_flipkart',
+    label: 'Amazon & Flipkart Verified Reviewer (Value, Pros/Cons & Verdict)',
+    shortLabel: 'Amazon / Flipkart',
+    desc: 'Practical buyer-style reviews: what the app actually provides, comparison with alternatives, and honest verdict.'
+  },
+  {
+    id: 'hinglish_casual',
+    label: 'Desi Hinglish + English Conversational Crowd',
+    shortLabel: 'Hinglish Crowd',
+    desc: 'Natural Indian mobile user voice mixing Roman Hindi and English ("Mast app hai, features kaafi useful hain").'
+  },
+  {
+    id: 'ultra_short_crowd',
+    label: 'Fast Micro-Comments & One-Liners (4–14 Words)',
+    shortLabel: 'Short 1-Liners',
+    desc: 'How 60% of real users comment: brief, casual, lowercase or punchy 1-sentence reactions.'
+  },
+  {
+    id: 'critical_tester',
+    label: 'Honest Power-User & Balanced QA Feedback',
+    shortLabel: 'Power User / QA',
+    desc: 'Detailed observations praising specific app features while noting realistic minor wishes or quirks.'
+  }
+];
+
+export const FOCUS_TOPIC_OPTIONS: {
+  id: ReviewFocusTopic;
+  label: string;
+  desc: string;
+}[] = [
+  {
+    id: 'what_app_provides',
+    label: 'What the App Provides',
+    desc: 'Specific modes, tools, rooms, levels, or benefits described in the app catalog.'
+  },
+  {
+    id: 'onboarding_ease',
+    label: 'Setup, Login & Size',
+    desc: 'Download size, quick registration/OTP, clean menu layout, beginner friendliness.'
+  },
+  {
+    id: 'daily_experience',
+    label: 'Real-Life Usage Story',
+    desc: 'How/when they use it (evening relaxation, commute, with friends/family, daily routine).'
+  },
+  {
+    id: 'device_network',
+    label: 'Phone & Network Reality',
+    desc: 'Battery usage, heating, low-RAM budget phones, Jio/Airtel 4G/5G stability.'
+  },
+  {
+    id: 'comparison_verdict',
+    label: 'Comparison vs Others',
+    desc: 'Why they kept this app after trying 2–3 cluttered or laggy alternatives.'
+  },
+  {
+    id: 'feature_requests',
+    label: 'Constructive Wishes',
+    desc: 'Realistic minor suggestions (dark mode, notification toggle, regional language, etc.).'
+  }
+];
+
+const INDIAN_REVIEWER_NAMES = [
+  'Aarav Sharma', 'Vivaan Patel', 'Aditya Verma', 'Vihaan Gupta', 'Arjun Singh',
+  'Sai Kumar', 'Reyansh Reddy', 'Ayaan Khan', 'Krishna Nair', 'Ishaan Joshi',
+  'Shaurya Mishra', 'Atharv Pandey', 'Dhruv Choudhary', 'Kabir Malhotra', 'Rishi Tiwari',
+  'Ananya Desai', 'Diya Mehta', 'Priya Iyer', 'Kavya Menon', 'Aadhya Rao',
+  'Saanvi Chatterjee', 'Myra Mukherjee', 'Ira Banerjee', 'Anika Bose', 'Prisha Sengupta',
+  'Rohan Deshmukh', 'Vikram Chauhan', 'Neha Agarwal', 'Pooja Thakur', 'Rahul Saxena',
+  'Suresh Natarajan', 'Karthik Subramanian', 'Deepak Yadav', 'Manish Rathore', 'Nitin Kulkarni',
+  'Gaurav Bhardwaj', 'Harshita Dubey', 'Swati Kashyap', 'Tarun Gill', 'Yashvardhan Chauhan',
+  'Abhishek Pathak', 'Siddharth Roy', 'Megha Nambiar', 'Rajat Hegde', 'Shubham Bisht',
+  'Pranav Bora', 'Tushar Kalita', 'Ankita Phukan', 'Mayank Goswami', 'VarunD_99',
+  'Rohit_Gamer07', 'Akash K.', 'Pradeep S', 'Sandeep_Raj', 'Nikhil M.',
+  'Kiran Patil', 'Ajay Vishwakarma', 'Sachin Pawar', 'Pankaj Soni', 'Mohit Jangid'
+];
+
+// Strictly scrub any accidental real-money or gambling phrases AND robotic AI cliches
+const SENSITIVE_REPLACEMENTS: [RegExp, string][] = [
+  [/\bwithdraw(al|als|ing|n)?\b/gi, 'reward progress'],
+  [/\b(real\s*cash|real\s*money|cash\s*out|cash\s*prize|win\s*cash|earn\s*money|earning\s*app)\b/gi, 'in-app points'],
+  [/\b(paytm|upi|bank\s*transfer|phonepe|gpay|google\s*pay|imps|neft|kyc|pan\s*card)\b/gi, 'account profile'],
+  [/\b(deposit(s|ed|ing)?|add\s*cash|recharge\s*money)\b/gi, 'unlock'],
+  [/\b(betting|gambling|wager|jackpot\s*cash|satta|matka|casino)\b/gi, 'gameplay'],
+  [/\b(paisa|paise|rupees|rs\.?\s*\d+|₹\s*\d+|lakh|crore)\b/gi, 'score'],
+  [/\b(game-changer|testament to|delve into|unparalleled|second to none)\b/gi, 'solid']
+];
+
+export function sanitizeReviewText(rawText: string): string {
+  if (!rawText) return '';
+  let cleaned = rawText.trim();
+  for (const [pattern, replacement] of SENSITIVE_REPLACEMENTS) {
+    cleaned = cleaned.replace(pattern, replacement);
+  }
+  return cleaned.replace(/\s{2,}/g, ' ').trim();
 }
 
-/**
- * Generates an authentic, realistic like/helpful vote count for a comment.
- * Sometime 2, sometime 1, occasionally 3 or 0, matching natural app store engagement.
- */
-export function generateRealisticHelpfulCount(
-  likesMode: LikesRateMode = 'subtle_1_2',
-  index = 0,
-  total = 1
-): number {
-  if (likesMode === 'zero_none') return 0;
-
-  const rand = Math.random();
-
-  if (likesMode === 'modest_1_4') {
-    // 1 to 4 likes
-    if (rand < 0.35) return 1;
-    if (rand < 0.70) return 2;
-    if (rand < 0.90) return 3;
-    return 4;
-  }
-
-  if (likesMode === 'natural_0_3') {
-    // 0 to 3 likes
-    if (rand < 0.25) return 0;
-    if (rand < 0.60) return 1;
-    if (rand < 0.88) return 2;
-    return 3;
-  }
-
-  // Default 'subtle_1_2': User specifically requested "sometime two, sometime one like that, lower rate of likes"
-  // ~40% 1 like, ~35% 2 likes, ~15% 0 likes, ~8% 3 likes, ~2% 4 likes
-  if (rand < 0.40) return 1;
-  if (rand < 0.75) return 2;
-  if (rand < 0.90) return 0;
-  if (rand < 0.98) return 3;
-  return 4;
+export function pickUniqueNames(count: number, usedNames: Set<string>): string[] {
+  const available = INDIAN_REVIEWER_NAMES.filter(n => !usedNames.has(n));
+  const shuffled = [...(available.length >= count ? available : INDIAN_REVIEWER_NAMES)].sort(
+    () => 0.5 - Math.random()
+  );
+  const selected = shuffled.slice(0, count);
+  selected.forEach(n => usedNames.add(n));
+  return selected;
 }
 
-/**
- * Extracts all non-sensitive content entered by the Admin in the website database.
- * Operates 100% in local memory — ZERO Firestore read operations!
- */
-export function extractAdminAppProfile(app: any) {
-  // 100% Local-First: If app has missing description or SEO info, check local mockApps memory
-  let baseApp = app;
-  if (!baseApp?.description_html || !baseApp?.seo_description || !baseApp?.features_html) {
-    const localMatch = (mockApps || []).find((a: any) => 
-      (a.id && a.id === app.id) || 
-      (a.slug && a.slug === app.slug) ||
-      (a.name && app.name && a.name.toLowerCase().trim() === app.name.toLowerCase().trim())
-    );
-    if (localMatch) {
-      baseApp = {
-        ...localMatch,
-        ...app,
-        description_html: app.description_html || localMatch.description_html || '',
-        seo_description: app.seo_description || localMatch.seo_description || localMatch.meta_description || '',
-        seo_title: app.seo_title || localMatch.seo_title || localMatch.meta_title || '',
-        features_html: app.features_html || localMatch.features_html || '',
-        custom_admin_box_html: app.custom_admin_box_html || localMatch.custom_admin_box_html || '',
-        release_notes: app.release_notes || localMatch.release_notes || ''
-      };
+export function generateRatingsArray(count: number, mix: StudioConfig['ratingMix']): number[] {
+  const ratings: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const r = Math.random();
+    if (mix === 'all_5_star') {
+      ratings.push(5);
+    } else if (mix === 'mostly_positive') {
+      if (r < 0.68) ratings.push(5);
+      else if (r < 0.92) ratings.push(4);
+      else if (r < 0.98) ratings.push(3);
+      else ratings.push(2);
+    } else if (mix === 'balanced_realistic') {
+      if (r < 0.45) ratings.push(5);
+      else if (r < 0.75) ratings.push(4);
+      else if (r < 0.90) ratings.push(3);
+      else if (r < 0.96) ratings.push(2);
+      else ratings.push(1);
+    } else if (mix === 'critical_feedback') {
+      if (r < 0.15) ratings.push(5);
+      else if (r < 0.35) ratings.push(4);
+      else if (r < 0.70) ratings.push(3);
+      else if (r < 0.90) ratings.push(2);
+      else ratings.push(1);
+    } else {
+      ratings.push(5);
     }
   }
+  return ratings;
+}
 
-  const appName = String(baseApp.name || baseApp.title || 'App').trim();
-  const category = String(baseApp.category || 'General').trim();
-  const developer = String(baseApp.developer || baseApp.developer_name || '').trim();
-  const seoTitle = String(baseApp.seo_title || baseApp.meta_title || '').trim();
-  const seoDescription = String(baseApp.seo_description || baseApp.meta_description || '').trim();
-  const description = stripHtml(baseApp.description_html || baseApp.description || '').slice(0, 1400).trim();
-  const features = stripHtml(baseApp.features_html || '').slice(0, 900).trim();
-  const customBox = stripHtml(baseApp.custom_admin_box_html || baseApp.custom_admin_box_heading || '').slice(0, 400).trim();
-  const releaseNotes = stripHtml(baseApp.release_notes || '').slice(0, 300).trim();
-  const version = String(baseApp.version || '').trim();
-  const fileSize = String(baseApp.file_size || '').trim();
+export function generateHelpfulLikes(rating: number, contentLength: number, config: StudioConfig): number {
+  const prob = typeof config.likesProbability === 'number' ? config.likesProbability : 70;
+  const maxLikes = typeof config.maxLikesPerReview === 'number' ? config.maxLikesPerReview : 14;
+  if (maxLikes <= 0 || Math.random() * 100 > prob) return 0;
 
-  let faqsSummary = '';
-  if (Array.isArray(baseApp.faqs) && baseApp.faqs.length > 0) {
-    faqsSummary = baseApp.faqs.slice(0, 3).map((f: any) => `Q: ${stripHtml(f.question)} A: ${stripHtml(f.answer)}`).join(' | ');
+  const lengthBoost = contentLength > 140 ? 1.35 : contentLength < 45 ? 0.5 : 1.0;
+  const roll = Math.random();
+  let base = 1;
+  if (roll < 0.55) {
+    base = Math.floor(Math.random() * Math.max(2, Math.floor(maxLikes * 0.3))) + 1;
+  } else if (roll < 0.88) {
+    base = Math.floor(Math.random() * Math.max(3, Math.floor(maxLikes * 0.65))) + 2;
+  } else {
+    base = Math.floor(Math.random() * maxLikes) + 1;
+  }
+  return Math.min(maxLikes, Math.max(1, Math.round(base * lengthBoost)));
+}
+
+function stripHtmlToCleanText(html?: string, maxLen = 2200): string {
+  if (!html) return '';
+  return String(html)
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<\/(p|div|li|h[1-6]|tr|br)>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim()
+    .slice(0, maxLen);
+}
+
+export interface AppDeepDossier {
+  appId: string;
+  appName: string;
+  category: string;
+  developer: string;
+  version: string;
+  size: string;
+  rating: string;
+  downloads: string;
+  metaTitle: string;
+  metaDescription: string;
+  h1Title: string;
+  featuresList: string[];
+  whatAppProvidesSummary: string;
+  faqsSummary: string[];
+  adminCallouts: string[];
+}
+
+export function extractAppDeepDossier(app: any): AppDeepDossier {
+  const appName = (app?.name || app?.title || 'Application').trim();
+  const category = (app?.category || 'Mobile Utility & Entertainment').trim();
+  const developer = (app?.developer || app?.author || app?.company || 'Official Developer').trim();
+  const version = (app?.version || 'Latest').trim();
+  const size = (app?.size || app?.file_size || 'Lightweight').trim();
+  const rating = String(app?.rating || '4.6');
+  const downloads = String(app?.downloads || '10K+');
+  const metaTitle = (app?.meta_title || app?.seo_title || '').trim();
+  const metaDescription = (app?.meta_description || app?.seo_description || '').trim();
+  const h1Title = (app?.h1_title || app?.custom_h1 || '').trim();
+
+  const rawFeatures: string[] = [];
+  if (Array.isArray(app?.features)) {
+    app.features.forEach((f: any) => {
+      const clean = stripHtmlToCleanText(String(f || ''), 160);
+      if (clean) rawFeatures.push(clean);
+    });
+  } else if (typeof app?.features === 'string' && app.features.trim()) {
+    app.features.split(/[,|\n•]+/).forEach((f: string) => {
+      const clean = stripHtmlToCleanText(f, 160);
+      if (clean && clean.length > 2) rawFeatures.push(clean);
+    });
+  }
+  if (app?.features_html) {
+    stripHtmlToCleanText(app.features_html, 1000)
+      .split('\n')
+      .map(s => s.trim())
+      .filter(s => s.length > 3)
+      .forEach(s => rawFeatures.push(s));
   }
 
-  const appRating = typeof baseApp.rating === 'number' 
-    ? baseApp.rating 
-    : (parseFloat(String(baseApp.rating || baseApp.rating_avg || '4.5')) || 4.5);
+  const rawAbout = [
+    stripHtmlToCleanText(app?.description_html, 1600),
+    stripHtmlToCleanText(app?.description, 1000),
+    stripHtmlToCleanText(app?.about, 600),
+    stripHtmlToCleanText(app?.short_description, 400),
+    metaDescription
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const faqsSummary: string[] = [];
+  if (Array.isArray(app?.faqs)) {
+    app.faqs.slice(0, 6).forEach((faq: any) => {
+      const q = stripHtmlToCleanText(faq?.question || faq?.q, 160);
+      const a = stripHtmlToCleanText(faq?.answer || faq?.a, 240);
+      if (q && a) faqsSummary.push(`Q: ${q} -> A: ${a}`);
+    });
+  }
+
+  const adminCallouts: string[] = [];
+  if (app?.idea_box_content || app?.idea_box_msg) {
+    adminCallouts.push(`Highlight: ${stripHtmlToCleanText(app.idea_box_content || app.idea_box_msg, 220)}`);
+  }
+  if (app?.security_box_content || app?.yellow_box_msg) {
+    adminCallouts.push(`Security Info: ${stripHtmlToCleanText(app.security_box_content || app.yellow_box_msg, 220)}`);
+  }
+
+  const safeFeatures = Array.from(new Set(rawFeatures))
+    .map(f => sanitizeReviewText(f))
+    .filter(Boolean)
+    .slice(0, 10);
 
   return {
+    appId: String(app?.id || app?.slug || appName),
     appName,
     category,
     developer,
-    seoTitle,
-    seoDescription,
-    description,
-    features,
-    customBox,
-    releaseNotes,
     version,
-    fileSize,
-    faqsSummary,
-    appRating
+    size,
+    rating,
+    downloads,
+    metaTitle: sanitizeReviewText(metaTitle),
+    metaDescription: sanitizeReviewText(metaDescription),
+    h1Title: sanitizeReviewText(h1Title),
+    featuresList: safeFeatures,
+    whatAppProvidesSummary: sanitizeReviewText(rawAbout).slice(0, 1800),
+    faqsSummary: faqsSummary.map(f => sanitizeReviewText(f)),
+    adminCallouts: adminCallouts.map(c => sanitizeReviewText(c))
+  };
+}
+
+function buildClientThinkingConfig(modelId: string): Record<string, any> | undefined {
+  const m = (modelId || '').toLowerCase();
+  if (m.startsWith('gemini-3') || m.startsWith('gemini-4')) {
+    return { thinkingLevel: m.includes('flash-lite') ? 'MINIMAL' : 'LOW' };
+  }
+  if (m.startsWith('gemini-2.5-pro')) {
+    return { thinkingBudget: 128 };
+  }
+  if (m.startsWith('gemini-2.5-flash') || m === 'gemini-flash-latest') {
+    return { thinkingBudget: 0 };
+  }
+  return undefined;
+}
+
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function isKeyErrorString(msg: string): boolean {
+  const u = (msg || '').toUpperCase();
+  return (
+    u.includes('API_KEY_INVALID') ||
+    u.includes('API KEY NOT VALID') ||
+    (u.includes('INVALID_ARGUMENT') && u.includes('API KEY')) ||
+    (u.includes('PERMISSION_DENIED') && u.includes('KEY')) ||
+    u.includes('UNAUTHENTICATED')
+  );
+}
+
+/**
+ * Industrial Sub-250ms Connection & Model Verifier:
+ * 1. If a custom API key is provided (or stored in local config), verifies directly against Google's
+ *    zero-quota model metadata endpoint in ~120ms AND syncs the key/model to the backend server in parallel.
+ * 2. If no custom key is on the client, checks the backend server for a saved studio key or GEMINI_API_KEY env var.
+ */
+export async function verifyStudioConnection(
+  apiKey?: string,
+  model?: string,
+  deepPing = false
+): Promise<AIConnectionStatus> {
+  const savedCfg = loadStudioConfig();
+  const effectiveKey =
+    apiKey !== undefined ? apiKey.trim() : (savedCfg.apiKey || '').trim();
+  const normalizedModel = normalizeClientModelId(model || savedCfg.model);
+  const startTime = Date.now();
+
+  // Path A: Direct Ultra-Fast Verification when a valid client API key is present
+  if (isValidClientApiKey(effectiveKey)) {
+    // Sync key & model to backend brain asynchronously so server is always in sync
+    fetchWithTimeout(
+      '/api/v1/admin/community/aistudio-gemini',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'test',
+          apiKey: effectiveKey,
+          model: normalizedModel,
+          deepPing
+        })
+      },
+      5000
+    ).catch(() => {});
+
+    try {
+      const metaUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+        normalizedModel
+      )}?key=${encodeURIComponent(effectiveKey)}`;
+
+      const metaRes = await fetchWithTimeout(metaUrl, { method: 'GET' }, 4500);
+      const metaJson: any = await metaRes.json().catch(() => ({}));
+
+      if (metaRes.ok && metaJson?.name) {
+        if (deepPing) {
+          // Optional 1-word generation ping
+          const genUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+            normalizedModel
+          )}:generateContent?key=${encodeURIComponent(effectiveKey)}`;
+          const thinkingConfig = buildClientThinkingConfig(normalizedModel);
+          const pingRes = await fetchWithTimeout(
+            genUrl,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ role: 'user', parts: [{ text: 'Reply with OK' }] }],
+                generationConfig: {
+                  temperature: 0.1,
+                  ...(thinkingConfig ? { thinkingConfig } : {})
+                }
+              })
+            },
+            6500
+          );
+          if (pingRes.ok) {
+            return {
+              state: 'connected',
+              model: normalizedModel,
+              requestedModel: normalizedModel,
+              latencyMs: Math.max(1, Date.now() - startTime),
+              keySource: 'custom',
+              keyMask: maskClientApiKey(effectiveKey),
+              lastCheckedAt: Date.now()
+            };
+          }
+        }
+
+        return {
+          state: 'connected',
+          model: normalizedModel,
+          requestedModel: normalizedModel,
+          latencyMs: Math.max(1, Date.now() - startTime),
+          keySource: 'custom',
+          keyMask: maskClientApiKey(effectiveKey),
+          lastCheckedAt: Date.now()
+        };
+      }
+
+      const errMsg = metaJson?.error?.message || `HTTP ${metaRes.status}`;
+      if (isKeyErrorString(errMsg) || metaRes.status === 400 || metaRes.status === 403) {
+        return {
+          state: 'invalid_key',
+          model: normalizedModel,
+          requestedModel: normalizedModel,
+          keySource: 'custom',
+          keyMask: maskClientApiKey(effectiveKey),
+          errorMessage: 'Invalid Gemini API Key. Please check that you copied the full key from Google AI Studio.',
+          lastCheckedAt: Date.now()
+        };
+      }
+
+      // If requested model returned 404, immediately check gemini-2.5-flash
+      if (metaRes.status === 404 && normalizedModel !== 'gemini-2.5-flash') {
+        const fbUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash?key=${encodeURIComponent(
+          effectiveKey
+        )}`;
+        const fbRes = await fetchWithTimeout(fbUrl, { method: 'GET' }, 4000);
+        if (fbRes.ok) {
+          return {
+            state: 'connected',
+            model: 'gemini-2.5-flash',
+            requestedModel: normalizedModel,
+            latencyMs: Math.max(1, Date.now() - startTime),
+            keySource: 'custom',
+            keyMask: maskClientApiKey(effectiveKey),
+            warningMessage: `Model "${normalizedModel}" unavailable on this tier; auto-routed to gemini-2.5-flash.`,
+            lastCheckedAt: Date.now()
+          };
+        }
+      }
+    } catch (_) {
+      // Fall through to server endpoint check if direct check was blocked by browser extension
+    }
+  }
+
+  // Path B: Backend Server Verification (for server_env key or fallback)
+  try {
+    const res = await fetchWithTimeout(
+      '/api/v1/admin/community/aistudio-gemini',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'test',
+          apiKey: effectiveKey,
+          clearKey: apiKey === '',
+          deepPing,
+          model: normalizedModel
+        })
+      },
+      5500
+    );
+
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data?.success) {
+      return {
+        state: 'connected',
+        model: data.model || normalizedModel,
+        requestedModel: data.requestedModel || normalizedModel,
+        latencyMs: data.latencyMs || Math.max(1, Date.now() - startTime),
+        keySource: data.keySource || (effectiveKey ? 'custom' : 'server_env'),
+        keyMask: data.keyMask || maskClientApiKey(effectiveKey),
+        warningMessage: data.warning || undefined,
+        lastCheckedAt: Date.now()
+      };
+    }
+
+    const errText = data?.error || `HTTP ${res.status}`;
+    const isMissing =
+      !effectiveKey &&
+      (res.status === 400 ||
+        errText.toLowerCase().includes('no valid gemini api key') ||
+        res.status === 404);
+    const isInvalid =
+      errText.toLowerCase().includes('invalid gemini api key') ||
+      errText.toLowerCase().includes('not valid');
+
+    return {
+      state: isMissing ? 'missing_key' : isInvalid ? 'invalid_key' : 'error',
+      model: data?.model || normalizedModel,
+      requestedModel: normalizedModel,
+      keySource: data?.keySource || 'none',
+      keyMask: data?.keyMask || maskClientApiKey(effectiveKey),
+      errorMessage: isMissing
+        ? 'No API key connected yet. Click "API Key" to paste your Google AI Studio key.'
+        : errText,
+      lastCheckedAt: Date.now()
+    };
+  } catch (err: any) {
+    if (!isValidClientApiKey(effectiveKey)) {
+      return {
+        state: 'missing_key',
+        model: normalizedModel,
+        requestedModel: normalizedModel,
+        keySource: 'none',
+        errorMessage: 'Paste your Google AI Studio API key in "API Key & Model" to connect instantly.',
+        lastCheckedAt: Date.now()
+      };
+    }
+    return {
+      state: 'error',
+      model: normalizedModel,
+      requestedModel: normalizedModel,
+      errorMessage:
+        err?.name === 'AbortError'
+          ? 'Connection timed out. Please check your network or try Gemini 2.5 Flash.'
+          : err?.message || 'Network error reaching Gemini endpoint',
+      lastCheckedAt: Date.now()
+    };
+  }
+}
+
+/**
+ * Direct Low-Latency REST Caller to Google's Gemini Edge API.
+ * Used when the Admin has configured their custom API key in the studio for instantaneous (<1.5s) ChatGPT-like speed,
+ * with automatic fallback to `gemini-2.5-flash` if a preview model is rate-limited.
+ */
+async function callGeminiDirectEdge(params: {
+  apiKey: string;
+  model: string;
+  systemInstruction?: string;
+  contents: any[];
+  temperature?: number;
+  responseMimeType?: string;
+}): Promise<{
+  ok: boolean;
+  text: string;
+  modelUsed: string;
+  isInvalidKey?: boolean;
+  error?: string;
+}> {
+  const cleanKey = params.apiKey.trim();
+  const primaryModel = normalizeClientModelId(params.model);
+  const candidates = [primaryModel, 'gemini-2.5-flash', 'gemini-2.5-flash-lite']
+    .filter((m, idx, arr) => m && arr.indexOf(m) === idx)
+    .slice(0, 2);
+
+  let lastError = '';
+
+  for (const currentModel of candidates) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+        currentModel
+      )}:generateContent?key=${encodeURIComponent(cleanKey)}`;
+
+      const thinkingConfig = buildClientThinkingConfig(currentModel);
+      const generationConfig: Record<string, any> = {
+        temperature: params.temperature ?? 0.88
+      };
+      if (params.responseMimeType) {
+        generationConfig.responseMimeType = params.responseMimeType;
+      }
+      if (thinkingConfig) {
+        generationConfig.thinkingConfig = thinkingConfig;
+      }
+
+      const bodyPayload: Record<string, any> = {
+        contents: params.contents,
+        generationConfig
+      };
+
+      if (params.systemInstruction) {
+        bodyPayload.systemInstruction = {
+          parts: [{ text: params.systemInstruction }]
+        };
+      }
+
+      const res = await fetchWithTimeout(
+        url,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyPayload)
+        },
+        20000
+      );
+
+      const json: any = await res.json().catch(() => ({}));
+
+      if (res.ok) {
+        const parts = json?.candidates?.[0]?.content?.parts;
+        if (Array.isArray(parts)) {
+          const extractedText = parts
+            .filter((p: any) => typeof p?.text === 'string' && !p?.thought)
+            .map((p: any) => p.text)
+            .join('')
+            .trim();
+          const fallbackText =
+            extractedText ||
+            parts
+              .map((p: any) => p?.text || '')
+              .join('')
+              .trim();
+
+          if (fallbackText) {
+            return {
+              ok: true,
+              text: fallbackText,
+              modelUsed: currentModel
+            };
+          }
+        }
+      }
+
+      const errMsg = json?.error?.message || `HTTP ${res.status}`;
+      lastError = errMsg;
+
+      if (isKeyErrorString(errMsg) || res.status === 400 || res.status === 403) {
+        if (isKeyErrorString(errMsg)) {
+          return {
+            ok: false,
+            text: '',
+            modelUsed: currentModel,
+            isInvalidKey: true,
+            error: 'Invalid Gemini API Key. Please check your key in API Key & Model settings.'
+          };
+        }
+      }
+    } catch (err: any) {
+      lastError =
+        err?.name === 'AbortError'
+          ? `Model ${currentModel} timed out`
+          : err?.message || 'Direct Gemini connection error';
+    }
+  }
+
+  return {
+    ok: false,
+    text: '',
+    modelUsed: primaryModel,
+    error: lastError || 'Direct Gemini call failed'
   };
 }
 
 /**
- * Safety scrubber: Strictly filters out any accidental real-money or withdrawal terminology
- * to guarantee 100% compliance with the user's non-real-money catalog rules.
+ * Industrial Dual-Path Gemini Execution Engine:
+ * 1. If the Admin has configured a custom API key, executes directly against Google's edge with
+ *    low-latency `thinkingConfig` (< 1.5s response time) and automatic server proxy failover.
+ * 2. If no custom key is in the browser, routes through `/api/v1/admin/community/aistudio-gemini`
+ *    using the server's saved key or `GEMINI_API_KEY` environment variable.
  */
-export function sanitizeReviewText(text: string): string {
-  if (!text) return '';
-  let cleaned = text;
+async function callGeminiProxy(params: {
+  apiKey?: string;
+  model: string;
+  systemInstruction?: string;
+  contents: any[];
+  temperature?: number;
+  responseMimeType?: string;
+}): Promise<{
+  ok: boolean;
+  text: string;
+  modelUsed?: string;
+  error?: string;
+}> {
+  const savedCfg = loadStudioConfig();
+  const effectiveKey = (params.apiKey || savedCfg.apiKey || '').trim();
+  const normalizedModel = normalizeClientModelId(params.model || savedCfg.model);
 
-  // Replace banned money/withdrawal words with neutral app experience words
-  const replacements: [RegExp, string][] = [
-    [/\b(withdrawal|withdraw|withdrawing)\b/gi, 'performance'],
-    [/\b(deposit|depositing)\b/gi, 'loading'],
-    [/\b(upi|paytm|bank account|bank transfer)\b/gi, 'network connection'],
-    [/\b(real money|cashout|cash out|earn money|earning money)\b/gi, 'experience'],
-    [/\b(rupees|rs\.?|₹)\s*\d+/gi, 'points'],
-    [/\b(bonus claim|referral bonus|sign up bonus|signup bonus)\b/gi, 'welcome features'],
-    [/\b(payout|wallet balance)\b/gi, 'app features']
-  ];
+  // Path 1: Ultra-Fast Direct Edge Execution when a valid custom key is present
+  if (isValidClientApiKey(effectiveKey)) {
+    const directRes = await callGeminiDirectEdge({
+      apiKey: effectiveKey,
+      model: normalizedModel,
+      systemInstruction: params.systemInstruction,
+      contents: params.contents,
+      temperature: params.temperature,
+      responseMimeType: params.responseMimeType
+    });
 
-  for (const [regex, replacement] of replacements) {
-    cleaned = cleaned.replace(regex, replacement);
-  }
-
-  return cleaned.trim();
-}
-
-/**
- * Generates an authentically balanced star rating distribution matching the target catalog rating.
- * Mathematically balances across 1 to 5 stars so the average matches the app's real score.
- */
-export function generateBalancedRatingDistribution(targetRating: number, count: number): number[] {
-  const clamped = Math.max(1.0, Math.min(5.0, Number(targetRating) || 4.5));
-  const targetSum = Math.round(clamped * count);
-  
-  const base = Math.max(1, Math.min(5, Math.floor(clamped)));
-  const arr: number[] = new Array(count).fill(base);
-  let currentSum = base * count;
-
-  while (currentSum < targetSum) {
-    let added = false;
-    for (let i = 0; i < count; i++) {
-      if (arr[i] < 5 && currentSum < targetSum) {
-        arr[i] += 1;
-        currentSum += 1;
-        added = true;
-      }
+    if (directRes.ok) {
+      return {
+        ok: true,
+        text: directRes.text,
+        modelUsed: directRes.modelUsed
+      };
     }
-    if (!added) break;
-  }
 
-  // Organic variance trade to ensure realistic mix (e.g. 5★ and 3★ together instead of uniform 4s)
-  if (count >= 3) {
-    for (let t = 0; t < Math.min(count, 3); t++) {
-      const idxHigh = arr.findIndex((v, i) => v < 5);
-      const idxLow = arr.findIndex((v, i) => v > 1 && i !== idxHigh);
-      if (idxHigh !== -1 && idxLow !== -1 && idxHigh !== idxLow) {
-        if (arr[idxHigh] + 1 <= 5 && arr[idxLow] - 1 >= 1) {
-          arr[idxHigh] += 1;
-          arr[idxLow] -= 1;
-        }
-      }
+    if (directRes.isInvalidKey) {
+      return {
+        ok: false,
+        text: '',
+        modelUsed: directRes.modelUsed,
+        error: directRes.error
+      };
     }
   }
 
-  // Shuffle to randomize review ordering
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
+  // Path 2: Server-Side Gemini Proxy (with strict 24s timeout)
+  try {
+    const serverRes = await fetchWithTimeout(
+      '/api/v1/admin/community/aistudio-gemini',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiKey: effectiveKey,
+          model: normalizedModel,
+          systemInstruction: params.systemInstruction,
+          contents: params.contents,
+          temperature: params.temperature ?? 0.9,
+          responseMimeType: params.responseMimeType
+        })
+      },
+      24000
+    );
 
-  return arr;
-}
-
-/**
- * Resolves an authentic, realistic star rating distribution for a batch of reviews.
- * Seamlessly integrates the app's real catalog score or respects the Admin's manual override.
- */
-export function resolveTargetRatings(
-  ratingMix: RatingMixMode,
-  appRating: number,
-  count: number
-): number[] {
-  if (ratingMix === 'auto_app_rating' || !ratingMix) {
-    return generateBalancedRatingDistribution(appRating, count);
-  }
-
-  const ratings: number[] = [];
-
-  for (let i = 0; i < count; i++) {
-    let r = 5;
-    const rand = Math.random();
-
-    switch (ratingMix) {
-      case 'all_5_star':
-        r = 5;
-        break;
-      case 'all_4_star':
-        r = 4;
-        break;
-      case 'all_3_star':
-        r = 3;
-        break;
-      case 'all_2_star':
-        r = 2;
-        break;
-      case 'all_1_star':
-        r = 1;
-        break;
-      case 'critical_bugs':
-        // 60% 1-star, 40% 2-star
-        r = rand < 0.6 ? 1 : 2;
-        break;
-      case 'organic_full_mix':
-        // Full organic 1-5 star spread
-        if (rand < 0.40) r = 5;
-        else if (rand < 0.70) r = 4;
-        else if (rand < 0.85) r = 3;
-        else if (rand < 0.93) r = 2;
-        else r = 1;
-        break;
-      case 'high_praise':
-        r = rand < 0.9 ? 5 : 4;
-        break;
-      case 'balanced_critical':
-        if (rand < 0.50) r = 5;
-        else if (rand < 0.80) r = 4;
-        else if (rand < 0.90) r = 3;
-        else if (rand < 0.96) r = 2;
-        else r = 1;
-        break;
-      case 'natural':
-      default:
-        if (rand < 0.75) r = 5;
-        else if (rand < 0.95) r = 4;
-        else r = 3;
-        break;
+    const serverJson = await serverRes.json().catch(() => ({}));
+    if (serverRes.ok && serverJson?.success && serverJson?.text) {
+      return {
+        ok: true,
+        text: serverJson.text,
+        modelUsed: serverJson.modelUsed || normalizedModel
+      };
     }
-    ratings.push(r);
-  }
 
-  return ratings;
+    return {
+      ok: false,
+      text: '',
+      modelUsed: serverJson?.modelUsed || normalizedModel,
+      error: serverJson?.error || `Gemini API returned HTTP ${serverRes.status}`
+    };
+  } catch (err: any) {
+    return {
+      ok: false,
+      text: '',
+      modelUsed: normalizedModel,
+      error:
+        err?.name === 'AbortError'
+          ? 'Request timed out. Please verify your API key or select Gemini 2.5 Flash.'
+          : err?.message || 'Failed to connect to Gemini endpoint'
+    };
+  }
+}
+
+function buildMarketplaceStyleInstructions(config: StudioConfig): string {
+  const style = config.marketplaceStyle || 'blended_authentic';
+  const lengthMix = config.lengthDistribution || 'natural_mix';
+  const langMix = config.languageMix || 'hinglish_mix';
+  const topics = Array.isArray(config.focusTopics) && config.focusTopics.length > 0
+    ? config.focusTopics
+    : ['what_app_provides', 'onboarding_ease', 'daily_experience', 'device_network'];
+
+  const styleMap: Record<MarketplaceStyle, string> = {
+    blended_authentic: `MARKETPLACE PERSONA MIX (BLENDED REALISM):
+- Distribute reviews across 4 distinct real-world comment archetypes:
+  1. [Play Store Regulars - 35%]: Mention what the app provides, specific modes/tools from the dossier, update stability, or how it runs on their Android phone (Redmi, Realme, Vivo, Samsung M-series, Poco) over 4G/5G.
+  2. [Amazon / Flipkart Value Reviewers - 25%]: Practical "worth downloading" mindset. Talk about what the app actually delivers vs expectations, why they kept it after uninstalling 2-3 cluttered apps, and a clear pros/cons takeaway.
+  3. [Casual Hinglish Crowd - 20%]: Natural conversational Roman Hindi + English ("Bhai sach me kaafi useful app hai", "Interface simple hai aur features bhi kaam ke hain", "Timepass aur daily use ke liye best").
+  4. [Fast One-Line Crowd - 20%]: Brief, natural 5 to 12 word comments ("good app works fine on my phone", "nice features and easy to understand 👍", "using since last week no issue so far").`,
+
+    play_store: `MARKETPLACE PERSONA (GOOGLE PLAY STORE NATIVE):
+- Write exactly like real Google Play Store mobile users in India.
+- Reference specific features/modes the app provides, version update improvements, storage footprint, login/onboarding ease, battery/data usage on budget or mid-range Android phones, and honest star-matched feedback.`,
+
+    amazon_flipkart: `MARKETPLACE PERSONA (AMAZON / FLIPKART VERIFIED REVIEWER STYLE):
+- Write like practical, value-conscious Flipkart & Amazon reviewers evaluating a product after real usage ("Using this for 10 days now", "Does what it promises", "Pros: ... / Minor con: ...").
+- Focus heavily on WHAT THE APP PROVIDES to the user, its practical utility/entertainment value, how easy it is for family/friends to use, and how it compares to other apps in the same category.`,
+
+    hinglish_casual: `MARKETPLACE PERSONA (INDIAN HINGLISH + ENGLISH CROWD):
+- Write in authentic, natural Roman Hindi + English code-switching used by real Indian mobile users ("Mast app hai bhai", "Features kaafi sahi diye hain, specially...", "Starting me doubt tha par ab daily use karta hu").
+- Keep the phrasing organic and street-real — never textbook or stiff translation.`,
+
+    ultra_short_crowd: `MARKETPLACE PERSONA (ULTRA-SHORT MICRO COMMENTS):
+- Every review must be a fast, punchy 1-liner (between 4 and 15 words).
+- Mix casual punctuation, occasional lowercase starts, and direct reactions about a specific feature or what the app offers.`,
+
+    critical_tester: `MARKETPLACE PERSONA (POWER-USER & BALANCED QA TESTER):
+- Write observant, nuanced reviews that highlight 1-2 specific things the app provides well alongside 1 realistic minor observation or feature wish (e.g., "Wish there was a compact list view", "Takes a few extra seconds on slow network", "Notification settings could be easier to find").`
+  };
+
+  const lengthMap: Record<ReviewLengthMix, string> = {
+    natural_mix: `LENGTH DISTRIBUTION:
+- 30% Short One-Liners (5 to 14 words)
+- 50% Medium Natural Reviews (18 to 38 words, 1–2 sentences)
+- 20% Detailed Experience Stories (40 to 70 words, 2–4 sentences explaining how they use the app and what it provides)`,
+    short_punchy: `LENGTH DISTRIBUTION: Keep ALL reviews concise and punchy (5 to 16 words max, 1 sentence).`,
+    medium_standard: `LENGTH DISTRIBUTION: Keep reviews 18 to 38 words (1–2 natural sentences).`,
+    detailed_story: `LENGTH DISTRIBUTION: Write substantive 35 to 75 word reviews sharing specific usage context, what the app provides, and practical takeaways.`
+  };
+
+  const langMap: Record<ReviewLanguageMix, string> = {
+    english_india: `LANGUAGE: Natural Indian English (relatable everyday phrasing, zero stiff corporate or western-slang clichés).`,
+    hinglish_mix: `LANGUAGE: ~70% natural Indian English reviews and ~30% conversational Hinglish (Roman Hindi + English mix) reviews.`,
+    global_english: `LANGUAGE: Clean, casual everyday English used by everyday mobile users.`,
+    pure_hinglish: `LANGUAGE: Conversational Hinglish (Roman Hindi mixed with English terms) for every review.`
+  };
+
+  const topicDescriptions: Record<ReviewFocusTopic, string> = {
+    what_app_provides: 'WHAT THE APP PROVIDES: Talk specifically about the core features, modes, tools, content, or services inside this app based on its dossier.',
+    onboarding_ease: 'ONBOARDING & USABILITY: Mention download size, quick installation, easy menu navigation, or straightforward setup.',
+    daily_experience: 'REAL-LIFE CONTEXT: Mention when/how they use it (evening break, commuting on metro/bus, with college friends/cousins, weekend relaxation).',
+    device_network: 'DEVICE & NETWORK REALITY: Mention real-world performance on 4G/5G (Jio/Airtel) or mid-range Android phones (Redmi, Realme, Samsung, Vivo) and battery/storage impact.',
+    comparison_verdict: 'COMPARISON VERDICT: Mention trying other apps in this category before settling on this one because it is cleaner or more reliable.',
+    feature_requests: 'CONSTRUCTIVE WISHES: Include realistic minor user suggestions or grounded feedback when rating is 3★ or 4★.'
+  };
+
+  const imperfectionGuide =
+    config.humanImperfectionLevel === 'raw_casual'
+      ? 'HUMAN TEXTURE: Use raw mobile typing habits — occasional lowercase starts, casual shorthand ("v good", "gud", "nic", "tho"), minimal punctuation, zero essay structure.'
+      : config.humanImperfectionLevel === 'polished'
+      ? 'HUMAN TEXTURE: Clear, well-written everyday human sentences without typos, but still conversational and never robotic.'
+      : 'HUMAN TEXTURE: Realistic mix — most reviews have normal casual grammar, while ~25% have relaxed mobile typing habits (lowercase start, missing period at end, or casual abbreviations).';
+
+  return [
+    styleMap[style] || styleMap.blended_authentic,
+    lengthMap[lengthMix] || lengthMap.natural_mix,
+    langMap[langMix] || langMap.hinglish_mix,
+    `REQUIRED COMMENT ANGLES TO ROTATE ACROSS REVIEWS:\n${topics.map(t => `- ${topicDescriptions[t]}`).join('\n')}`,
+    imperfectionGuide,
+    `ANTI-AI-SLOP RULES (CRITICAL):
+- NEVER use AI giveaway words: "seamlessly", "game-changer", "top-notch", "delve", "testament", "unparalleled", "elevate", "boasts", "comprehensive", "sleek", "intuitive interface" (use normal human words like "easy to use", "clean layout", "simple menu").
+- NEVER start multiple reviews with the same opening word ("Really love...", "Great app...", "I have been using..."). Every review MUST start differently.
+- NEVER write generic praise that could apply to any random app; anchor comments in what THIS specific app provides according to its Dossier.`
+  ].join('\n\n');
+}
+
+export interface CoPilotChatResponse {
+  reply: string;
+  configPatches?: Partial<StudioConfig>;
+  compiledStrategyBrief?: string;
+  appliedAdjustments?: string[];
+  modelUsed?: string;
+  error?: string;
 }
 
 /**
- * Builds the strict system instruction enforcing knowledge isolation to ONLY the website content.
- */
-function buildStrictSystemInstructions(directives: BrainMemoryDirective[], tone: LanguageToneMode): string {
-  const activeDirectives = directives.filter(d => d.active).map(d => `- ${d.rule}`).join('\n');
-
-  let toneGuideline = '';
-  switch (tone) {
-    case 'happy_with_emojis':
-      toneGuideline = 'Write enthusiastic, genuinely happy comments with natural emojis (e.g. 😊, 👍, ⭐, ❤️, 🙌). Sounds like satisfied everyday mobile users.';
-      break;
-    case 'super_excited_emojis':
-      toneGuideline = 'Write highly energetic, passionate reviews with vivid emojis (🔥, 🚀, 💯, ⭐, 🤩, 👏). Expresses true excitement about speed, graphics, and performance.';
-      break;
-    case 'hinglish_natural':
-      toneGuideline = 'Use casual, natural colloquial phrasing typical of everyday mobile users (e.g. "kaafi smooth chal raha hai", "UI clean aur easy hai", "daily use ke liye badhiya app hai", "lag nahi karta bilkul").';
-      break;
-    case 'natural_english':
-      toneGuideline = 'Use casual, natural everyday English. Avoid stiff corporate vocabulary. Friendly and human.';
-      break;
-    case 'short_punchy':
-      toneGuideline = 'Keep each review strictly 1 to 2 short sentences. Punchy, authentic, and direct.';
-      break;
-    case 'detailed_feedback':
-      toneGuideline = 'Write 2 to 3 sentences discussing specific interface features, ease of use, or content playback.';
-      break;
-    case 'honest_balanced':
-      toneGuideline = 'Write balanced, authentic user reviews praising the strengths while noting minor suggestions (e.g. battery, dark mode).';
-      break;
-    case 'feature_focused':
-      toneGuideline = 'Focus deeply on feature smoothness, clean navigation, responsive touch controls, and lightweight storage usage.';
-      break;
-    case 'beginner_friendly':
-      toneGuideline = 'Write from the perspective of someone who just installed the app and found it extremely easy and intuitive to get started.';
-      break;
-    case 'daily_regular_user':
-      toneGuideline = 'Write from the perspective of a loyal, regular user who uses this app frequently on their phone and appreciates its consistent stability.';
-      break;
-    case 'all_rounder_standard':
-    default:
-      toneGuideline = 'Write like standard, spontaneous human comments on an Instagram video or App Store review board. Genuine, concise, varied.';
-      break;
-  }
-
-  return `You are the Dedicated In-House Review Creator for our website catalog.
-
-CRITICAL INSTRUCTIONS:
-
-1. ABSOLUTE KNOWLEDGE BOUNDARY (STRICTLY USE PROVIDED APP DOSSIER):
-   - You MUST base all comments directly on the provided app dossier below (the real admin description, meta title, meta description, and listed features).
-   - If a feature is NOT in the dossier, DO NOT invent or assume it.
-
-2. STRICT BAN ON REAL-MONEY AND GAMBLING WORDS:
-   - NEVER USE: "withdrawal", "deposit", "withdraw", "UPI", "cash", "money", "rupees", "₹", "bank", "payout", "wallet", "earning", "referral bonus", "bonus claim".
-   - Talk strictly about what is actually in the app: table animations, controls, streaming quality, sound effects, battery efficiency, and stability.
-
-3. SPONTANEOUS HUMAN COMMENTING PERSPECTIVE:
-   - Write like real people leaving honest feedback under a post or on the app store.
-   - For 5-star: Genuine appreciation, praises specific smooth details.
-   - For 4-star: Satisfied with small helpful notes (e.g. "graphics are great, battery drains a little fast").
-   - For 3-star: Neutral feedback, requests improvements like dark mode or faster reconnection.
-   - For 2-star: Constructive complaint about lag, missing feature, or stuttering.
-   - For 1-star: Direct bug or crash report on their device (e.g. "crashes after update", "loads too slow on mobile data").
-
-PERSISTENT STORE BRAIN DIRECTIVES:
-${activeDirectives || '- Write natural, authentic everyday user reviews.'}
-
-TONE STYLE:
-${toneGuideline}
-`;
-}
-
-/**
- * Detects on-the-fly configuration updates directly from the Admin's conversational chat messages.
- * Automatically aligns review counts, rating strategy, language tone, or date timeline without manual clicks.
- */
-export function detectConfigUpdatesFromChat(userMessage: string): Partial<StudioConfig> {
-  const lower = userMessage.toLowerCase().trim();
-  const updates: Partial<StudioConfig> = {};
-
-  // 1. Reviews count detection (e.g. "5 reviews each", "10 reviews", "create 3 reviews")
-  const countMatch = lower.match(/(\d+)\s*(reviews?|comments?|each|per app)/);
-  if (countMatch && countMatch[1]) {
-    const num = parseInt(countMatch[1], 10);
-    if (num >= 1 && num <= 500) {
-      updates.reviewsPerApp = num;
-    }
-  }
-
-  // 2. Rating mix detection
-  if (lower.includes('all 1 star') || lower.includes('1 star only') || lower.includes('one star only') || lower.includes('1-star only') || lower.includes('1 star review')) {
-    updates.ratingMix = 'all_1_star';
-  } else if (lower.includes('all 2 star') || lower.includes('2 star only') || lower.includes('two star only') || lower.includes('2-star only')) {
-    updates.ratingMix = 'all_2_star';
-  } else if (lower.includes('all 3 star') || lower.includes('3 star only') || lower.includes('three star only') || lower.includes('3-star only')) {
-    updates.ratingMix = 'all_3_star';
-  } else if (lower.includes('all 4 star') || lower.includes('4 star only') || lower.includes('four star only') || lower.includes('4-star only')) {
-    updates.ratingMix = 'all_4_star';
-  } else if (lower.includes('all 5 star') || lower.includes('5 star only') || lower.includes('five star only') || lower.includes('5-star only')) {
-    updates.ratingMix = 'all_5_star';
-  } else if (lower.includes('critical') || lower.includes('bug report') || lower.includes('crash review') || lower.includes('crashes')) {
-    updates.ratingMix = 'critical_bugs';
-  } else if (lower.includes('organic') || lower.includes('abnormally') || lower.includes('all kind of comment') || lower.includes('every kind of star') || lower.includes('mixing') || lower.includes('mix')) {
-    updates.ratingMix = 'organic_full_mix';
-  } else if (lower.includes('balance') || lower.includes('catalog') || lower.includes('app rating') || lower.includes('auto rating')) {
-    updates.ratingMix = 'auto_app_rating';
-  }
-
-  // 3. Language tone detection
-  if (lower.includes('emoji') || lower.includes('happy')) {
-    updates.languageTone = 'happy_with_emojis';
-  } else if (lower.includes('hinglish') || lower.includes('hindi') || lower.includes('desi') || lower.includes('slang')) {
-    updates.languageTone = 'hinglish_natural';
-  } else if (lower.includes('punchy') || lower.includes('short') || lower.includes('one line')) {
-    updates.languageTone = 'short_punchy';
-  } else if (lower.includes('detail') || lower.includes('deep feedback')) {
-    updates.languageTone = 'detailed_feedback';
-  } else if (lower.includes('feature') || lower.includes('ui smoothness')) {
-    updates.languageTone = 'feature_focused';
-  }
-
-  // 4. Date mode detection
-  if (lower.includes('today only') || lower.includes('only today')) {
-    updates.dateMode = 'today_only';
-  } else if (lower.includes('yesterday only')) {
-    updates.dateMode = 'yesterday_only';
-  } else if (lower.includes('last 2 days') || lower.includes('past 48 hours')) {
-    updates.dateMode = 'last_2_days';
-  } else if (lower.includes('today and yesterday') || lower.includes('today yesterday')) {
-    updates.dateMode = 'today_and_yesterday';
-  }
-
-  // 5. Likes / helpful rate detection (e.g. "sometime two, sometime one", "lower rate of likes")
-  if (
-    lower.includes('lower rate of likes') || 
-    lower.includes('two likes') || 
-    lower.includes('one likes') || 
-    lower.includes('1 or 2 likes') ||
-    lower.includes('1-2 likes') ||
-    lower.includes('subtle likes') ||
-    lower.includes('few likes') ||
-    lower.includes('sometime two') ||
-    lower.includes('sometime one')
-  ) {
-    updates.likesMode = 'subtle_1_2';
-  } else if (lower.includes('no likes') || lower.includes('zero likes') || lower.includes('without likes')) {
-    updates.likesMode = 'zero_none';
-  } else if (lower.includes('more likes') || lower.includes('high likes') || lower.includes('4 likes') || lower.includes('1-4 likes')) {
-    updates.likesMode = 'modest_1_4';
-  } else if (lower.includes('organic likes') || lower.includes('natural likes')) {
-    updates.likesMode = 'natural_0_3';
-  }
-
-  return updates;
-}
-
-/**
- * Handles conversational discussion with the Master AI Brain (Brain 1).
- * Discusses review strategy and confirms understanding.
+ * Interactive AI Co-Pilot Chat that responds in ~1s and translates natural language into structured configPatches.
  */
 export async function sendChatMessageToGemini(
   userMessage: string,
   chatHistory: ChatMessage[],
-  directives: BrainMemoryDirective[],
-  config: StudioConfig
-): Promise<string> {
-  const envKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) || '';
-  const apiKey = (config.apiKey || '').trim() || envKey;
-  const modelName = (config.model || '').trim() || 'gemini-flash-latest';
-
-  const systemPrompt = `${buildStrictSystemInstructions(directives, config.languageTone)}
-
-CHAT CO-PILOT ROLE:
-You are conversing with the Admin. The Admin discusses today's overall review strategy, tone, persona, happiness level, emoji usage, date spreads, star rating focus (including 1-5 star mix or critical bug feedback), or specific app angles.
-You understand them deeply, give constructive human-like suggestions, and maintain a friendly, cooperative tone.
-You confirm that when generating reviews, you will strictly inspect each app's Meta Title, Meta Description, and full Admin Description stored on our website.`;
-
-  // Handle stop command immediately if typed in chat
-  const lowerMsg = userMessage.toLowerCase().trim();
-  if (
-    lowerMsg === 'stop' || 
-    lowerMsg === 'cancel' || 
-    lowerMsg.includes('stop generating') || 
-    lowerMsg.includes('stop the working') ||
-    lowerMsg.includes('stop ai')
-  ) {
-    return `⏹ Understood! I have stopped the AI generation process. Any reviews produced up to this point have been safely preserved in your Staged Deck.`;
+  config: StudioConfig,
+  selectedApps: any[],
+  brainDirectives: BrainDirective[] = [],
+  siteContext?: {
+    allApps?: any[];
+    newsList?: any[];
+    videosList?: any[];
+    faqsList?: any[];
+    developersList?: any[];
+    settings?: any;
   }
+): Promise<CoPilotChatResponse> {
+  const activeRules = brainDirectives
+    .filter(d => d.active)
+    .map((d, i) => `${i + 1}. [${d.category.toUpperCase()}] ${d.rule}`)
+    .join('\n');
 
-  // Local fallback response if no API key is available
-  if (!apiKey) {
-    if (lowerMsg.includes('start') || lowerMsg.includes('generate')) {
-      return `Got it! I understand today's review strategy. Click "Start Generating Now" or the green start button above, and I will inspect each selected app's real website metadata and produce tailored comments one by one.`;
-    }
-    return `Understood! I've locked in your directive for today's review session: "${userMessage}". I will inspect each app's real admin metadata, match the ratings, and generate realistic human reviews. When you are ready, tap Start Generating!`;
-  }
+  const allCatalogApps =
+    siteContext?.allApps && siteContext.allApps.length > 0
+      ? siteContext.allApps
+      : (siteBrainSnapshot as any)?.apps || [];
 
-  // Format conversation history for Gemini API
-  const contents: any[] = [
-    {
-      role: 'user',
-      parts: [{ text: `${systemPrompt}\n\n[ADMIN INITIALIZATION]` }]
-    },
-    {
-      role: 'model',
-      parts: [{ text: 'Understood. I am your Dedicated Review Creator. I strictly follow your website admin content, adapt to your exact requested tone and rating mix, and talk like real everyday humans.' }]
-    }
-  ];
-
-  // Append recent turns
-  const recentHistory = chatHistory.slice(-10);
-  for (const msg of recentHistory) {
-    if (msg.id === 'welcome') continue;
-    contents.push({
-      role: msg.sender === 'user' ? 'user' : 'model',
-      parts: [{ text: msg.text }]
-    });
-  }
-
-  // Append current user message
-  contents.push({
-    role: 'user',
-    parts: [{ text: userMessage }]
+  const selectedDossiers = selectedApps.slice(0, 6).map(app => {
+    const d = extractAppDeepDossier(app);
+    return [
+      `• APP: "${d.appName}" (Category: ${d.category} | Dev: ${d.developer} | Size: ${d.size} | Ver: ${d.version})`,
+      d.whatAppProvidesSummary ? `  What It Provides: ${d.whatAppProvidesSummary.slice(0, 380)}` : '',
+      d.featuresList.length > 0 ? `  Key Features: ${d.featuresList.slice(0, 6).join(' | ')}` : ''
+    ]
+      .filter(Boolean)
+      .join('\n');
   });
 
-  // 1. Try server-side proxy
-  try {
-    const srvRes = await fetch('/api/v1/admin/community/aistudio-gemini', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        apiKey,
-        model: modelName,
-        systemInstruction: systemPrompt,
-        contents,
-        temperature: 0.75
-      })
-    });
-    if (srvRes.ok) {
-      const data = await srvRes.json();
-      if (data?.text) return data.text.trim();
-    }
-  } catch (_) {}
+  const conversationHistoryText = chatHistory
+    .slice(-8)
+    .map(m => `${m.role === 'user' ? 'ADMIN' : 'AI CO-PILOT'}: ${m.text.slice(0, 400)}`)
+    .join('\n\n');
 
-  // 2. Direct client fallback
+  const systemInstruction = `You are the Lead Crowd Psychology & Review Strategy Architect for "${siteContext?.settings?.site_title || 'Platform'}".
+Your role is to collaborate with the Admin to design ultra-authentic, human-indistinguishable user reviews for the platform's apps, AND automatically translate the Admin's natural-language requests into structured studio adjustments.
+
+=== CURRENT SELECTED APPS (${selectedApps.length} selected out of ${allCatalogApps.length} catalog apps) ===
+${selectedDossiers.length > 0 ? selectedDossiers.join('\n\n') : 'No apps currently checked in the left panel.'}
+
+=== CURRENT STUDIO ADJUSTMENTS ===
+- Reviews Per App: ${config.reviewsPerApp}
+- Rating Mix: ${config.ratingMix} ('mostly_positive' | 'all_5_star' | 'balanced_realistic' | 'critical_feedback')
+- Marketplace Style: ${config.marketplaceStyle} ('blended_authentic' | 'play_store' | 'amazon_flipkart' | 'hinglish_casual' | 'ultra_short_crowd' | 'critical_tester')
+- Length Distribution: ${config.lengthDistribution} ('natural_mix' | 'short_punchy' | 'medium_standard' | 'detailed_story')
+- Language Mix: ${config.languageMix} ('english_india' | 'hinglish_mix' | 'global_english' | 'pure_hinglish')
+- Focus Topics: ${(config.focusTopics || []).join(', ')}
+- Date Range Mode: ${config.dateRangeMode} (Custom Days: ${config.customDays}, Custom Months: ${config.customMonths})
+- Helpful Likes: ${config.likesProbability}% chance, up to ${config.maxLikesPerReview} likes
+- Publish Mode: ${config.autoPublish ? 'Auto-Publish Live' : 'Stage in Queue'}
+- Previous Compiled Strategy Brief: ${config.activeSessionDirective || 'None yet'}
+
+=== PERMANENT BRAIN DIRECTIVES ===
+${activeRules || 'Standard safety and authenticity rules active.'}
+
+=== HOW YOU MUST RESPOND (STRICT JSON) ===
+Analyze the Admin's message ("${userMessage}") and the conversation history.
+Return ONLY a valid JSON object matching this exact schema:
+{
+  "reply": "Your clear, helpful markdown response to the Admin. Explain how you will craft the reviews based on what the selected apps actually provide, how Play Store / Flipkart / Amazon / Hinglish users talk about these features, and confirm any parameter adjustments you just applied.",
+  "configPatches": {
+    // Include ONLY fields that the Admin explicitly or implicitly asked to change in their message! Leave out unchanged fields.
+    // Allowed keys & values:
+    // "reviewsPerApp": number (1 to 50),
+    // "ratingMix": "mostly_positive" | "all_5_star" | "balanced_realistic" | "critical_feedback",
+    // "marketplaceStyle": "blended_authentic" | "play_store" | "amazon_flipkart" | "hinglish_casual" | "ultra_short_crowd" | "critical_tester",
+    // "lengthDistribution": "natural_mix" | "short_punchy" | "medium_standard" | "detailed_story",
+    // "languageMix": "english_india" | "hinglish_mix" | "global_english" | "pure_hinglish",
+    // "focusTopics": array of ["what_app_provides", "onboarding_ease", "daily_experience", "device_network", "comparison_verdict", "feature_requests"],
+    // "humanImperfectionLevel": "natural" | "polished" | "raw_casual",
+    // "customDays": number,
+    // "likesProbability": number (0 to 100),
+    // "maxLikesPerReview": number (0 to 50),
+    // "autoPublish": boolean
+  },
+  "compiledStrategyBrief": "A comprehensive, cumulative 2-5 sentence master instruction brief that combines the Previous Compiled Strategy Brief with the Admin's latest instructions from this chat. Be specific about tone, what app features/mechanisms to emphasize, persona types, things to avoid, and special requests so the review generator executes it with 100% fidelity.",
+  "appliedAdjustments": ["Short human-readable badges of any settings you updated, e.g. 'Reviews/App → 8', 'Style → Amazon & Flipkart', 'Language → Hinglish Mix'"]
+}`;
+
+  const proxyRes = await callGeminiProxy({
+    apiKey: config.apiKey,
+    model: config.model,
+    systemInstruction,
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          {
+            text: `RECENT CONVERSATION HISTORY:\n${conversationHistoryText || '(Start of session)'}\n\nLATEST ADMIN MESSAGE:\n${userMessage}\n\nRespond with the JSON object now.`
+          }
+        ]
+      }
+    ],
+    temperature: 0.75,
+    responseMimeType: 'application/json'
+  });
+
+  if (!proxyRes.ok) {
+    return {
+      reply: `⚠️ **Gemini API Connection Issue (${proxyRes.modelUsed || config.model})**\n\n${proxyRes.error}\n\nPlease click **API Key** in the top bar to verify your Google AI Studio API key or switch to **Gemini 2.5 Flash**.`,
+      error: proxyRes.error,
+      modelUsed: proxyRes.modelUsed
+    };
+  }
+
   try {
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'X-goog-api-key': apiKey
+    const cleanedJson = proxyRes.text
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/```\s*$/i, '')
+      .trim();
+    const jsonMatch = cleanedJson.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : cleanedJson);
+
+    return {
+      reply: parsed.reply || proxyRes.text,
+      configPatches: parsed.configPatches && typeof parsed.configPatches === 'object' ? parsed.configPatches : undefined,
+      compiledStrategyBrief:
+        typeof parsed.compiledStrategyBrief === 'string' && parsed.compiledStrategyBrief.trim()
+          ? parsed.compiledStrategyBrief.trim()
+          : config.activeSessionDirective,
+      appliedAdjustments: Array.isArray(parsed.appliedAdjustments) ? parsed.appliedAdjustments : [],
+      modelUsed: proxyRes.modelUsed
+    };
+  } catch (_) {
+    const combinedDirective = [config.activeSessionDirective, userMessage].filter(Boolean).join(' | ');
+    return {
+      reply: proxyRes.text,
+      compiledStrategyBrief: combinedDirective,
+      modelUsed: proxyRes.modelUsed
+    };
+  }
+}
+
+interface ReviewerPersonaSlot {
+  index: number;
+  authorName: string;
+  rating: number;
+  archetypeLabel: string;
+  archetypeInstruction: string;
+}
+
+function assignPersonaSlotsForBatch(
+  count: number,
+  names: string[],
+  ratings: number[],
+  config: StudioConfig
+): ReviewerPersonaSlot[] {
+  const style = config.marketplaceStyle || 'blended_authentic';
+  const archetypesByStyle: Record<MarketplaceStyle, { label: string; instruction: string }[]> = {
+    blended_authentic: [
+      {
+        label: 'Play Store • Daily User',
+        instruction: 'Write like a regular Google Play Store user talking about what this app provides, how a specific feature works in daily use, and how smoothly it runs on their Android phone.'
       },
-      body: JSON.stringify({
-        contents,
-        generationConfig: {
-          temperature: 0.75,
-          maxOutputTokens: 1200
-        }
-      })
-    });
+      {
+        label: 'Flipkart/Amazon • Value Verdict',
+        instruction: 'Write like an Amazon/Flipkart verified reviewer evaluating whether the app delivers on its promises, what makes it better than 2-3 cluttered alternatives, and a practical takeaway.'
+      },
+      {
+        label: 'Hinglish • Casual Desi User',
+        instruction: 'Write in natural conversational Hinglish (Roman Hindi + English mix) talking casually about what they liked inside the app and how they use it with friends or in free time.'
+      },
+      {
+        label: 'Crowd • Fast 1-Liner',
+        instruction: 'Write a short, punchy 5 to 12 word micro-comment reacting directly to the app or a specific feature with casual mobile punctuation.'
+      },
+      {
+        label: 'Play Store • Device & Network',
+        instruction: 'Mention installing the latest version on a mid-range phone (e.g. Redmi, Realme, Samsung, Vivo) over 4G/5G, low storage/battery usage, and clean navigation.'
+      },
+      {
+        label: 'Power User • Honest Feedback',
+        instruction: 'Share a grounded, specific review praising the core offering while mentioning one realistic minor wish or observation.'
+      }
+    ],
+    play_store: [
+      {
+        label: 'Play Store • Feature Focus',
+        instruction: 'Talk specifically about the core features and modes this app provides and how easy the interface is to navigate.'
+      },
+      {
+        label: 'Play Store • Android Device User',
+        instruction: 'Mention performance on their Android phone (Redmi/Realme/Samsung/Vivo), quick loading on mobile data, and low battery drain.'
+      },
+      {
+        label: 'Play Store • Quick Reaction',
+        instruction: 'Write a brief 6 to 14 word Play Store comment about the latest update or daily experience.'
+      },
+      {
+        label: 'Play Store • Long-Time User',
+        instruction: 'Mention using the app for a couple of weeks after trying similar apps, noting what keeps them coming back.'
+      }
+    ],
+    amazon_flipkart: [
+      {
+        label: 'Flipkart • Value & Utility Verdict',
+        instruction: 'Evaluate what the app actually provides vs expectations, highlighting practical benefits and ease of setup.'
+      },
+      {
+        label: 'Amazon • Pros & Cons Style',
+        instruction: 'Write a structured, practical review sharing what works great and why it is worth keeping on the phone.'
+      },
+      {
+        label: 'Verified User • Comparison',
+        instruction: 'Compare this app favorably against 2-3 noisy/cluttered alternatives in the same category.'
+      }
+    ],
+    hinglish_casual: [
+      {
+        label: 'Hinglish • Daily Timepass',
+        instruction: 'Use natural Roman Hindi + English ("Bhai sach me...", "Kaafi sahi app hai...") talking about specific features.'
+      },
+      {
+        label: 'Hinglish • Short Reaction',
+        instruction: 'Write a short 6 to 14 word Hinglish comment praising the app or suggesting a small feature.'
+      },
+      {
+        label: 'Hinglish • Friend Recommendation',
+        instruction: 'Mention downloading it on a friend/cousin recommendation and finding the features genuinely useful.'
+      }
+    ],
+    ultra_short_crowd: [
+      {
+        label: 'Crowd • 1-Line Reaction',
+        instruction: 'Write a 4 to 11 word casual one-liner about the app.'
+      },
+      {
+        label: 'Crowd • Short Feature Note',
+        instruction: 'Write a 6 to 14 word casual comment mentioning one specific thing the app provides.'
+      }
+    ],
+    critical_tester: [
+      {
+        label: 'QA Tester • Detailed Analysis',
+        instruction: 'Praise specific capabilities from the app dossier while pointing out a realistic minor UI/feature suggestion.'
+      },
+      {
+        label: 'Power User • Performance Check',
+        instruction: 'Comment on onboarding, menu responsiveness, and one constructive improvement idea for the next update.'
+      }
+    ]
+  };
 
-    if (res.ok) {
-      const data = await res.json();
-      const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (candidateText) return candidateText.trim();
+  const pool = archetypesByStyle[style] || archetypesByStyle.blended_authentic;
+
+  return Array.from({ length: count }, (_, idx) => {
+    const rating = ratings[idx] ?? 5;
+    const baseArchetype = pool[idx % pool.length];
+    let ratingSpecificNote = '';
+    if (rating === 5) {
+      ratingSpecificNote = '5-STAR: Genuinely satisfied with what the app provides; mention 1-2 concrete specifics from the dossier.';
+    } else if (rating === 4) {
+      ratingSpecificNote = '4-STAR: Positive about the app and its features, with a tiny realistic wish or minor note (e.g., wish dark mode was easier to toggle or notification sound was softer).';
+    } else if (rating === 3) {
+      ratingSpecificNote = '3-STAR: Balanced/mixed — likes the core concept and features, but notes a minor hiccup (like occasional slow loading on weak 4G or wanting more customization).';
+    } else {
+      ratingSpecificNote = `${rating}-STAR: Constructive complaint (e.g., took two tries to load on an older 3GB RAM phone or waiting for an update to fix a minor screen lag), while staying polite and realistic.`;
     }
-  } catch (_) {}
 
-  return `Understood! I've locked in your strategy: "${userMessage}". I will inspect each app's real admin metadata one by one, maintain your exact directives, and produce natural comments with authentic likes. Tap Start Generating when ready!`;
+    return {
+      index: idx,
+      authorName: names[idx] || `User_${idx + 1}`,
+      rating,
+      archetypeLabel: baseArchetype.label,
+      archetypeInstruction: `${baseArchetype.instruction} ${ratingSpecificNote}`
+    };
+  });
 }
 
 /**
- * Generates realistic reviews for a specific app using Gemini API or smart local templates.
- * Uses micro-batching and multivariant perspective angles to ensure maximum comment diversity!
+ * Generates authentic, human-indistinguishable reviews in a single ultra-fast batch call (< 2 seconds per app)
+ * and streams them progressively to the UI when step_by_step mode is enabled.
  */
 export async function generateReviewsForAppWithGemini(
   app: any,
-  countToGenerate: number,
-  directives: BrainMemoryDirective[],
   config: StudioConfig,
-  customInstructions?: string
+  customPromptInstruction?: string,
+  onReviewGenerated?: (review: StagedReview, currentIdx: number, total: number) => void,
+  brainDirectives: BrainDirective[] = [],
+  existingAppReviews: { authorName?: string; content?: string }[] = [],
+  recentChatMessages: ChatMessage[] = []
 ): Promise<StagedReview[]> {
-  const profile = extractAdminAppProfile(app);
-  const targetRatings = resolveTargetRatings(config.ratingMix, profile.appRating, countToGenerate);
+  const count = Math.max(1, Math.min(50, Number(config.reviewsPerApp) || 5));
+  const dossier = extractAppDeepDossier(app);
 
-  const envKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) || '';
-  const apiKey = (config.apiKey || '').trim() || envKey;
-  const modelName = (config.model || '').trim() || 'gemini-flash-latest';
-  const systemPrompt = buildStrictSystemInstructions(directives, config.languageTone);
+  const usedNames = new Set<string>(
+    existingAppReviews.map(r => (r.authorName || '').trim()).filter(Boolean)
+  );
+  const existingSnippets = existingAppReviews
+    .slice(0, 10)
+    .map(r => (r.content || '').slice(0, 85))
+    .filter(Boolean);
 
-  let allParsedReviews: Array<{ rating: number; text: string }> = [];
+  const names = pickUniqueNames(count, usedNames);
+  const ratings = generateRatingsArray(count, config.ratingMix);
+  const personaSlots = assignPersonaSlotsForBatch(count, names, ratings, config);
 
-  // Micro-batching helper: splits large generation requests (e.g. 10 or 20) into crisp 4-5 review bursts
-  const CHUNK_SIZE = 5;
-  const batchesCount = Math.ceil(countToGenerate / CHUNK_SIZE);
+  const activeBrainRules = brainDirectives
+    .filter(d => d.active)
+    .map((d, idx) => `${idx + 1}. [${d.category.toUpperCase()}] ${d.rule}`)
+    .join('\n');
 
-  for (let b = 0; b < batchesCount; b++) {
-    const startIdx = b * CHUNK_SIZE;
-    const endIdx = Math.min(countToGenerate, startIdx + CHUNK_SIZE);
-    const batchRatings = targetRatings.slice(startIdx, endIdx);
-    const batchCount = batchRatings.length;
-    if (batchCount === 0) continue;
+  const recentUserChatContext = recentChatMessages
+    .filter(m => m.role === 'user' || m.role === 'assistant')
+    .slice(-6)
+    .map(m => `${m.role === 'user' ? 'Admin' : 'Strategy Co-Pilot'}: ${m.text.slice(0, 300)}`)
+    .join('\n');
 
-    const ratingInstruction = `Target Star Ratings for this batch of ${batchCount} reviews: [${batchRatings.join(', ')} Stars].
-(App Catalog Rating: ${profile.appRating.toFixed(1)}/5.0). Match the sentiment of each star rating authentically!`;
+  const masterStrategyDirective = [
+    config.activeSessionDirective ? `Compiled Strategy Brief: ${config.activeSessionDirective}` : '',
+    customPromptInstruction ? `Latest Admin Instruction: ${customPromptInstruction}` : ''
+  ]
+    .filter(Boolean)
+    .join('\n');
 
-    const prompt = `Generate exactly ${batchCount} authentic user reviews for this specific app using ONLY the content provided below.
+  const marketplaceInstructions = buildMarketplaceStyleInstructions(config);
 
---- WEBSITE ADMIN APP DOSSIER ---
-App Name: "${profile.appName}"
-Category: "${profile.category}"
-Catalog Official Star Rating: ${profile.appRating.toFixed(1)} / 5.0
-${profile.developer ? `Developer: "${profile.developer}"` : ''}
-${profile.seoTitle ? `Official Meta Title: "${profile.seoTitle}"` : ''}
-${profile.seoDescription ? `Official Meta Description: "${profile.seoDescription}"` : ''}
-${profile.description ? `Admin Description: "${profile.description.slice(0, 1000)}"` : ''}
-${profile.features ? `Core Features: "${profile.features.slice(0, 600)}"` : ''}
-${profile.customBox ? `Admin Notice: "${profile.customBox}"` : ''}
-${profile.releaseNotes ? `What's New: "${profile.releaseNotes}"` : ''}
-${profile.version ? `Version: "${profile.version}"` : ''}
-${profile.fileSize ? `Size: "${profile.fileSize}"` : ''}
----------------------------------
+  const results: StagedReview[] = [];
+  // Always use a fast batch chunk size of 15 to avoid sequential API call delays
+  const chunkSize = 15;
 
-SESSION DIRECTIVE:
-"${customInstructions || config.activeSessionDirective || 'Natural everyday user feedback reflecting the actual website features and content.'}"
+  for (let startIdx = 0; startIdx < count; startIdx += chunkSize) {
+    const chunkSlots = personaSlots.slice(startIdx, Math.min(count, startIdx + chunkSize));
+    const alreadyGeneratedInThisRun = results.map(r => `- "${r.content}"`).join('\n');
 
-RATING INSTRUCTION:
-${ratingInstruction}
+    const systemInstruction = `You are an elite Marketplace Crowd Simulation Engine generating real-world user reviews for "${dossier.appName}".
+Your reviews must be 100% indistinguishable from authentic human comments written on Google Play Store, Flipkart, Amazon Appstore, and Indian mobile communities.
 
-CRITICAL MULTIVARIANT VARIETY INSTRUCTION:
-Every single comment in this batch of ${batchCount} MUST be completely distinct in perspective, length, and angle:
-- Angle 1 (Quick / Informal Reaction): Casual, punchy comment (e.g. "mast chal raha hai", "clean UI", "op update").
-- Angle 2 (Specific Feature Reaction): Specific detail from Meta Title/Description (e.g. card table animations, video streaming resolution, player controls).
-- Angle 3 (Hardware / Performance): Battery consumption, frame rate smoothness, lightweight storage usage, or low RAM compatibility.
-- Angle 4 (Constructive / Feature Request): Reasonable suggestion (e.g. asking for dark mode, faster table reconnect, audio toggle).
-- Angle 5 (Daily Social Player): Playing with friends, regular daily enjoyment.
+=== COMPLETE APP MECHANISM & CONTENT DOSSIER (READ CAREFULLY) ===
+- App Name: ${dossier.appName}
+- Category: ${dossier.category}
+- Developer: ${dossier.developer}
+- Version: ${dossier.version} | Package Size: ${dossier.size}
+${dossier.h1Title ? `- Headline: ${dossier.h1Title}` : ''}
+${dossier.metaDescription ? `- Summary: ${dossier.metaDescription}` : ''}
+${dossier.featuresList.length > 0 ? `- Specific Features & Capabilities:\n  • ${dossier.featuresList.join('\n  • ')}` : ''}
+${dossier.whatAppProvidesSummary ? `- Full Description of What the App Provides & How It Works:\n${dossier.whatAppProvidesSummary}` : ''}
+${dossier.faqsSummary.length > 0 ? `- Real App FAQs & Answers:\n  • ${dossier.faqsSummary.join('\n  • ')}` : ''}
+${dossier.adminCallouts.length > 0 ? `- Platform Notes:\n  • ${dossier.adminCallouts.join('\n  • ')}` : ''}
 
-STRICT RULES:
-1. ONLY USE THE APP CONTENT ABOVE. Comment specifically on what is in this app's Meta Title, Description, and Features.
-2. STRICTLY FORBIDDEN: NO real-money, gambling, betting, withdrawal, deposit, UPI, cash, or rupees words.
-3. OUTPUT FORMAT: Clean JSON array of objects with the exact requested ratings:
+=== MARKETPLACE COMMENT PSYCHOLOGY & STYLE RULES ===
+${marketplaceInstructions}
+
+${masterStrategyDirective ? `=== ADMIN & CO-PILOT SESSION STRATEGY (HIGHEST PRIORITY — FOLLOW STRICTLY) ===\n${masterStrategyDirective}\n` : ''}
+${recentUserChatContext ? `=== RECENT CHAT DISCUSSION CONTEXT ===\n${recentUserChatContext}\n` : ''}
+${activeBrainRules ? `=== PERMANENT PLATFORM SAFETY & TONE DIRECTIVES ===\n${activeBrainRules}\n` : ''}
+${existingSnippets.length > 0 ? `=== EXISTING REVIEWS ON THIS APP (DO NOT REPEAT THESE ANGLES OR PHRASES) ===\n${existingSnippets.map(s => `- "${s}"`).join('\n')}\n` : ''}
+${alreadyGeneratedInThisRun ? `=== ALREADY GENERATED IN THIS BATCH (DO NOT REPEAT OPENINGS OR SENTENCE STRUCTURES) ===\n${alreadyGeneratedInThisRun}\n` : ''}`;
+
+    const slotPromptLines = chunkSlots
+      .map(
+        (slot, i) =>
+          `Slot #${i + 1}: Reviewer="${slot.authorName}" | Star Rating=${slot.rating}★ | Persona="${slot.archetypeLabel}" -> ${slot.archetypeInstruction}`
+      )
+      .join('\n');
+
+    const userPrompt = `Generate ${chunkSlots.length} distinct, authentic human reviews for "${dossier.appName}" matching these exact Reviewer Persona Slots:
+
+${slotPromptLines}
+
+CRITICAL OUTPUT REQUIREMENTS:
+1. Return ONLY a valid JSON array of objects with this exact structure:
 [
-  { "rating": ${batchRatings[0] || 5}, "text": "comment text here" }
-]`;
+  {
+    "slot": 1,
+    "rating": 5,
+    "personaTag": "Play Store • Daily User",
+    "content": "The authentic review text here..."
+  }
+]
+2. Every review MUST talk specifically about what "${dossier.appName}" provides, its actual features/category (${dossier.category}), or real user experience (onboarding, phone performance, comparison, daily routine) — NEVER generic filler.
+3. Vary sentence length, openings, punctuation, and vocabulary across every single slot so they look written by ${chunkSlots.length} completely different people.`;
 
-    let batchParsed: Array<{ rating: number; text: string }> = [];
+    const proxyRes = await callGeminiProxy({
+      apiKey: config.apiKey,
+      model: config.model,
+      systemInstruction,
+      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+      temperature: 0.92,
+      responseMimeType: 'application/json'
+    });
 
-    // 1. Primary: Server-side Gemini API proxy with automatic backoff and model rotation
+    if (!proxyRes.ok) {
+      throw new Error(proxyRes.error || `Gemini generation failed on model ${config.model}`);
+    }
+
+    let parsedItems: any[] = [];
     try {
-      const srvRes = await fetch('/api/v1/admin/community/aistudio-gemini', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          apiKey,
-          model: modelName,
-          systemInstruction: systemPrompt,
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          temperature: 0.85,
-          responseMimeType: 'application/json'
-        })
-      });
-
-      if (srvRes.ok) {
-        const srvData = await srvRes.json();
-        const rawText = srvData.text || '';
-        const cleaned = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-        const jsonMatch = cleaned.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-          const arr = JSON.parse(jsonMatch[0]);
-          if (Array.isArray(arr) && arr.length > 0) {
-            const mapped = arr.map((item: any, idx: number) => ({
-              rating: typeof item.rating === 'number' ? Math.min(5, Math.max(1, item.rating)) : (batchRatings[idx] || 5),
-              text: sanitizeReviewText(String(item.text || item.review || item.comment || '').trim())
-            })).filter((item: any) => item.text.length > 0);
-
-            if (mapped.length > 0) {
-              batchParsed = mapped;
-            }
-          }
-        }
-      }
-    } catch (_) {}
-
-    // 2. Secondary fallback: Direct Google AI Studio REST call with exponential backoff on 429
-    if (batchParsed.length === 0 && apiKey) {
-      const callGeminiForBatch = async (targetModel: string): Promise<boolean> => {
-        for (let attempt = 0; attempt < 2; attempt++) {
-          try {
-            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-            const res = await fetch(endpoint, {
-              method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json',
-                'X-goog-api-key': apiKey
-              },
-              body: JSON.stringify({
-                contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\n${prompt}` }] }],
-                generationConfig: {
-                  temperature: 0.85,
-                  responseMimeType: 'application/json'
-                }
-              })
-            });
-
-            if (res.status === 429) {
-              // Rate limit encountered: wait 2.2s before retry
-              await new Promise(r => setTimeout(r, 2200));
-              continue;
-            }
-
-            if (res.ok) {
-              const data = await res.json();
-              const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-              const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-              const jsonMatch = cleaned.match(/\[[\s\S]*\]/);
-              if (jsonMatch) {
-                const arr = JSON.parse(jsonMatch[0]);
-                if (Array.isArray(arr) && arr.length > 0) {
-                  const mapped = arr.map((item: any, idx: number) => ({
-                    rating: typeof item.rating === 'number' ? Math.min(5, Math.max(1, item.rating)) : (batchRatings[idx] || 5),
-                    text: sanitizeReviewText(String(item.text || item.review || item.comment || '').trim())
-                  })).filter((item: any) => item.text.length > 0);
-
-                  if (mapped.length > 0) {
-                    batchParsed = mapped;
-                    return true;
-                  }
-                }
-              }
-            }
-          } catch (_) {}
-        }
-        return false;
-      };
-
-      let success = await callGeminiForBatch(modelName);
-      if (!success && modelName !== 'gemini-2.5-flash') {
-        success = await callGeminiForBatch('gemini-2.5-flash');
-      } else if (!success && modelName !== 'gemini-flash-latest') {
-        success = await callGeminiForBatch('gemini-flash-latest');
-      } else if (!success && modelName !== 'gemini-3.8-flash') {
-        success = await callGeminiForBatch('gemini-3.8-flash');
+      const cleaned = proxyRes.text
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/```\s*$/i, '')
+        .trim();
+      const jsonMatch = cleaned.match(/\[[\s\S]*\]/);
+      parsedItems = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned);
+    } catch (_) {
+      const objMatches = proxyRes.text.match(/\{[\s\S]*?\}/g) || [];
+      for (const rawObj of objMatches) {
+        try {
+          parsedItems.push(JSON.parse(rawObj));
+        } catch (_) {}
       }
     }
 
-    if (batchParsed.length > 0) {
-      allParsedReviews.push(...batchParsed);
-    } else {
-      // High-variety multivariant smart generator strictly tailored to this app's dossier & user command
-      const hasEmojis = config.languageTone === 'happy_with_emojis' || 
-                        (customInstructions && customInstructions.toLowerCase().includes('emoji')) ||
-                        (config.activeSessionDirective && config.activeSessionDirective.toLowerCase().includes('emoji'));
+    if (!Array.isArray(parsedItems) || parsedItems.length === 0) {
+      throw new Error('Gemini returned an unexpected response format. Please retry or switch to Gemini 2.5 Flash.');
+    }
 
-      // Extract specific app context terms
-      const appKeyphrase = profile.seoTitle ? profile.seoTitle.replace(/[-|].*$/, '').trim() : profile.appName;
-      const cleanDescSnippet = (profile.seoDescription || profile.description || '').replace(/[^\w\s]/g, ' ').split(/\s+/).slice(0, 8).join(' ');
+    for (let i = 0; i < chunkSlots.length; i++) {
+      const slot = chunkSlots[i];
+      const item = parsedItems[i] || parsedItems[0] || {};
+      const rawContent = String(item.content || item.text || item.review || '').trim();
+      const sanitizedContent = sanitizeReviewText(rawContent);
 
-      // Contextual phrase pools incorporating user commands and app identity
-      const pool5Star = [
-        hasEmojis ? `Really love ${profile.appName}! Interface is clean and loads very fast on my phone 👍✨` : `${profile.appName} runs with great stability and fast response times. Very satisfied with the experience.`,
-        hasEmojis ? `Smooth graphics and no lag at all in ${appKeyphrase} 🔥 Recommended!` : `Excellent optimization on ${profile.appName}. Smooth table flow and clear visuals.`,
-        hasEmojis ? `Best app in ${profile.category} so far! Audio is clear and matchmaking connects fast ❤️` : `Very lightweight on storage, simple controls, and starts up instantly. Great job by developers.`,
-        hasEmojis ? `Playing daily with friends on ${profile.appName}, super fun experience 👏` : `Intuitive UI and responsive controls. Clean navigation across all sections.`,
-        hasEmojis ? `Latest update made ${profile.appName} even smoother! Battery usage is very low ⭐⭐⭐⭐⭐` : `Solid update. High frame rate and no network disconnects on mobile data.`
-      ];
+      if (!sanitizedContent) continue;
 
-      const pool4Star = [
-        hasEmojis ? `Good overall experience on ${profile.appName}. Very responsive touch controls! Thoda battery drain optimize ho sakta hai 😊` : `Solid app with reliable performance. Features work as advertised in ${profile.category}.`,
-        hasEmojis ? `Nice graphics and clean menu navigation! Sound effects are nice 👍` : `Loads quickly without freezing. Would appreciate dark theme in next build.`,
-        hasEmojis ? `Fast table joins and stable gameplay flow on ${profile.appName} ⭐` : `Responsive touch controls and fair gameplay flow. Quite satisfied with daily usage.`,
-        hasEmojis ? `Enjoying the features in ${profile.appName}, great graphics! 👌` : `Very good application. Minimal storage footprint and quick app launch.`
-      ];
+      const createdAt = generateReviewTimestamp(
+        config,
+        slot.index,
+        count,
+        results.length > 0 ? results[results.length - 1].createdAt : undefined
+      );
 
-      const pool3Star = [
-        `Decent performance on ${profile.appName}. UI is clean, but takes a few seconds to reconnect on 4G network.`,
-        `Average experience in ${profile.category}. Works fine on Wi-Fi, hope to see lighter animations in next patch.`,
-        `Features in ${profile.appName} are good, but menu navigation could be simplified.`
-      ];
+      const stagedItem: StagedReview = {
+        id: `staged-${Date.now()}-${Math.random().toString(36).substring(2, 8)}-${slot.index}`,
+        appId: String(app.id),
+        appName: dossier.appName,
+        appIcon: app.icon || app.icon_url || app.logo || '',
+        authorName: slot.authorName,
+        rating: slot.rating,
+        content: sanitizedContent,
+        createdAt,
+        helpfulCount: generateHelpfulLikes(slot.rating, sanitizedContent.length, config),
+        isPinned: slot.index === 0 && slot.rating === 5 && count >= 4 && Math.random() < 0.25,
+        status: 'staged',
+        personaTag: item.personaTag || slot.archetypeLabel
+      };
 
-      const pool2Star = [
-        `Facing occasional stuttering in ${profile.appName} on mobile data. Please optimize the loading speed in next patch.`,
-        `Recent update caused slight delay on older Android phones. Hope developers roll out a quick patch.`,
-        `Takes too long to load on low battery mode. Needs better background optimization.`
-      ];
-
-      const pool1Star = [
-        `App froze after the latest update on my device. Please fix this bug soon.`,
-        `Keeps closing unexpectedly when opening the main section. Needs a stability patch for Android.`,
-        `Slow connection response on mobile data. Requires urgent optimization.`
-      ];
-
-      for (let i = 0; i < batchCount; i++) {
-        const r = batchRatings[i] || 5;
-        let text = '';
-
-        if (r === 5) {
-          text = pool5Star[i % pool5Star.length];
-        } else if (r === 4) {
-          text = pool4Star[i % pool4Star.length];
-        } else if (r === 3) {
-          text = pool3Star[i % pool3Star.length];
-        } else if (r === 2) {
-          text = pool2Star[i % pool2Star.length];
-        } else {
-          text = pool1Star[i % pool1Star.length];
+      results.push(stagedItem);
+      if (onReviewGenerated) {
+        if (config.generationPacing === 'step_by_step' && i > 0) {
+          await new Promise(r => setTimeout(r, 75));
         }
-
-        allParsedReviews.push({ rating: r, text: sanitizeReviewText(text) });
+        onReviewGenerated(stagedItem, results.length, count);
       }
     }
   }
 
-  // Transform into full StagedReview objects with realistic dates, usernames, and likes
-  return allParsedReviews.slice(0, countToGenerate).map((item, idx) => {
-    const dateResult = generateRealisticTimestamp(config.dateMode, idx, countToGenerate);
-    const helpfulCount = generateRealisticHelpfulCount(config.likesMode || 'subtle_1_2', idx, countToGenerate);
-    return {
-      id: `stage_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      appId: String(app.id || app.slug || ''),
-      appName: profile.appName,
-      appSlug: app.slug || '',
-      appIcon: app.icon_url || '',
-      appCategory: profile.category,
-      userName: generateRealisticUserName(),
-      rating: item.rating || 5,
-      reviewText: item.text.trim(),
-      dateTag: dateResult.dateTag,
-      timestamp: dateResult.isoTimestamp,
-      status: 'staged',
-      helpful_count: helpfulCount
-    };
-  });
+  return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }

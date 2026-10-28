@@ -1,5 +1,5 @@
 /**
- * Yono Transparency - Device Fingerprinting Utility
+ * Platform Security - Device Fingerprinting Utility
  * Generates a unique cross-browser signal for security verification.
  */
 

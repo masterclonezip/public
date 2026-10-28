@@ -206,7 +206,7 @@ export const AdminBannersTab = React.memo(({
                     type="text" 
                     value={banner.title || ''} 
                     onChange={(e) => onUpdate(index, banner.id, 'title', e.target.value)} 
-                    placeholder="e.g. Featured Rummy App of the Week" 
+                    placeholder="e.g. Featured App of the Week" 
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs font-semibold dark:text-white focus:ring-2 focus:ring-blue-500 transition-all" 
                   />
                 </div>
@@ -218,7 +218,7 @@ export const AdminBannersTab = React.memo(({
                     type="text" 
                     value={banner.subtitle || ''} 
                     onChange={(e) => onUpdate(index, banner.id, 'subtitle', e.target.value)} 
-                    placeholder="e.g. Get ₹51 Instant Bonus with Fast Withdrawals" 
+                    placeholder="e.g. Official Launch & Latest Version Updates" 
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs font-semibold dark:text-white focus:ring-2 focus:ring-blue-500 transition-all" 
                   />
                 </div>
@@ -245,7 +245,7 @@ export const AdminBannersTab = React.memo(({
                     type="text" 
                     value={banner.link || ''} 
                     onChange={(e) => onUpdate(index, banner.id, 'link', e.target.value)} 
-                    placeholder="e.g. /app/rummy-wealth or https://..." 
+                    placeholder="e.g. /app/sample-app or https://..." 
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs font-semibold dark:text-white focus:ring-2 focus:ring-blue-500 transition-all" 
                   />
                 </div>

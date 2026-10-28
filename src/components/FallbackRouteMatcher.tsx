@@ -64,7 +64,7 @@ export default function FallbackRouteMatcher() {
   }
 
   // 4. Check if slug matches a category -> Redirect to /category/:slug
-  const matchedCategory = apps.some(a => (a.category || '').toLowerCase().replace(/[^a-z0-9]+/g, '-') === slug) || ['rummy-apps', 'yono-apps', 'teen-patti', 'all-apps', 'casino', 'slots'].includes(slug);
+  const matchedCategory = apps.some(a => (a.category || '').toLowerCase().replace(/[^a-z0-9]+/g, '-') === slug) || ['all-apps', 'games', 'apps', 'entertainment', 'arcade', 'board', 'casual'].includes(slug);
   if (matchedCategory) {
     return <Navigate to={`/category/${slug}`} replace />;
   }

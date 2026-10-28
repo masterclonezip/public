@@ -154,7 +154,7 @@ export function renderHome(apps: any[], settings: any, news: any[], _videos: any
           const isAll = c.toLowerCase() === 'all' || c.toLowerCase() === 'all apps' || idx === 0;
           const catSlug = c.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
           const link = isAll ? '/' : `/category/${encodeURIComponent(catSlug)}`;
-          return `<a href="${link}" class="whitespace-nowrap px-2.5 xxs:px-3 xs:px-4 py-1 xxs:py-1.5 xs:py-2 text-[11px] xxs:text-xs xs:text-sm font-medium transition-all rounded-full border ${isAll ? 'bg-blue-500 text-white border-blue-500 shadow-sm' : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-black/5 dark:border-white/5 hover:bg-zinc-50 dark:hover:bg-zinc-800'}">${escapeHtml(c)}</a>`;
+          return `<a href="${link}" class="whitespace-nowrap px-2.5 xxs:px-3 xs:px-4 py-1 xxs:py-1.5 xs:py-2 text-[11px] xxs:text-xs xs:text-sm font-medium transition-all rounded-full border no-underline inline-flex items-center ${isAll ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border-zinc-200/80 dark:border-white/10 hover:bg-zinc-200/70 dark:hover:bg-zinc-800'}">${escapeHtml(c)}</a>`;
         }).join('')}
       </div>
     </div>

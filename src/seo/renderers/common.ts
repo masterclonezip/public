@@ -38,7 +38,7 @@ export function renderHeader(settings: any): string {
   const logoUrl = getField(settings, 'logo_url');
   const optimizedLogo = logoUrl ? optimizeImageUrl(logoUrl, 120) : '';
   return `
-    <header class="sticky top-0 z-50 transition-transform duration-200 ease-out will-change-transform translate-y-0 pointer-events-auto bg-white dark:bg-black sm:bg-white/80 sm:dark:bg-black/80 border-b border-white/20 dark:border-white/10 py-2.5 sm:py-3">
+    <header class="sticky top-0 z-50 transition-transform duration-200 ease-out will-change-transform translate-y-0 pointer-events-auto bg-white dark:bg-[#090d16] sm:bg-white/90 sm:dark:bg-[#090d16]/90 border-b border-black/5 dark:border-white/10 py-2.5 sm:py-3">
       <div class="w-full max-w-7xl px-1.5 xxs:px-2.5 xs:px-4 sm:px-6 lg:px-8 mx-auto relative flex justify-between items-center">
         <a href="/" class="flex items-center gap-1 xxs:gap-1.5 xs:gap-2.5 sm:gap-3 group min-w-0" aria-label="${escapeHtml(siteTitle || 'Home')}">
           <div class="p-0 transition-transform group-hover:scale-[1.03] duration-300 shrink-0">
@@ -56,17 +56,17 @@ export function renderHeader(settings: any): string {
             <a href="/categories" class="sr-only">Categories</a>
             <a href="/about" class="sr-only">About</a>
           </nav>
-          <button type="button" class="flex items-center gap-2 lg:gap-3 w-full max-w-[160px] lg:max-w-xs bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200/70 dark:hover:bg-zinc-700/70 text-zinc-500 px-3 lg:px-4 py-2 lg:py-2.5 rounded-full transition-all text-xs lg:text-sm font-medium border border-black/5 dark:border-white/5 shadow-inner" aria-label="Search applications">
+          <button type="button" class="flex items-center gap-2 lg:gap-3 w-full max-w-[160px] lg:max-w-xs bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200/70 dark:hover:bg-zinc-700/70 text-zinc-500 dark:text-zinc-400 px-3 lg:px-4 py-2 lg:py-2.5 rounded-full transition-all text-xs lg:text-sm font-medium border border-black/5 dark:border-white/5 shadow-inner" aria-label="Search applications">
             <svg class="w-3.5 h-3.5 lg:w-4 lg:h-4 text-zinc-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
             <span class="truncate">Search apps...</span>
           </button>
         </div>
         <div class="md:hidden flex items-center gap-1 xxs:gap-1.5 xs:gap-2 sm:gap-3 shrink-0">
-          <button type="button" class="flex items-center justify-center w-7 h-7 xxs:w-8 xxs:h-8 xs:w-9 xs:h-9 bg-zinc-100 dark:bg-zinc-800 rounded-full active:scale-95 transition-all text-zinc-500" aria-label="Search">
-            <svg class="w-3 h-3 xxs:w-3.5 xxs:h-3.5 xs:w-4 xs:h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+          <button type="button" class="flex items-center justify-center w-7 h-7 xxs:w-8 xxs:h-8 xs:w-9 xs:h-9 bg-zinc-100 dark:bg-zinc-800 rounded-full active:scale-95 transition-all text-zinc-600 dark:text-zinc-300" aria-label="Search">
+            <svg class="w-3 h-3 xxs:w-3.5 xxs:h-3.5 xs:w-4 xs:h-4 text-zinc-500 dark:text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
           </button>
           <div class="relative inline-block z-50">
-            <button type="button" class="flex items-center gap-2 w-8 h-8 xs:w-9 xs:h-9 lg:w-auto lg:h-11 lg:px-4 justify-center bg-blue-50 text-blue-500 rounded-full hover:bg-blue-100 transition-colors shrink-0" aria-label="Support Widget">
+            <button type="button" class="flex items-center gap-2 w-8 h-8 xs:w-9 xs:h-9 lg:w-auto lg:h-11 lg:px-4 justify-center bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 rounded-full hover:bg-blue-100 dark:hover:bg-blue-500/25 transition-colors shrink-0" aria-label="Support Widget">
               <svg class="w-3.5 h-3.5 xs:w-4 xs:h-4 lg:w-5 lg:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
             </button>
           </div>

@@ -19,6 +19,19 @@
   --card-bg: rgba(255, 255, 255, 0.85);
   --glass-border: rgba(0, 0, 0, 0.08);
   --ticker-bg: rgba(255, 255, 255, 0.92);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --bg-primary: #090d16;
+    --text-primary: #f8fafc;
+    --text-secondary: #a1a1aa;
+    --card-bg: rgba(17, 23, 38, 0.85);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --ticker-bg: rgba(9, 13, 22, 0.92);
+    color-scheme: dark;
+  }
 }
 
 .dark {
@@ -29,6 +42,7 @@
   --card-bg: rgba(17, 23, 38, 0.85);
   --glass-border: rgba(255, 255, 255, 0.08);
   --ticker-bg: rgba(9, 13, 22, 0.92);
+  color-scheme: dark;
 }
 
 html {
@@ -49,10 +63,6 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-a {
-  color: inherit; 
-}
-
 .button-text {
   color: white !important;
 }
@@ -70,6 +80,12 @@ a {
 
 .dark .glass-panel {
   box-shadow: 0 8px 32px -10px rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) .glass-panel {
+    box-shadow: 0 8px 32px -10px rgba(0, 0, 0, 0.5);
+  }
 }
 
 @media (hover: hover) {
@@ -193,6 +209,12 @@ a {
   color: rgba(255, 255, 255, 0.4);
 }
 
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) .search-input-premium::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+  }
+}
+
 /* Dynamic HTML Content Adjustments & Disclaimer Overrides */
 .disclaimer-content,
 .disclaimer-content * {
@@ -255,6 +277,32 @@ a {
   border-color: rgba(14, 165, 233, 0.25) !important;
 }
 
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) .disclaimer-content div[style*="border: 1px solid"] {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+    border-color: rgba(255, 255, 255, 0.05) !important;
+    box-shadow: none !important;
+  }
+  :root:not(.light) .disclaimer-content,
+  :root:not(.light) .disclaimer-content * {
+    color: var(--text-secondary) !important;
+  }
+  :root:not(.light) .disclaimer-content strong,
+  :root:not(.light) .disclaimer-content h1,
+  :root:not(.light) .disclaimer-content h2,
+  :root:not(.light) .disclaimer-content h3,
+  :root:not(.light) .disclaimer-content h4 {
+    color: var(--text-primary) !important;
+  }
+  :root:not(.light) .disclaimer-content p {
+    color: var(--text-secondary) !important;
+  }
+  :root:not(.light) .disclaimer-content span[style*="background: linear-gradient"] {
+    color: #0284c7 !important;
+    border-color: rgba(14, 165, 233, 0.25) !important;
+  }
+}
+
 /* Ensure the page-level and section-level containers scale up to a gorgeous widescreen view */
 .max-w-\[1550px\] {
   max-width: none !important;
@@ -264,7 +312,7 @@ a {
 /* Modern Fully Fluid Responsive Layouts & Overrides for Custom Box/Description HTML */
 .rs-567-wrapper,
 .rs-jackpot-wrapper,
-.rs-yono-wrapper,
+.rs-portal-wrapper,
 .rs-abc-wrapper,
 .rs-club-wrapper,
 .rs-resp-wrapper,
@@ -280,7 +328,7 @@ a {
 @media (min-width: 769px) {
   .rs-567-wrapper,
   .rs-jackpot-wrapper,
-  .rs-yono-wrapper,
+  .rs-portal-wrapper,
   .rs-abc-wrapper,
   .rs-club-wrapper,
   .rs-resp-wrapper,
@@ -291,7 +339,7 @@ a {
   
   .rs-567-glass-card,
   .rs-jackpot-glass-card,
-  .rs-yono-glass-card,
+  .rs-portal-glass-card,
   .rs-abc-glass-card,
   .rs-club-glass-card,
   .rs-resp-glass-card,
@@ -305,7 +353,7 @@ a {
 @media (max-width: 768px) {
   .rs-567-wrapper,
   .rs-jackpot-wrapper,
-  .rs-yono-wrapper,
+  .rs-portal-wrapper,
   .rs-abc-wrapper,
   .rs-club-wrapper,
   .rs-resp-wrapper,
@@ -317,7 +365,7 @@ a {
 
   .rs-567-glass-card,
   .rs-jackpot-glass-card,
-  .rs-yono-glass-card,
+  .rs-portal-glass-card,
   .rs-abc-glass-card,
   .rs-club-glass-card,
   .rs-resp-glass-card,
@@ -334,8 +382,8 @@ a {
   .rs-jackpot-grid,
   .rs-abc-bonus-container,
   .rs-abc-grid,
-  .rs-yono-bonus-container,
-  .rs-yono-grid,
+  .rs-portal-bonus-container,
+  .rs-portal-grid,
   .rs-club-bonus-container,
   .rs-club-grid,
   .rs-resp-grid {
@@ -347,7 +395,7 @@ a {
   .rs-567-glass-box,
   .rs-jackpot-glass-box,
   .rs-abc-glass-box,
-  .rs-yono-glass-box,
+  .rs-portal-glass-box,
   .rs-club-glass-box,
   .rs-resp-glass-box {
     padding: 14px 12px !important;
@@ -359,7 +407,7 @@ a {
   .rs-567-header h2,
   .rs-jackpot-header h2,
   .rs-abc-header h2,
-  .rs-yono-header h2,
+  .rs-portal-header h2,
   .rs-club-header h2,
   .rs-resp-header h2 {
     font-size: 24px !important;
@@ -370,7 +418,7 @@ a {
   .rs-567-description,
   .rs-jackpot-description,
   .rs-abc-description,
-  .rs-yono-description,
+  .rs-portal-description,
   .rs-club-description,
   .rs-resp-description {
     padding: 12px !important;
@@ -383,7 +431,7 @@ a {
   .rs-567-keywords,
   .rs-jackpot-keywords,
   .rs-abc-keywords,
-  .rs-yono-keywords,
+  .rs-portal-keywords,
   .rs-club-keywords,
   .rs-resp-keywords {
     gap: 6px !important;
@@ -393,7 +441,7 @@ a {
   .rs-567-keywords span,
   .rs-jackpot-keywords span,
   .rs-abc-keywords span,
-  .rs-yono-keywords span,
+  .rs-portal-keywords span,
   .rs-club-keywords span,
   .rs-resp-keywords span {
     padding: 5px 10px !important;
@@ -411,6 +459,11 @@ a {
 
   body {
     -webkit-overflow-scrolling: touch;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: inherit;
   }
 }
 
@@ -859,6 +912,30 @@ body {
 }
 .dark .prose a {
   color: #60a5fa !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) .prose {
+    color: #e4e4e7 !important;
+  }
+  :root:not(.light) .prose h1,
+  :root:not(.light) .prose h2,
+  :root:not(.light) .prose h3,
+  :root:not(.light) .prose h4,
+  :root:not(.light) .prose strong,
+  :root:not(.light) .prose b {
+    color: #ffffff !important;
+  }
+  :root:not(.light) .prose p,
+  :root:not(.light) .prose li,
+  :root:not(.light) .prose td,
+  :root:not(.light) .prose th,
+  :root:not(.light) .prose blockquote {
+    color: #d4d4d8 !important;
+  }
+  :root:not(.light) .prose a {
+    color: #60a5fa !important;
+  }
 }
 
 

@@ -41,16 +41,17 @@ export function normalizeSchemaCategory(rawCategory?: string): string {
   if (
     lower.includes('card') ||
     lower.includes('game') ||
-    lower.includes('rummy') ||
-    lower.includes('teen patti') ||
-    lower.includes('patti') ||
-    lower.includes('yono') ||
-    lower.includes('casino') ||
     lower.includes('arcade') ||
-    lower.includes('slots') ||
-    lower.includes('poker') ||
     lower.includes('board') ||
-    lower.includes('puzzle')
+    lower.includes('puzzle') ||
+    lower.includes('casual') ||
+    lower.includes('action') ||
+    lower.includes('strategy') ||
+    lower.includes('simulation') ||
+    lower.includes('sports') ||
+    lower.includes('adventure') ||
+    lower.includes('racing') ||
+    lower.includes('trivia')
   ) {
     return 'GameApplication';
   }

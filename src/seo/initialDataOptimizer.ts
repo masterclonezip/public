@@ -297,7 +297,7 @@ function getSimilarAppsForApp(targetApp: any, baseApps: any[]): any[] {
 
     const anchorApp = newsRelatedApp || baseApps.find((a: any) => {
       const cat = (getField(a, 'category', '') || '').toLowerCase();
-      const newsCat = (getField(targetNews, 'category', '') || 'yono apps').toLowerCase();
+      const newsCat = (getField(targetNews, 'category', '') || 'all apps').toLowerCase();
       return cat.includes(newsCat) || newsCat.includes(cat);
     }) || baseApps[0];
 

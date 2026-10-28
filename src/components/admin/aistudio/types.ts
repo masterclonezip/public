@@ -1,94 +1,167 @@
-export interface ChatMessage {
-  id: string;
-  sender: 'user' | 'assistant' | 'system';
-  text: string;
-  timestamp: string;
-  suggestedAction?: 'generate' | 'adjust_prompt' | 'save_memory';
-}
+export type MarketplaceStyle =
+  | 'blended_authentic'
+  | 'play_store'
+  | 'amazon_flipkart'
+  | 'hinglish_casual'
+  | 'ultra_short_crowd'
+  | 'critical_tester';
 
-export interface BrainMemoryDirective {
-  id: string;
-  rule: string;
-  category: 'tone' | 'topic' | 'date' | 'rating' | 'persona' | 'general';
-  createdAt: string;
-  active: boolean;
-}
+export type ReviewLengthMix =
+  | 'natural_mix'
+  | 'short_punchy'
+  | 'medium_standard'
+  | 'detailed_story';
 
-export interface StagedReview {
-  id: string;
-  appId: string;
-  appName: string;
-  appSlug?: string;
-  appIcon?: string;
-  appCategory?: string;
-  userName: string;
-  rating: number;
-  reviewText: string;
-  dateTag: string;
-  timestamp: string; // ISO date string
-  status: 'staged' | 'approved' | 'published';
-  helpful_count?: number; // Likes / helpful vote count below the comment
-}
+export type ReviewLanguageMix =
+  | 'english_india'
+  | 'hinglish_mix'
+  | 'global_english'
+  | 'pure_hinglish';
 
-export type DateDistributionMode = 
-  | 'today_and_yesterday' // 50% Today, 50% Yesterday
-  | 'today_only'          // 100% Today
-  | 'yesterday_only'      // 100% Yesterday
-  | 'today_morning'       // Today morning / daytime
-  | 'today_evening'       // Today evening / night
-  | 'last_2_days'         // Strict past 48 hours
-  | 'last_3_days'         // Spread evenly across today, yesterday, and 2 days ago
-  | 'last_5_days'         // Spread across last 5 days
-  | 'last_7_days'         // Spread naturally across past week
-  | 'last_15_days'        // Spread across last 2 weeks (no future)
-  | 'last_30_days';       // Spread across last month (no future)
+export type ReviewFocusTopic =
+  | 'what_app_provides'
+  | 'onboarding_ease'
+  | 'daily_experience'
+  | 'device_network'
+  | 'comparison_verdict'
+  | 'feature_requests';
 
-export type RatingMixMode = 
-  | 'auto_app_rating'     // Smart Auto: Automatically matches the app's real catalog rating score (e.g. 4.3★)
-  | 'all_5_star'          // 100% 5-star
-  | 'all_4_star'          // 100% 4-star
-  | 'all_3_star'          // 100% 3-star (neutral/average feedback)
-  | 'all_2_star'          // 100% 2-star (issues/missing features)
-  | 'all_1_star'          // 100% 1-star (complaints/bugs/crashes)
-  | 'organic_full_mix'    // Full 1 to 5 star realistic mix (complaints, praise, suggestions)
-  | 'critical_bugs'       // 1-star & 2-star critical bug and improvement feedback
-  | 'high_praise'         // 90% 5-star, 10% 4-star
-  | 'natural'             // Default: ~75% 5-star, 20% 4-star, 5% 3-star
-  | 'balanced_critical';  // 50% 5-star, 30% 4-star, 20% 1-3 star
+// Compatibility aliases for subcomponents
+export type DateDistributionMode =
+  | 'today_only'
+  | 'today_morning'
+  | 'today_evening'
+  | 'yesterday_only'
+  | 'today_and_yesterday'
+  | 'last_2_days'
+  | 'last_3_days'
+  | 'last_5_days'
+  | 'last_7_days'
+  | 'last_15_days'
+  | 'last_30_days';
 
-export type LanguageToneMode = 
-  | 'all_rounder_standard'  // Standard, normal everyday users across all categories
-  | 'happy_with_emojis'     // Happy enthusiastic customers with natural emojis (😊, 👍, ⭐)
-  | 'super_excited_emojis'  // Highly enthusiastic fans with energetic emojis (🔥, 🚀, ❤️, 💯)
-  | 'hinglish_natural'      // Casual, colloquial Indian mobile tone
-  | 'natural_english'       // Casual, everyday conversational English
-  | 'short_punchy'          // Ultra-short punchy feedback (1-2 sentences)
-  | 'detailed_feedback'    // Thoughtful 2-3 sentence user experience feedback
-  | 'honest_balanced'       // Balanced constructive feedback praising strengths
-  | 'feature_focused'       // Technical praise on UI smoothness and battery life
-  | 'beginner_friendly'     // Simple friendly praise for first-time installers
-  | 'daily_regular_user';   // Habitual daily user perspective praising long-term stability
-
-export type PublishMode = 
-  | 'wait_approve'  // Reviews staged for manual admin inspection, edit & 1-click publish
-  | 'auto_direct';  // Reviews automatically published directly to Live Community upon generation
-
-export type LikesRateMode = 
-  | 'subtle_1_2'     // Recommended: Low subtle rate, mostly 1 or 2 likes, occasional 0
-  | 'natural_0_3'    // Organic mix: 0 to 3 likes across comments
-  | 'modest_1_4'     // Modest engagement: 1 to 4 likes
-  | 'zero_none'      // 0 likes clean
-  | 'custom';        // Custom admin set range
+export type RatingMixMode =
+  | 'mostly_positive'
+  | 'all_5_star'
+  | 'balanced_realistic'
+  | 'critical_feedback'
+  | 'realistic_48'
+  | 'pure_5'
+  | 'balanced_45'
+  | 'mixed_42';
+export type LanguageToneMode = 'casual_indian' | 'enthusiastic_gamer' | 'detailed_analytical' | 'short_punchy' | 'mixed_natural' | string;
+export type PublishMode = 'stage' | 'direct_firebase' | string;
 
 export interface StudioConfig {
   apiKey: string;
   model: string;
   reviewsPerApp: number;
-  dateMode: DateDistributionMode;
   ratingMix: RatingMixMode;
-  languageTone: LanguageToneMode;
-  likesMode?: LikesRateMode;
-  customTopic: string;
-  publishMode: PublishMode;
-  activeSessionDirective?: string; // Live directive agreed in chat or typed in custom box
+  tone: 'casual_indian' | 'enthusiastic_gamer' | 'detailed_analytical' | 'short_punchy' | 'mixed_natural';
+  marketplaceStyle: MarketplaceStyle;
+  lengthDistribution: ReviewLengthMix;
+  languageMix: ReviewLanguageMix;
+  focusTopics: ReviewFocusTopic[];
+  humanImperfectionLevel: 'natural' | 'polished' | 'raw_casual';
+  dateRangeMode: 'recent_days' | 'custom_days' | 'custom_months' | 'specific_range';
+  customDays: number;
+  customMonths: number;
+  startDate: string;
+  endDate: string;
+  autoPublish: boolean;
+  likesProbability: number;
+  maxLikesPerReview: number;
+  generationPacing: 'batch_fast' | 'step_by_step';
+  activeSessionDirective?: string;
+  updatedAt?: number;
+  // Optional compatibility properties
+  publishMode?: PublishMode;
+  dateMode?: DateDistributionMode;
+  languageTone?: LanguageToneMode;
+  customTopic?: string;
+}
+
+export interface StagedReview {
+  id: string;
+  appId: string;
+  appSlug?: string;
+  appName: string;
+  appIcon?: string;
+  appCategory?: string;
+  authorName: string;
+  userName?: string;
+  rating: number;
+  content: string;
+  reviewText?: string;
+  createdAt: string;
+  dateTag?: string;
+  helpfulCount: number;
+  helpful_count?: number;
+  isPinned: boolean;
+  status: 'staged' | 'publishing' | 'published' | 'failed';
+  adminReply?: string;
+  personaTag?: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  text: string;
+  timestamp: string;
+  isGenerating?: boolean;
+  generatedCount?: number;
+  appliedAdjustments?: string[];
+  modelUsed?: string;
+}
+
+export interface BrainDirective {
+  id: string;
+  rule: string;
+  category: 'tone' | 'vocabulary' | 'formatting' | 'safety' | 'custom';
+  active: boolean;
+  createdAt: string;
+}
+
+export interface GenerationActionLog {
+  id: string;
+  timestamp: string;
+  actionType: 'generated' | 'published' | 'edited' | 'deleted' | 'directive_added';
+  summary: string;
+  appNames: string[];
+  count: number;
+}
+
+export interface AppGenerationProgress {
+  appId: string;
+  appName: string;
+  appIcon?: string;
+  totalTarget: number;
+  completedCount: number;
+  status: 'waiting' | 'generating' | 'completed' | 'error';
+  lastReviewPreview?: string;
+  errorMsg?: string;
+}
+
+export interface AIStudioBrainMemory {
+  version: string;
+  lastUpdated: string;
+  directives: BrainDirective[];
+  actionLogs: GenerationActionLog[];
+  totalGeneratedAllTime: number;
+  totalPublishedAllTime: number;
+  appLastGeneratedMap: Record<string, string>;
+}
+
+export interface AIConnectionStatus {
+  state: 'checking' | 'connected' | 'missing_key' | 'invalid_key' | 'error';
+  model: string;
+  requestedModel?: string;
+  latencyMs?: number;
+  keySource?: 'custom' | 'saved_studio' | 'server_env' | 'none';
+  keyMask?: string;
+  hasServerEnvKey?: boolean;
+  serverEnvKeyMask?: string;
+  errorMessage?: string;
+  warningMessage?: string;
+  lastCheckedAt?: number;
 }

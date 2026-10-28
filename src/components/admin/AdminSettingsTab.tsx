@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
-import { Save, ShieldCheck, KeyRound, Cloud, UploadCloud, CheckCircle2, AlertCircle, RefreshCw, Sparkles } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Save, ShieldCheck, KeyRound, Cloud, UploadCloud, CheckCircle2, AlertCircle, RefreshCw, Sparkles, Wifi } from 'lucide-react';
 import ImageUpload from '../ImageUpload';
 import { ensureDefaultSettings } from '../../lib/defaultLegalContent';
 import { SeoFieldWithLimit } from './SeoFieldWithLimit';
 import { toast } from '../Toast';
 import { generateSha1 } from '../../lib/cryptoUtils';
 import { getAllSiteIconUrls, getEnvLogoUrl, getEnvFaviconUrl } from '../../seo/utils';
+import { loadStudioConfig, saveStudioConfig, normalizeClientModelId } from './aistudio/storage';
+import { verifyStudioConnection } from './aistudio/geminiEngine';
 
 interface AdminSettingsTabProps {
   settings: any;
@@ -19,6 +21,74 @@ export const AdminSettingsTab = React.memo(({ settings: rawSettings, handleSaveS
   const [cloudinaryTestResult, setCloudinaryTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [liveLogoUrl, setLiveLogoUrl] = useState<string>(() => settings.logo_url || settings.favicon_url || getEnvLogoUrl() || '');
   const [liveFaviconUrl, setLiveFaviconUrl] = useState<string>(() => settings.favicon_url || settings.logo_url || getEnvFaviconUrl() || '');
+
+  // Unified Gemini Studio Key & Model state
+  const [geminiKeyInput, setGeminiKeyInput] = useState<string>(() => {
+    const cfg = loadStudioConfig(settings.gemini_api_key, settings.gemini_model);
+    return cfg.apiKey || settings.gemini_api_key || '';
+  });
+  const [geminiModelInput, setGeminiModelInput] = useState<string>(() => {
+    const cfg = loadStudioConfig(settings.gemini_api_key, settings.gemini_model);
+    return normalizeClientModelId(cfg.model || settings.gemini_model || 'gemini-2.5-flash');
+  });
+  const [testingGemini, setTestingGemini] = useState(false);
+  const [geminiTestResult, setGeminiTestResult] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const handleSync = (e: Event) => {
+      const evt = e as CustomEvent;
+      if (evt.detail && typeof evt.detail === 'object') {
+        if (typeof evt.detail.apiKey === 'string') setGeminiKeyInput(evt.detail.apiKey);
+        if (evt.detail.model) setGeminiModelInput(normalizeClientModelId(evt.detail.model));
+      }
+    };
+    window.addEventListener('aistudio-config-sync', handleSync);
+    return () => window.removeEventListener('aistudio-config-sync', handleSync);
+  }, []);
+
+  const handleTestAndSaveGemini = async (e?: React.MouseEvent, overrideModel?: string) => {
+    if (e) e.preventDefault();
+    const cleanKey = geminiKeyInput.trim();
+    const targetModel = normalizeClientModelId(overrideModel || geminiModelInput);
+
+    const existingCfg = loadStudioConfig(cleanKey, targetModel);
+    saveStudioConfig({
+      ...existingCfg,
+      apiKey: cleanKey,
+      model: targetModel,
+      updatedAt: Date.now()
+    });
+
+    setTestingGemini(true);
+    setGeminiTestResult(null);
+
+    const status = await verifyStudioConnection(cleanKey, targetModel, false);
+    setTestingGemini(false);
+
+    if (status.state === 'connected') {
+      const finalModel = status.model || targetModel;
+      setGeminiModelInput(finalModel);
+      saveStudioConfig({
+        ...existingCfg,
+        apiKey: cleanKey,
+        model: finalModel,
+        updatedAt: Date.now()
+      });
+      const msg = `Connected to ${finalModel} in ${status.latencyMs || 1}ms (${
+        status.keySource === 'server_env' ? 'Server Key' : status.keyMask || 'Verified Key'
+      })${status.warningMessage ? ` — ${status.warningMessage}` : ''}`;
+      setGeminiTestResult({ success: true, message: msg });
+      toast(`Gemini connected: ${finalModel} (${status.latencyMs || 1}ms)`, 'success');
+    } else {
+      const errMsg = status.errorMessage || 'Please enter a valid Google AI Studio API key.';
+      setGeminiTestResult({ success: false, message: errMsg });
+      toast(errMsg, 'error');
+    }
+  };
+
   const previewIcons = getAllSiteIconUrls({
     ...settings,
     logo_url: liveLogoUrl,
@@ -187,7 +257,20 @@ export const AdminSettingsTab = React.memo(({ settings: rawSettings, handleSaveS
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Manage global identity, content, and legal text.</p>
       </div>
     </div>
-    <form key={settings.last_updated || (settings.privacy_content ? 'loaded' : 'unloaded') || settings.site_title || 'settings-form'} onSubmit={handleSaveSettings} className="space-y-8">
+    <form
+      key={settings.last_updated || (settings.privacy_content ? 'loaded' : 'unloaded') || settings.site_title || 'settings-form'}
+      onSubmit={(e) => {
+        const existingCfg = loadStudioConfig(geminiKeyInput, geminiModelInput);
+        saveStudioConfig({
+          ...existingCfg,
+          apiKey: geminiKeyInput.trim(),
+          model: normalizeClientModelId(geminiModelInput),
+          updatedAt: Date.now()
+        });
+        handleSaveSettings(e);
+      }}
+      className="space-y-8"
+    >
       
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-6">
         <h3 className="font-bold text-sm text-slate-900 dark:text-white border-b border-black/5 dark:border-white/5 pb-2">Branding & Identity</h3>
@@ -818,21 +901,46 @@ export const AdminSettingsTab = React.memo(({ settings: rawSettings, handleSaveS
 
       {/* Google AI Studio & Gemini Configuration */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-6">
-        <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 pb-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-black/5 dark:border-white/5 pb-3">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-amber-500" />
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white">Google AI Studio & Gemini Key</h3>
+            <h3 className="font-bold text-sm text-slate-900 dark:text-white">Google AI Studio &amp; Gemini Key</h3>
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium border border-amber-500/20">
+              Instant Sync with AI Review Studio
+            </span>
           </div>
-          <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium border border-amber-500/20">
-            Review Generation
-          </span>
+          <button
+            type="button"
+            onClick={(e) => handleTestAndSaveGemini(e)}
+            disabled={testingGemini}
+            className="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5 self-start sm:self-auto cursor-pointer disabled:opacity-50"
+          >
+            {testingGemini ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Wifi className="w-3.5 h-3.5" />}
+            {testingGemini ? 'Connecting...' : 'Test & Save Gemini Key'}
+          </button>
         </div>
+
+        {geminiTestResult && (
+          <div
+            className={`p-3.5 rounded-xl border text-xs flex items-start gap-2.5 ${
+              geminiTestResult.success
+                ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/50 text-emerald-800 dark:text-emerald-300'
+                : 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800/50 text-rose-800 dark:text-rose-300'
+            }`}
+          >
+            {geminiTestResult.success ? (
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500 mt-0.5" />
+            ) : (
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-500 mt-0.5" />
+            )}
+            <span className="leading-relaxed font-medium">{geminiTestResult.message}</span>
+          </div>
+        )}
 
         <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/60 text-xs text-slate-600 dark:text-slate-400 space-y-1">
           <p className="font-semibold text-slate-800 dark:text-slate-200">How to use your Gemini API Key:</p>
           <p>1. Get your 100% free Gemini API key from <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 underline font-medium">Google AI Studio</a>.</p>
-          <p>2. Enter it here or in the <strong>AI Reviews</strong> tab. It is saved in your encrypted admin settings and browser memory.</p>
-          <p>3. If no key is set, review staging runs smoothly in local template mode.</p>
+          <p>2. Paste it below and click <strong>Test &amp; Save Gemini Key</strong> — it connects in milliseconds and automatically syncs with the <strong>AI Reviews</strong> tab.</p>
         </div>
 
         <div className="grid gap-6 sm:grid-cols-2">
@@ -843,8 +951,19 @@ export const AdminSettingsTab = React.memo(({ settings: rawSettings, handleSaveS
             <input 
               type="password" 
               name="gemini_api_key" 
-              defaultValue={settings.gemini_api_key || ''} 
-              placeholder="Paste your Gemini API Key..." 
+              value={geminiKeyInput}
+              onChange={(e) => {
+                const val = e.target.value;
+                setGeminiKeyInput(val);
+                const existingCfg = loadStudioConfig(val, geminiModelInput);
+                saveStudioConfig({
+                  ...existingCfg,
+                  apiKey: val.trim(),
+                  model: geminiModelInput,
+                  updatedAt: Date.now()
+                });
+              }}
+              placeholder="AIzaSy... (Paste your Gemini API Key)" 
               className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm font-mono dark:text-white focus:ring-2 focus:ring-amber-500 transition-all" 
             />
             <span className="text-[11px] text-slate-400 mt-1 block">Private key stored securely in your admin settings. Never exposed in public git commits.</span>
@@ -852,19 +971,26 @@ export const AdminSettingsTab = React.memo(({ settings: rawSettings, handleSaveS
 
           <div>
             <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-              Default Gemini Model
+              Active Gemini Model
             </label>
             <select
               name="gemini_model"
-              defaultValue={settings.gemini_model || 'gemini-flash-latest'}
+              value={geminiModelInput}
+              onChange={(e) => {
+                const nextModel = normalizeClientModelId(e.target.value);
+                setGeminiModelInput(nextModel);
+                handleTestAndSaveGemini(undefined, nextModel);
+              }}
               className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm dark:text-white focus:ring-2 focus:ring-amber-500 transition-all"
             >
-              <option value="gemini-flash-latest">Gemini 3.8 Flash (gemini-flash-latest — Default)</option>
-              <option value="gemini-3.7-flash">Gemini 3.7 Flash (Free Tier / Alternate)</option>
-              <option value="gemini-3.6-flash">Gemini 3.6 Flash (Backup Tier)</option>
-              <option value="gemini-flash-lite-latest">Gemini Flash Lite (Ultra-Low Quota Usage)</option>
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fastest &amp; Reliable Free Tier — Recommended)</option>
+              <option value="gemini-3-flash-preview">Gemini 3 Flash Preview (Next-Gen Crowd Psychology)</option>
+              <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite (Ultra-High Free Quota / Fast Batch)</option>
+              <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash-Lite Preview (Next-Gen High Volume)</option>
+              <option value="gemini-2.5-pro">Gemini 2.5 Pro (Deep Analytical &amp; Strategy)</option>
+              <option value="gemini-flash-latest">Gemini Flash Latest (Auto-Updated Alias)</option>
             </select>
-            <span className="text-[11px] text-slate-400 mt-1 block">Model used by the AI Review Studio tab.</span>
+            <span className="text-[11px] text-slate-400 mt-1 block">Switching models here immediately updates the AI Review Studio &amp; Backend.</span>
           </div>
         </div>
       </div>

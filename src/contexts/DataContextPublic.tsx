@@ -42,7 +42,7 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | null>(null);
 
-const DATA_CACHE_KEY = 'yd_public_data_cache_v5';
+const DATA_CACHE_KEY = 'platform_public_data_cache_v5';
 
 // Strict canonical deduplication utilities to guarantee zero duplicate app cards or news items
 const mergeUniqueApps = (baseList: AppConfig[], incomingList: AppConfig[]): AppConfig[] => {

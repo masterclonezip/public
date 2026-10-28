@@ -80,8 +80,8 @@ To ensure high performance, we will NOT calculate the average rating by reading 
   "reviewId": "auto-generated-id",
   "appId": "spin-crush",
   "rating": 5,
-  "reviewText": "Amazing graphics and fast withdrawals!",
-  "userName": "RummyKing99",
+  "reviewText": "Amazing graphics and smooth experience!",
+  "userName": "Player99",
   "timestamp": "2026-08-21T12:00:00Z",
   "status": "published" // or "pending" for admin moderation
 }

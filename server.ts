@@ -33,7 +33,7 @@ async function startServer() {
         imgSrc: ["'self'", "data:", "blob:", "https://res.cloudinary.com", "https://i.ytimg.com", "https://img.youtube.com", "https://*.googleusercontent.com", "https://challenges.cloudflare.com"],
         mediaSrc: ["'self'", "blob:", "https://res.cloudinary.com"],
         frameSrc: ["'self'", "https://challenges.cloudflare.com", "https://www.youtube-nocookie.com", "https://www.youtube.com"],
-        connectSrc: ["'self'", "https://api.github.com", "https://res.cloudinary.com", "https://api.cloudinary.com", "https://challenges.cloudflare.com", "https://firestore.googleapis.com", "https://*.firebaseio.com", "https://identitytoolkit.googleapis.com", "https://cloudflareinsights.com"],
+        connectSrc: ["'self'", "https://api.github.com", "https://res.cloudinary.com", "https://api.cloudinary.com", "https://challenges.cloudflare.com", "https://firestore.googleapis.com", "https://*.firebaseio.com", "https://identitytoolkit.googleapis.com", "https://cloudflareinsights.com", "https://generativelanguage.googleapis.com"],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
         frameAncestors: ["'self'", "https://aistudio.google.com", "https://*.google.com", "https://*.run.app"]
@@ -191,6 +191,13 @@ async function startServer() {
             ignored: [
               '**/.data/**',
               '**/aiStudioBrain.json',
+              '**/staticData.json',
+              '**/staticData.ts',
+              '**/communityStaticReviews.json',
+              '**/communityCatalogStats.json',
+              '**/secureVault.ts',
+              '**/public/sitemap*.xml*',
+              '**/public/site.webmanifest',
               '**/*.log',
               '**/server_requests.log'
             ]
@@ -368,7 +375,7 @@ async function startServer() {
       }).send('Access Forbidden for automated crawlers.');
     }
 
-    // 2. Canonicalize trailing slashes (e.g. /app/a23-rummy/ -> /app/a23-rummy) except root
+    // 2. Canonicalize trailing slashes (e.g. /app/sample-app/ -> /app/sample-app) except root
     if (rawPath.length > 1 && rawPath.endsWith('/')) {
       const query = req.originalUrl.includes('?') ? '?' + req.originalUrl.split('?')[1] : '';
       return res.redirect(301, rawPath.replace(/\/+$/, '') + query);
@@ -420,7 +427,7 @@ async function startServer() {
       }
     }
 
-    // 3. Handle root-level single slugs (e.g. /a23-rummy -> 301 to canonical /app/a23-rummy)
+    // 3. Handle root-level single slugs (e.g. /sample-app -> 301 to canonical /app/sample-app)
     const cleanSegment = rawPath.replace(/^\/+|\/+$/g, '').toLowerCase();
     const knownTopLevelRoutes = new Set([
       '',

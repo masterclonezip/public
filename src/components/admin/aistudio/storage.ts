@@ -1,382 +1,405 @@
-import { StudioConfig, BrainMemoryDirective, ChatMessage, StagedReview } from './types';
+import { StudioConfig, StagedReview, ChatMessage, AIStudioBrainMemory, BrainDirective, GenerationActionLog } from './types';
+import { getDefaultStartDate, getDefaultEndDate } from './dateEngine';
 
-export const KEY_STUDIO_CONFIG = 'admin_ai_studio_config';
-export const KEY_STORE_BRAIN_DIRECTIVES = 'admin_ai_brain_directives';
-export const KEY_CHAT_HISTORY = 'admin_ai_chat_history';
-export const KEY_SELECTED_APPS = 'admin_ai_selected_apps';
-export const KEY_STAGED_REVIEWS = 'admin_ai_staged_reviews';
+const STORAGE_KEYS = {
+  CONFIG: 'ai_review_studio_config_v1',
+  LEGACY_CONFIG: 'admin_ai_studio_config',
+  STAGED: 'ai_review_studio_staged_v1',
+  CHAT: 'ai_review_studio_chat_v1',
+  BRAIN: 'ai_review_studio_brain_v1'
+};
 
-export const DEFAULT_DIRECTIVES: BrainMemoryDirective[] = [
+const LEGACY_MODEL_MAP: Record<string, string> = {
+  'gemini-3.8-flash': 'gemini-3-flash-preview',
+  'gemini-3.7-flash': 'gemini-2.5-flash',
+  'gemini-3.6-flash': 'gemini-2.5-flash-lite',
+  'gemini-3.8-flash-lite': 'gemini-3.1-flash-lite-preview',
+  'gemini-1.5-flash': 'gemini-2.5-flash',
+  'gemini-1.5-flash-latest': 'gemini-2.5-flash',
+  'gemini-1.5-pro': 'gemini-2.5-pro',
+  'gemini-pro': 'gemini-2.5-pro'
+};
+
+export function normalizeClientModelId(rawModel?: string): string {
+  const cleaned = (rawModel || '').trim().replace(/^models\//i, '');
+  if (!cleaned) return 'gemini-2.5-flash';
+  if (LEGACY_MODEL_MAP[cleaned]) {
+    return LEGACY_MODEL_MAP[cleaned];
+  }
+  return cleaned;
+}
+
+export function isValidClientApiKey(rawKey?: string): boolean {
+  const clean = (rawKey || '').trim();
+  if (!clean || clean.length < 20) return false;
+  const lower = clean.toLowerCase();
+  if (
+    lower === 'my_gemini_api_key' ||
+    lower.includes('your_api_key') ||
+    lower.includes('your-api-key') ||
+    lower.includes('paste_your') ||
+    lower.includes('placeholder')
+  ) {
+    return false;
+  }
+  return true;
+}
+
+export function maskClientApiKey(rawKey?: string): string {
+  const clean = (rawKey || '').trim();
+  if (!isValidClientApiKey(clean)) return '';
+  if (clean.length <= 10) return '••••••';
+  return `${clean.slice(0, 6)}••••${clean.slice(-4)}`;
+}
+
+const DEFAULT_BRAIN_DIRECTIVES: BrainDirective[] = [
   {
-    id: 'dir_1',
-    rule: 'Never sound robotic or like marketing copy. Write like regular, authentic everyday people who downloaded the app.',
-    category: 'persona',
-    createdAt: new Date().toISOString(),
-    active: true
+    id: 'dir-safety-1',
+    rule: 'Strictly avoid real-money gambling, betting, cash withdrawal, Paytm/UPI, or financial earning terms. Focus on what the app provides, its core features, gameplay/utility modes, interface smoothness, and authentic user experiences.',
+    category: 'safety',
+    active: true,
+    createdAt: '2026-01-01T00:00:00.000Z'
   },
   {
-    id: 'dir_2',
-    rule: 'Deep app understanding: strictly ground every comment in the specific app’s real features, category, UI, and content stored on our website.',
-    category: 'topic',
-    createdAt: new Date().toISOString(),
-    active: true
+    id: 'dir-tone-1',
+    rule: 'Write like real people on Google Play Store, Flipkart, and Amazon: mix short punchy 1-liners, practical pros/cons, and casual conversational Indian English / Hinglish without robotic AI buzzwords.',
+    category: 'tone',
+    active: true,
+    createdAt: '2026-01-01T00:00:00.000Z'
   },
   {
-    id: 'dir_3',
-    rule: 'All-rounder adaptability: adapt vocabulary naturally to the app genre (entertainment, card game, casual arcade, tools) without forcing money or gambling terms.',
-    category: 'general',
-    createdAt: new Date().toISOString(),
-    active: true
-  },
-  {
-    id: 'dir_4',
-    rule: 'Realistic dates: strictly past or current day timestamps (never future dates) with natural hour and minute distribution.',
-    category: 'date',
-    createdAt: new Date().toISOString(),
-    active: true
+    id: 'dir-format-1',
+    rule: 'Every reviewer must sound like a distinct human user (e.g. commuter, college student, budget Android user, long-time user, or skeptical first-timer) talking about specific features of that exact app.',
+    category: 'formatting',
+    active: true,
+    createdAt: '2026-01-01T00:00:00.000Z'
   }
 ];
 
-export const DEFAULT_STUDIO_CONFIG: StudioConfig = {
-  apiKey: '',
-  model: 'gemini-flash-latest',
-  reviewsPerApp: 2,
-  dateMode: 'today_and_yesterday',
-  ratingMix: 'auto_app_rating',
-  languageTone: 'all_rounder_standard',
-  likesMode: 'subtle_1_2',
-  customTopic: 'Core features, smooth performance, authentic user experience',
-  publishMode: 'wait_approve',
-  activeSessionDirective: ''
-};
-
-export function loadStudioConfig(): StudioConfig {
-  if (typeof window === 'undefined') return DEFAULT_STUDIO_CONFIG;
-  try {
-    const raw = localStorage.getItem(KEY_STUDIO_CONFIG);
-    const envKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) || '';
-    const initialSettingsKey = (window as any)?.__INITIAL_DATA__?.settings?.gemini_api_key || '';
-    const initialSettingsModel = (window as any)?.__INITIAL_DATA__?.settings?.gemini_model || '';
-    const fallbackKey = envKey || initialSettingsKey;
-
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      const merged: StudioConfig = { ...DEFAULT_STUDIO_CONFIG, ...parsed };
-      // If storage key is empty, check environment variable or admin settings fallback
-      if (!merged.apiKey || merged.apiKey.trim() === '') {
-        merged.apiKey = fallbackKey;
-      }
-      if (
-        !merged.model ||
-        merged.model === 'gemini-2.5-flash' ||
-        merged.model === 'gemini-2.0-flash' ||
-        merged.model === 'gemini-1.5-flash'
-      ) {
-        merged.model = initialSettingsModel || 'gemini-flash-latest';
-      }
-      return merged;
-    }
-    if (fallbackKey) {
-      return { 
-        ...DEFAULT_STUDIO_CONFIG, 
-        apiKey: fallbackKey,
-        model: initialSettingsModel || DEFAULT_STUDIO_CONFIG.model
-      };
-    }
-  } catch (_) {}
-  return DEFAULT_STUDIO_CONFIG;
+export function getDefaultStudioConfig(initialSettingsKey?: string, initialSettingsModel?: string): StudioConfig {
+  const cleanInitialKey = isValidClientApiKey(initialSettingsKey) ? (initialSettingsKey || '').trim() : '';
+  return {
+    apiKey: cleanInitialKey,
+    model: normalizeClientModelId(initialSettingsModel || 'gemini-2.5-flash'),
+    reviewsPerApp: 5,
+    ratingMix: 'mostly_positive',
+    tone: 'mixed_natural',
+    marketplaceStyle: 'blended_authentic',
+    lengthDistribution: 'natural_mix',
+    languageMix: 'hinglish_mix',
+    focusTopics: ['what_app_provides', 'onboarding_ease', 'daily_experience', 'device_network'],
+    humanImperfectionLevel: 'natural',
+    dateRangeMode: 'recent_days',
+    customDays: 14,
+    customMonths: 2,
+    startDate: getDefaultStartDate(),
+    endDate: getDefaultEndDate(),
+    autoPublish: false,
+    likesProbability: 70,
+    maxLikesPerReview: 14,
+    generationPacing: 'batch_fast',
+    activeSessionDirective: '',
+    updatedAt: 0
+  };
 }
 
-export function saveStudioConfig(config: StudioConfig, persistToCloud = true): void {
-  if (typeof window === 'undefined') return;
+export function loadStudioConfig(initialSettingsKey?: string, initialSettingsModel?: string): StudioConfig {
+  const defaults = getDefaultStudioConfig(initialSettingsKey, initialSettingsModel);
   try {
-    localStorage.setItem(KEY_STUDIO_CONFIG, JSON.stringify(config));
+    const rawPrimary = localStorage.getItem(STORAGE_KEYS.CONFIG);
+    const rawLegacy = localStorage.getItem(STORAGE_KEYS.LEGACY_CONFIG);
+    const parsedPrimary = rawPrimary ? JSON.parse(rawPrimary) : null;
+    const parsedLegacy = rawLegacy ? JSON.parse(rawLegacy) : null;
+
+    let parsed = parsedPrimary || parsedLegacy;
+    if (parsedPrimary && parsedLegacy) {
+      parsed = (parsedLegacy.updatedAt || 0) > (parsedPrimary.updatedAt || 0) ? parsedLegacy : parsedPrimary;
+    }
+
+    if (parsed && typeof parsed === 'object') {
+      const merged: StudioConfig = { ...defaults, ...parsed };
+
+      if (isValidClientApiKey(parsed.apiKey)) {
+        merged.apiKey = parsed.apiKey.trim();
+      } else if (isValidClientApiKey(initialSettingsKey)) {
+        merged.apiKey = (initialSettingsKey || '').trim();
+      } else {
+        merged.apiKey = '';
+      }
+
+      if (parsed.model && String(parsed.model).trim()) {
+        merged.model = normalizeClientModelId(parsed.model);
+      } else if (initialSettingsModel && String(initialSettingsModel).trim()) {
+        merged.model = normalizeClientModelId(initialSettingsModel);
+      } else {
+        merged.model = 'gemini-2.5-flash';
+      }
+
+      if (!Array.isArray(merged.focusTopics) || merged.focusTopics.length === 0) {
+        merged.focusTopics = defaults.focusTopics;
+      }
+
+      return merged;
+    }
+  } catch (e) {
+    console.warn('Failed to load AI Studio config from localStorage:', e);
+  }
+  return defaults;
+}
+
+export function saveStudioConfig(config: StudioConfig): StudioConfig {
+  const normalized: StudioConfig = {
+    ...config,
+    apiKey: isValidClientApiKey(config.apiKey) ? config.apiKey.trim() : '',
+    model: normalizeClientModelId(config.model),
+    updatedAt: Date.now()
+  };
+
+  try {
+    const serialized = JSON.stringify(normalized);
+    localStorage.setItem(STORAGE_KEYS.CONFIG, serialized);
+    localStorage.setItem(STORAGE_KEYS.LEGACY_CONFIG, serialized);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('aistudio-config-sync', { detail: normalized }));
+    }
+  } catch (e) {
+    console.warn('Failed to save AI Studio config to localStorage:', e);
+  }
+
+  // Persist to Server Brain Memory asynchronously with a fast 4s timeout (never blocks UI)
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 4000);
+    fetch('/api/v1/admin/community/aistudio-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ config: normalized }),
+      signal: ctrl.signal
+    })
+      .catch(() => {})
+      .finally(() => clearTimeout(timer));
   } catch (_) {}
 
-  if (persistToCloud) {
-    saveStudioConfigToCloud(config).catch(() => {});
+  return normalized;
+}
+
+export function loadStagedReviews(): StagedReview[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.STAGED);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.warn('Failed to load staged reviews:', e);
+  }
+  return [];
+}
+
+export function saveStagedReviews(reviews: StagedReview[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.STAGED, JSON.stringify(reviews));
+  } catch (e) {
+    console.warn('Failed to save staged reviews:', e);
   }
 }
 
-export function loadBrainDirectives(): BrainMemoryDirective[] {
-  if (typeof window === 'undefined') return DEFAULT_DIRECTIVES;
+export function loadChatHistory(): ChatMessage[] {
   try {
-    const raw = localStorage.getItem(KEY_STORE_BRAIN_DIRECTIVES);
+    const raw = localStorage.getItem(STORAGE_KEYS.CHAT);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
-  } catch (_) {}
-  return DEFAULT_DIRECTIVES;
-}
-
-export function saveBrainDirectives(directives: BrainMemoryDirective[], persistToCloud = false): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(KEY_STORE_BRAIN_DIRECTIVES, JSON.stringify(directives));
-  } catch (_) {}
-
-  if (persistToCloud) {
-    saveBrainDirectivesToCloud(directives).catch(() => {});
-  }
-}
-
-/**
- * Persists brain directives directly to server storage & Firestore
- * Works 100% reliably across device refreshes, cache clearing, and mobile browsers.
- */
-export async function saveBrainDirectivesToCloud(directives: BrainMemoryDirective[]): Promise<boolean> {
-  const payload = {
-    directives: directives.map(d => ({
-      id: String(d.id || ''),
-      rule: String(d.rule || ''),
-      category: String(d.category || 'general'),
-      createdAt: String(d.createdAt || new Date().toISOString()),
-      active: Boolean(d.active)
-    })),
-    updatedAt: new Date().toISOString()
-  };
-
-  // 1. Primary: Save via robust server admin endpoint
-  try {
-    const res = await fetch('/api/v1/admin/community/aistudio-settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (res.ok) return true;
-  } catch (_) {}
-
-  // 2. Fallback: Direct Firestore REST
-  try {
-    const { getResolvedCommunityFirebaseConfig, convertToFirestoreFields } = await import('../../../lib/communityFirebase');
-    const cfg = getResolvedCommunityFirebaseConfig();
-    if (cfg && cfg.apiKey && cfg.projectId) {
-      const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/community_store/ai_studio_brain?key=${cfg.apiKey}`;
-      const res = await fetch(url, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields: convertToFirestoreFields({ ...payload, _rest_admin_bypass: 'aistudio_preview_bypass_key' }) })
-      });
-      return res.ok;
-    }
-  } catch (_) {}
-
-  return false;
-}
-
-/**
- * Loads brain directives from server storage / Firestore cloud
- */
-export async function loadBrainDirectivesFromCloud(): Promise<BrainMemoryDirective[] | null> {
-  // 1. Primary: Server admin endpoint (0 Firestore reads!)
-  try {
-    const res = await fetch('/api/v1/admin/community/aistudio-settings');
-    if (res.ok) {
-      const json = await res.json();
-      if (Array.isArray(json?.data?.directives) && json.data.directives.length > 0) {
-        const cloudDirectives: BrainMemoryDirective[] = json.data.directives.map((d: any, idx: number) => ({
-          id: String(d.id || `dir_${idx}`),
-          rule: String(d.rule || ''),
-          category: (d.category || 'general') as any,
-          createdAt: String(d.createdAt || new Date().toISOString()),
-          active: Boolean(d.active !== false)
-        })).filter((d: any) => Boolean(d.rule));
-
-        try {
-          localStorage.setItem(KEY_STORE_BRAIN_DIRECTIVES, JSON.stringify(cloudDirectives));
-        } catch (_) {}
-        return cloudDirectives;
-      }
-    }
-  } catch (_) {}
-
-  // 2. Fallback: Direct Firestore REST
-  try {
-    const { getResolvedCommunityFirebaseConfig, parseFirestoreFields } = await import('../../../lib/communityFirebase');
-    const cfg = getResolvedCommunityFirebaseConfig();
-    if (!cfg || !cfg.apiKey || !cfg.projectId) return null;
-
-    const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/community_store/ai_studio_brain?key=${cfg.apiKey}`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-
-    const json = await res.json();
-    if (json && json.fields) {
-      const parsed = parseFirestoreFields(json.fields);
-      if (Array.isArray(parsed?.directives)) {
-        const cloudDirectives: BrainMemoryDirective[] = parsed.directives.map((d: any, idx: number) => ({
-          id: String(d.id || `dir_${idx}`),
-          rule: String(d.rule || ''),
-          category: (d.category || 'general') as any,
-          createdAt: String(d.createdAt || new Date().toISOString()),
-          active: Boolean(d.active !== false)
-        })).filter((d: any) => Boolean(d.rule));
-
-        try {
-          localStorage.setItem(KEY_STORE_BRAIN_DIRECTIVES, JSON.stringify(cloudDirectives));
-        } catch (_) {}
-        return cloudDirectives;
-      }
-    }
   } catch (e) {
-    console.warn('[AI Studio] Cloud directives load error:', e);
+    console.warn('Failed to load chat history:', e);
   }
-  return null;
-}
-
-/**
- * Persists studio automation config to server & Cloud Firestore
- */
-export async function saveStudioConfigToCloud(config: StudioConfig): Promise<boolean> {
-  const payload = {
-    apiKey: String(config.apiKey || '').trim(),
-    model: String(config.model || 'gemini-flash-latest'),
-    reviewsPerApp: Number(config.reviewsPerApp) || 2,
-    languageTone: String(config.languageTone || 'all_rounder_standard'),
-    dateMode: String(config.dateMode || 'today_and_yesterday'),
-    ratingMix: String(config.ratingMix || 'auto_app_rating'),
-    likesMode: String(config.likesMode || 'subtle_1_2'),
-    publishMode: String(config.publishMode || 'wait_approve'),
-    activeSessionDirective: String(config.activeSessionDirective || ''),
-    updatedAt: new Date().toISOString()
-  };
-
-  // 1. Primary: Save via server admin endpoint
-  try {
-    const res = await fetch('/api/v1/admin/community/aistudio-settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ config: payload })
-    });
-    if (res.ok) return true;
-  } catch (_) {}
-
-  // 2. Fallback: Direct Firestore REST
-  try {
-    const { getResolvedCommunityFirebaseConfig, convertToFirestoreFields } = await import('../../../lib/communityFirebase');
-    const cfg = getResolvedCommunityFirebaseConfig();
-    if (cfg && cfg.apiKey && cfg.projectId) {
-      const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/community_store/ai_studio_config?key=${cfg.apiKey}`;
-      const res = await fetch(url, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields: convertToFirestoreFields({ ...payload, _rest_admin_bypass: 'aistudio_preview_bypass_key' }) })
-      });
-      return res.ok;
-    }
-  } catch (_) {}
-
-  return false;
-}
-
-/**
- * Loads studio config from server / Cloud Firestore
- */
-export async function loadStudioConfigFromCloud(): Promise<Partial<StudioConfig> | null> {
-  // 1. Primary: Server admin endpoint (0 Firestore reads!)
-  try {
-    const res = await fetch('/api/v1/admin/community/aistudio-settings');
-    if (res.ok) {
-      const json = await res.json();
-      const cfg = json?.data?.config;
-      if (cfg) {
-        return {
-          apiKey: cfg.apiKey ? String(cfg.apiKey).trim() : undefined,
-          model: cfg.model ? String(cfg.model).trim() : undefined,
-          reviewsPerApp: Number(cfg.reviewsPerApp) || 2,
-          languageTone: cfg.languageTone || 'all_rounder_standard',
-          dateMode: cfg.dateMode || 'today_and_yesterday',
-          ratingMix: cfg.ratingMix || 'auto_app_rating',
-          likesMode: cfg.likesMode || 'subtle_1_2',
-          publishMode: cfg.publishMode || 'wait_approve',
-          activeSessionDirective: cfg.activeSessionDirective || ''
-        };
-      }
-    }
-  } catch (_) {}
-
-  // 2. Fallback: Direct Firestore REST
-  try {
-    const { getResolvedCommunityFirebaseConfig, parseFirestoreFields } = await import('../../../lib/communityFirebase');
-    const cfg = getResolvedCommunityFirebaseConfig();
-    if (!cfg || !cfg.apiKey || !cfg.projectId) return null;
-
-    const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/community_store/ai_studio_config?key=${cfg.apiKey}`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-
-    const json = await res.json();
-    if (json && json.fields) {
-      const parsed = parseFirestoreFields(json.fields);
-      if (parsed) {
-        return {
-          reviewsPerApp: Number(parsed.reviewsPerApp) || 2,
-          languageTone: parsed.languageTone || 'all_rounder_standard',
-          dateMode: parsed.dateMode || 'today_and_yesterday',
-          ratingMix: parsed.ratingMix || 'auto_app_rating',
-          publishMode: parsed.publishMode || 'wait_approve',
-          activeSessionDirective: parsed.activeSessionDirective || ''
-        };
-      }
-    }
-  } catch (e) {
-    console.warn('[AI Studio] Cloud config load error:', e);
-  }
-  return null;
-}
-
-export function loadChatHistory(): ChatMessage[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(KEY_CHAT_HISTORY);
-    if (raw) return JSON.parse(raw);
-  } catch (_) {}
   return [
     {
-      id: 'welcome',
-      sender: 'assistant',
-      text: 'Namaste! I am your AI Review Studio Brain. I retain all custom directives in memory and build 100% human-realistic reviews based on your local app data. Tell me what topic, tone, or specific details you want to focus on, or select apps and ask me to generate reviews for Today and Yesterday!',
+      id: 'welcome-msg',
+      role: 'assistant',
+      text: "Welcome to the **AI Review Studio & Crowd Psychology Engine**.\n\nI study the actual content, features, FAQs, and category mechanism of each selected app and generate authentic human reviews modeled on **Google Play Store**, **Amazon / Flipkart Verified Reviewers**, **Casual Hinglish Users**, and **Quick One-Line Crowd Comments**.\n\n**You can tell me anything in plain language or adjust the controls above:**\n- *\"Generate 8 reviews per app — mix Play Store and Flipkart style, talk about what the app actually provides, and keep 30% short one-liners.\"*\n- *\"Make comments for the selected apps sound like casual Indian college students & daily commuters using Hinglish.\"*\n- *\"Focus on onboarding ease, low-RAM phone performance, and add 1 constructive 4-star suggestion per app.\"*",
       timestamp: new Date().toISOString()
     }
   ];
 }
 
-export function saveChatHistory(history: ChatMessage[]): void {
-  if (typeof window === 'undefined') return;
+export function saveChatHistory(messages: ChatMessage[]): void {
   try {
-    localStorage.setItem(KEY_CHAT_HISTORY, JSON.stringify(history.slice(-30))); // Keep last 30 messages
-  } catch (_) {}
+    const trimmed = messages.slice(-60);
+    localStorage.setItem(STORAGE_KEYS.CHAT, JSON.stringify(trimmed));
+  } catch (e) {
+    console.warn('Failed to save chat history:', e);
+  }
 }
 
-export function loadStagedReviews(): StagedReview[] {
-  if (typeof window === 'undefined') return [];
+export function loadBrainMemory(): AIStudioBrainMemory {
+  const defaultMemory: AIStudioBrainMemory = {
+    version: '2.0.0',
+    lastUpdated: new Date().toISOString(),
+    directives: DEFAULT_BRAIN_DIRECTIVES,
+    actionLogs: [],
+    totalGeneratedAllTime: 0,
+    totalPublishedAllTime: 0,
+    appLastGeneratedMap: {}
+  };
+
   try {
-    const raw = localStorage.getItem(KEY_STAGED_REVIEWS);
-    if (raw) return JSON.parse(raw);
-  } catch (_) {}
-  return [];
+    const raw = localStorage.getItem(STORAGE_KEYS.BRAIN);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        ...defaultMemory,
+        ...parsed,
+        directives: Array.isArray(parsed.directives) && parsed.directives.length > 0
+          ? parsed.directives
+          : DEFAULT_BRAIN_DIRECTIVES,
+        actionLogs: Array.isArray(parsed.actionLogs) ? parsed.actionLogs : [],
+        appLastGeneratedMap: parsed.appLastGeneratedMap || {}
+      };
+    }
+  } catch (e) {
+    console.warn('Failed to load AI Studio Brain memory:', e);
+  }
+  return defaultMemory;
 }
 
-export function saveStagedReviews(reviews: StagedReview[]): void {
-  if (typeof window === 'undefined') return;
+export function saveBrainMemory(memory: AIStudioBrainMemory): void {
   try {
-    localStorage.setItem(KEY_STAGED_REVIEWS, JSON.stringify(reviews));
-  } catch (_) {}
+    const updated: AIStudioBrainMemory = {
+      ...memory,
+      lastUpdated: new Date().toISOString(),
+      actionLogs: (memory.actionLogs || []).slice(0, 100)
+    };
+    localStorage.setItem(STORAGE_KEYS.BRAIN, JSON.stringify(updated));
+
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 4000);
+    fetch('/api/v1/admin/community/aistudio-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brain: updated }),
+      signal: ctrl.signal
+    })
+      .catch(() => {})
+      .finally(() => clearTimeout(timer));
+  } catch (e) {
+    console.warn('Failed to save AI Studio Brain memory:', e);
+  }
 }
 
-export function loadSelectedAppIds(): string[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(KEY_SELECTED_APPS);
-    if (raw) return JSON.parse(raw);
-  } catch (_) {}
-  return [];
+export interface CloudStudioSettingsResponse {
+  config: Partial<StudioConfig> | null;
+  brain: AIStudioBrainMemory | null;
+  hasServerEnvKey: boolean;
+  serverEnvKeyMask: string;
+  activeKeySource: 'custom' | 'saved_studio' | 'server_env' | 'none';
+  activeKeyMask: string;
 }
 
-export function saveSelectedAppIds(ids: string[]): void {
-  if (typeof window === 'undefined') return;
+export async function loadStudioSettingsFromCloud(): Promise<CloudStudioSettingsResponse> {
   try {
-    localStorage.setItem(KEY_SELECTED_APPS, JSON.stringify(ids));
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 3500);
+    const res = await fetch('/api/v1/admin/community/aistudio-settings', {
+      signal: ctrl.signal
+    }).finally(() => clearTimeout(timer));
+
+    if (res.ok) {
+      const json = await res.json();
+      const rawCfg = json?.data?.config;
+      let cleanConfig: Partial<StudioConfig> | null = null;
+
+      if (rawCfg && typeof rawCfg === 'object' && Object.keys(rawCfg).length > 0) {
+        cleanConfig = {};
+        if (isValidClientApiKey(rawCfg.apiKey)) {
+          cleanConfig.apiKey = rawCfg.apiKey.trim();
+        }
+        if (rawCfg.model && String(rawCfg.model).trim()) {
+          cleanConfig.model = normalizeClientModelId(rawCfg.model);
+        }
+        if (typeof rawCfg.reviewsPerApp === 'number') cleanConfig.reviewsPerApp = rawCfg.reviewsPerApp;
+        if (rawCfg.ratingMix) cleanConfig.ratingMix = rawCfg.ratingMix;
+        if (rawCfg.tone) cleanConfig.tone = rawCfg.tone;
+        if (rawCfg.marketplaceStyle) cleanConfig.marketplaceStyle = rawCfg.marketplaceStyle;
+        if (rawCfg.lengthDistribution) cleanConfig.lengthDistribution = rawCfg.lengthDistribution;
+        if (rawCfg.languageMix) cleanConfig.languageMix = rawCfg.languageMix;
+        if (Array.isArray(rawCfg.focusTopics) && rawCfg.focusTopics.length > 0) {
+          cleanConfig.focusTopics = rawCfg.focusTopics;
+        }
+        if (rawCfg.humanImperfectionLevel) cleanConfig.humanImperfectionLevel = rawCfg.humanImperfectionLevel;
+        if (rawCfg.dateRangeMode) cleanConfig.dateRangeMode = rawCfg.dateRangeMode;
+        if (typeof rawCfg.customDays === 'number') cleanConfig.customDays = rawCfg.customDays;
+        if (typeof rawCfg.customMonths === 'number') cleanConfig.customMonths = rawCfg.customMonths;
+        if (rawCfg.startDate) cleanConfig.startDate = rawCfg.startDate;
+        if (rawCfg.endDate) cleanConfig.endDate = rawCfg.endDate;
+        if (typeof rawCfg.autoPublish === 'boolean') cleanConfig.autoPublish = rawCfg.autoPublish;
+        if (typeof rawCfg.likesProbability === 'number') cleanConfig.likesProbability = rawCfg.likesProbability;
+        if (typeof rawCfg.maxLikesPerReview === 'number') cleanConfig.maxLikesPerReview = rawCfg.maxLikesPerReview;
+        if (rawCfg.generationPacing) cleanConfig.generationPacing = rawCfg.generationPacing;
+        if (typeof rawCfg.activeSessionDirective === 'string') {
+          cleanConfig.activeSessionDirective = rawCfg.activeSessionDirective;
+        }
+        if (typeof rawCfg.updatedAt === 'number') cleanConfig.updatedAt = rawCfg.updatedAt;
+      }
+
+      return {
+        config: cleanConfig,
+        brain: json?.data?.brain && typeof json.data.brain === 'object' ? json.data.brain : null,
+        hasServerEnvKey: Boolean(json?.hasServerEnvKey),
+        serverEnvKeyMask: json?.serverEnvKeyMask || '',
+        activeKeySource: json?.activeKeySource || 'none',
+        activeKeyMask: json?.activeKeyMask || ''
+      };
+    }
   } catch (_) {}
+
+  return {
+    config: null,
+    brain: null,
+    hasServerEnvKey: false,
+    serverEnvKeyMask: '',
+    activeKeySource: 'none',
+    activeKeyMask: ''
+  };
+}
+
+export function appendBrainActionLog(
+  memory: AIStudioBrainMemory,
+  actionType: GenerationActionLog['actionType'],
+  summary: string,
+  appNames: string[],
+  count: number
+): AIStudioBrainMemory {
+  const newLog: GenerationActionLog = {
+    id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    timestamp: new Date().toISOString(),
+    actionType,
+    summary,
+    appNames: appNames.slice(0, 10),
+    count
+  };
+
+  const updated: AIStudioBrainMemory = {
+    ...memory,
+    actionLogs: [newLog, ...(memory.actionLogs || [])].slice(0, 100),
+    totalGeneratedAllTime: actionType === 'generated' ? (memory.totalGeneratedAllTime || 0) + count : (memory.totalGeneratedAllTime || 0),
+    totalPublishedAllTime: actionType === 'published' ? (memory.totalPublishedAllTime || 0) + count : (memory.totalPublishedAllTime || 0)
+  };
+  saveBrainMemory(updated);
+  return updated;
+}
+
+export function recordAppsGeneratedInBrain(memory: AIStudioBrainMemory, appIds: string[]): AIStudioBrainMemory {
+  const nowIso = new Date().toISOString();
+  const nextMap = { ...(memory.appLastGeneratedMap || {}) };
+  appIds.forEach(id => {
+    if (id) nextMap[String(id)] = nowIso;
+  });
+  const updated: AIStudioBrainMemory = {
+    ...memory,
+    appLastGeneratedMap: nextMap
+  };
+  saveBrainMemory(updated);
+  return updated;
 }

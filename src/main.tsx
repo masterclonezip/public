@@ -24,19 +24,18 @@ if (typeof window !== 'undefined' && window.location.search && window.location.s
 // Force wipe old mock/static data from local storage cache
 const CACHE_VERSION = '5.0';
 if (typeof window !== 'undefined' && window.localStorage) {
-  if (localStorage.getItem('rummystore_cache_version') !== CACHE_VERSION) {
-    localStorage.removeItem('rummystore_apps');
-    localStorage.removeItem('rummystore_settings');
-    localStorage.removeItem('rummystore_news');
-    localStorage.removeItem('rummystore_blogs');
-    localStorage.removeItem('rummystore_videos');
-    localStorage.removeItem('rummystore_public_data');
-    localStorage.removeItem('rummystore_cache');
+  if (localStorage.getItem('platform_cache_version') !== CACHE_VERSION) {
+    localStorage.removeItem('platform_apps');
+    localStorage.removeItem('platform_settings');
+    localStorage.removeItem('platform_news');
+    localStorage.removeItem('platform_blogs');
+    localStorage.removeItem('platform_videos');
+    localStorage.removeItem('platform_public_data');
+    localStorage.removeItem('platform_cache');
     localStorage.removeItem('cached_firestore_data');
-    localStorage.removeItem('rummystore_firestore_cache');
-    localStorage.removeItem('yd_public_data_cache');
-    localStorage.removeItem('yd_public_data');
-    localStorage.setItem('rummystore_cache_version', CACHE_VERSION);
+    localStorage.removeItem('platform_firestore_cache');
+    localStorage.removeItem('platform_public_data_cache');
+    localStorage.setItem('platform_cache_version', CACHE_VERSION);
   }
 }
 

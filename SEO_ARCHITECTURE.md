@@ -47,9 +47,9 @@ Every page strictly declares its canonical URL in:
 
 **Strict Rules**:
 - **Domain**: Strictly `https://example.com` (enforces HTTPS and WWW subdomain).
-- **No Trailing Slash**: `https://example.com/app/rummy-master` (NEVER `.../rummy-master/`).
+- **No Trailing Slash**: `https://example.com/app/sample-app` (NEVER `.../sample-app/`).
 - **No Query Parameters**: Query strings (e.g. `?ref=share`, `?utm_source=...`) are stripped from canonicals.
-- **Kebab-Case Slugs**: All dynamic routes use semantic kebab-case slugs (e.g., `/app/teen-patti-gold`), NEVER internal database IDs (e.g. `/app/doc_92817x` ❌).
+- **Kebab-Case Slugs**: All dynamic routes use semantic kebab-case slugs (e.g., `/app/sample-app`), NEVER internal database IDs (e.g. `/app/doc_92817x` ❌).
 
 ### 3.2 Complete Route Inventory
 
@@ -64,7 +64,7 @@ Every page strictly declares its canonical URL in:
 | `/developers` | Dev Directory | Verified game studios and publisher profiles. |
 | `/developers/:slug`| Dev Portfolio | Studio overview, portfolio of published titles. |
 | `/categories` | Category Index| Browsable directory of all game/app classifications. |
-| `/category/:slug` | Category Page | Curated listings for specific categories (e.g. Rummy, Teen Patti, Slots). |
+| `/category/:slug` | Category Page | Curated listings for specific categories (e.g. Games, Apps, Entertainment). |
 | `/new` | New Additions | Latest added applications to the catalog. |
 | `/about` | Transparency | Company mission, verification standards, E-E-A-T background. |
 | `/contact` | Contact Form | Direct inquiry and developer support channels. |
@@ -73,7 +73,7 @@ Every page strictly declares its canonical URL in:
 | `/disclaimer` | Legal Disclaimer| Fair use, third-party trademark, and transparency notices. |
 | `/ethics` | Review Ethics | Review impartiality, ranking methodology, and non-discrimination. |
 | `/notice` | Important Notice| Regulatory and consumer guidance advisories. |
-| `/responsibility` | Responsible Play| Player safety, deposit limit guidelines, and de-addiction resources. |
+| `/responsibility` | Responsible Play| Player safety, usage guidelines, and digital wellbeing resources. |
 | `/report-removal` | DMCA / Takedown | Intellectual property rights protection & instant takedown portal. |
 
 ---
@@ -87,7 +87,7 @@ All structured data is generated dynamically on the server and hydrated on the c
 {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  "name": "Rummy Master",
+  "name": "Sample App",
   "operatingSystem": "Android",
   "applicationCategory": "GameApplication",
   "offers": {
@@ -108,7 +108,7 @@ All structured data is generated dynamically on the server and hydrated on the c
       "@type": "Review",
       "author": { "@type": "Person", "name": "Rahul Verma" },
       "datePublished": "2026-08-15T10:30:00Z",
-      "reviewBody": "Smooth gameplay and instant withdrawals.",
+      "reviewBody": "Smooth performance and clean interface.",
       "reviewRating": {
         "@type": "Rating",
         "ratingValue": "5",
@@ -128,7 +128,7 @@ All structured data is generated dynamically on the server and hydrated on the c
   "itemListElement": [
     { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://example.com" },
     { "@type": "ListItem", "position": 2, "name": "Games", "item": "https://example.com/categories" },
-    { "@type": "ListItem", "position": 3, "name": "Rummy Master", "item": "https://example.com/app/rummy-master" }
+    { "@type": "ListItem", "position": 3, "name": "Sample App", "item": "https://example.com/app/sample-app" }
   ]
 }
 ```
@@ -142,10 +142,10 @@ Automatically injected on home and app detail pages from the admin database:
   "mainEntity": [
     {
       "@type": "Question",
-      "name": "Is Rummy Master free to download?",
+      "name": "Is Sample App free to download?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes, Rummy Master is 100% free to download on Android devices via Platform."
+        "text": "Yes, Sample App is 100% free to download on Android devices via Platform."
       }
     }
   ]

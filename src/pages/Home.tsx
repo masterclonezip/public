@@ -134,7 +134,7 @@ export default function Home() {
       const rawCat = categoryParam.toLowerCase().replace(/[-_]+/g, ' ').trim();
       const allKnownCats = (mockSettings?.categories && mockSettings.categories.length > 0)
         ? mockSettings.categories
-        : ['All Apps', 'Rummy Apps', 'Yono Apps', 'Teen Patti', 'Casino', 'Slot Games', 'Arcade', 'Board', 'Casual'];
+        : ['All Apps', 'Games', 'Apps', 'Entertainment'];
       
       const matched = allKnownCats.find(c => 
         c.toLowerCase().trim() === rawCat || 

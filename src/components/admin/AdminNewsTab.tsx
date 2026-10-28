@@ -627,7 +627,7 @@ export const AdminNewsTab = React.memo(({
                               value={item.seo_keywords || ''}
                               onChange={e => handleNewsChange(item.id, 'seo_keywords', e.target.value)}
                               className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm dark:text-white focus:ring-2 focus:ring-blue-500 transition-all"
-                              placeholder="rummy news, updates, safety"
+                              placeholder="app news, updates, release notes"
                             />
                           </div>
                         </div>

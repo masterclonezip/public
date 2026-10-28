@@ -81,7 +81,7 @@ export const useAdminApps = (apps: any[], loading: boolean, isAdminUser: boolean
 
           // Session recovery
           try {
-            const recoveredStr = sessionStore.getItem('rummystore_recovered_links');
+            const recoveredStr = sessionStore.getItem('platform_recovered_links');
             if (recoveredStr) {
               const recovered = JSON.parse(recoveredStr);
               Object.entries(recovered).forEach(([id, url]) => {

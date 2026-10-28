@@ -39,8 +39,8 @@ export function PublicHeader() {
           isHeaderHidden ? '-translate-y-full pointer-events-none' : 'translate-y-0 pointer-events-auto'
         } ${
           scrolled 
-            ? 'bg-white dark:bg-black sm:bg-white/90 sm:dark:bg-black/90 border-b border-black/10 dark:border-white/10 shadow-sm py-2' 
-            : 'bg-white dark:bg-black sm:bg-white/80 sm:dark:bg-black/80 border-b border-white/20 dark:border-white/10 py-2.5 sm:py-3'
+            ? 'bg-white dark:bg-[#090d16] sm:bg-white/95 sm:dark:bg-[#090d16]/95 border-b border-black/10 dark:border-white/10 shadow-sm py-2' 
+            : 'bg-white dark:bg-[#090d16] sm:bg-white/90 sm:dark:bg-[#090d16]/90 border-b border-black/5 dark:border-white/10 py-2.5 sm:py-3'
         }`}
       >
         <div className="w-full max-w-7xl px-1.5 xxs:px-2.5 xs:px-4 sm:px-6 lg:px-8 mx-auto relative flex justify-between items-center">
@@ -93,7 +93,7 @@ export function PublicHeader() {
               
               {moreOpen && (
                 <div 
-                  className="absolute top-full right-0 mt-1 w-48 bg-white/80 dark:bg-zinc-800/80  border border-black/5 dark:border-white/10 rounded-2xl shadow-lg overflow-hidden py-2 z-50 transition-all duration-200 animate-in fade-in slide-in-from-top-1"
+                  className="absolute top-full right-0 mt-1 w-48 bg-white dark:bg-zinc-900 border border-black/10 dark:border-white/10 rounded-2xl shadow-lg overflow-hidden py-2 z-50 transition-all duration-200 animate-in fade-in slide-in-from-top-1"
                 >
                   {[
                     { to: '/videos', label: 'Videos', icon: Video },
@@ -153,7 +153,7 @@ export function PublicHeader() {
                   href={settings.helpline_telegram.startsWith('http') ? settings.helpline_telegram : `https://t.me/${settings.helpline_telegram.replace('@', '')}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center w-8 h-8 bg-blue-50 text-blue-500 rounded-full hover:bg-blue-100 transition-colors"
+                  className="flex items-center justify-center w-8 h-8 bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 rounded-full hover:bg-blue-100 dark:hover:bg-blue-500/25 transition-colors"
                   aria-label="Telegram"
                 >
                   <Send className="w-3.5 h-3.5" />
@@ -167,7 +167,7 @@ export function PublicHeader() {
             <button 
               type="button"
               onClick={() => { triggerHaptic(); if (apps.length < 25 && fetchApps) fetchApps(); setSearchOpen(true); }}
-              className="flex items-center justify-center w-7 h-7 xxs:w-8 xxs:h-8 xs:w-9 xs:h-9 bg-zinc-100 dark:bg-zinc-800 rounded-full active:scale-95 transition-all text-zinc-500"
+              className="flex items-center justify-center w-7 h-7 xxs:w-8 xxs:h-8 xs:w-9 xs:h-9 bg-zinc-100 dark:bg-zinc-800 rounded-full active:scale-95 transition-all text-zinc-600 dark:text-zinc-300"
               aria-label="Search"
             >
               <Search className="w-3 h-3 xxs:w-3.5 xxs:h-3.5 xs:w-4 xs:h-4" />
@@ -178,7 +178,7 @@ export function PublicHeader() {
                 href={settings.helpline_telegram.startsWith('http') ? settings.helpline_telegram : `https://t.me/${settings.helpline_telegram.replace('@', '')}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center w-7 h-7 xxs:w-8 xxs:h-8 xs:w-9 xs:h-9 bg-blue-50 text-blue-500 rounded-full"
+                className="flex items-center justify-center w-7 h-7 xxs:w-8 xxs:h-8 xs:w-9 xs:h-9 bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 rounded-full"
                 aria-label="Telegram"
               >
                 <Send className="w-3 h-3 xxs:w-3.5 xxs:h-3.5 xs:w-4 xs:h-4" />
