@@ -178,7 +178,49 @@ export interface VideoItem {
   created_at: string;
 }
 
-export const mockApps: any[] = [];
+export const mockApps: any[] = [
+  {
+    "category": "General",
+    "description_html": "",
+    "name": "SPIN CRUSH",
+    "seo_title": "",
+    "created_at": "2026-10-29T11:20:53.133Z",
+    "custom_admin_box_html": "",
+    "yellow_box_msg": "",
+    "rating": 5,
+    "is_hot": false,
+    "red_box_msg": "",
+    "reviews": 0,
+    "file_size": "Unknown",
+    "icon_url": "https://res.cloudinary.com/potup3yi/image/upload/v1793272852/yn7tyiru1anaghuozhn9.webp",
+    "review_count": 0,
+    "meta_title": "",
+    "meta_description": "",
+    "sync_to_public": true,
+    "canonical_url": "",
+    "faqs": [],
+    "release_notes": "",
+    "safety_status": "Verified",
+    "updated_at": "2026-10-29T11:20:53.141Z",
+    "seo_description": "",
+    "seo_keywords": "",
+    "screenshots": [],
+    "publish_date": "",
+    "serial_number": 1,
+    "idea_box_msg": "",
+    "version": "1.0",
+    "is_coming_soon": false,
+    "developer": "Admin",
+    "custom_admin_box_heading": "",
+    "video_url": "",
+    "features_html": "",
+    "id": "hancb1ns3",
+    "is_new": true,
+    "slug": "spin-crush",
+    "og_image_url": "",
+    "has_secure_link": false
+  }
+];
 
 export const saveMockApps = (apps: any[]) => {
   try {
@@ -206,6 +248,8 @@ export const mockSettings: any = {
   "quick_links": [],
   "website_faqs": [],
   "developers": [],
+  "_rest_admin_bypass": "aistudio_preview_bypass_key",
+  "last_updated": "2026-10-29T11:23:52.201Z",
   "site_description": "",
   "site_tagline": "",
   "primary_color": "#10b981",
@@ -223,7 +267,6 @@ export const mockSettings: any = {
   "og_image": "",
   "custom_head_scripts": "",
   "maintenance_mode": false,
-  "last_updated": "2026-10-29T10:08:54.060Z",
   "privacy_content": "",
   "terms_content": "",
   "responsibility_content": "",

@@ -1,92 +1,92 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>/</loc>
-    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
+    <loc>https://admin-1gk.pages.dev/</loc>
+    <lastmod>2026-10-29T11:23:52+00:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>/new-apps</loc>
-    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
+    <loc>https://admin-1gk.pages.dev/new-apps</loc>
+    <lastmod>2026-10-29T11:23:52+00:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/categories</loc>
-    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
+    <loc>https://admin-1gk.pages.dev/categories</loc>
+    <lastmod>2026-10-29T11:23:52+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/news</loc>
+    <loc>https://admin-1gk.pages.dev/news</loc>
     <lastmod>2026-09-01T00:00:00+00:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>/videos</loc>
+    <loc>https://admin-1gk.pages.dev/videos</loc>
     <lastmod>2026-09-01T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>/about</loc>
-    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
+    <loc>https://admin-1gk.pages.dev/about</loc>
+    <lastmod>2026-10-29T11:23:52+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>/contact</loc>
-    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
+    <loc>https://admin-1gk.pages.dev/contact</loc>
+    <lastmod>2026-10-29T11:23:52+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>/faq</loc>
-    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
+    <loc>https://admin-1gk.pages.dev/faq</loc>
+    <lastmod>2026-10-29T11:23:52+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>/privacy</loc>
-    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
+    <loc>https://admin-1gk.pages.dev/privacy</loc>
+    <lastmod>2026-10-29T11:23:52+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>/terms</loc>
-    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
+    <loc>https://admin-1gk.pages.dev/terms</loc>
+    <lastmod>2026-10-29T11:23:52+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>/disclaimer</loc>
-    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
+    <loc>https://admin-1gk.pages.dev/disclaimer</loc>
+    <lastmod>2026-10-29T11:23:52+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>/notice</loc>
-    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
+    <loc>https://admin-1gk.pages.dev/notice</loc>
+    <lastmod>2026-10-29T11:23:52+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>/ethics</loc>
-    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
+    <loc>https://admin-1gk.pages.dev/ethics</loc>
+    <lastmod>2026-10-29T11:23:52+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>/responsibility</loc>
-    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
+    <loc>https://admin-1gk.pages.dev/responsibility</loc>
+    <lastmod>2026-10-29T11:23:52+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>/report-removal</loc>
-    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
+    <loc>https://admin-1gk.pages.dev/report-removal</loc>
+    <lastmod>2026-10-29T11:23:52+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
