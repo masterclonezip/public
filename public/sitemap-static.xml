@@ -1,91 +1,91 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>http://localhost:3000/</loc>
+    <loc>https://bfa85d8e.admin-1gk.pages.dev/</loc>
     <lastmod>2026-09-01T00:00:00+00:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>http://localhost:3000/new-apps</loc>
+    <loc>https://bfa85d8e.admin-1gk.pages.dev/new-apps</loc>
     <lastmod>2026-09-01T00:00:00+00:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>http://localhost:3000/categories</loc>
+    <loc>https://bfa85d8e.admin-1gk.pages.dev/categories</loc>
     <lastmod>2026-09-01T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>http://localhost:3000/news</loc>
+    <loc>https://bfa85d8e.admin-1gk.pages.dev/news</loc>
     <lastmod>2026-09-01T00:00:00+00:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>http://localhost:3000/videos</loc>
+    <loc>https://bfa85d8e.admin-1gk.pages.dev/videos</loc>
     <lastmod>2026-09-01T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>http://localhost:3000/about</loc>
+    <loc>https://bfa85d8e.admin-1gk.pages.dev/about</loc>
     <lastmod>2026-09-01T00:00:00+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>http://localhost:3000/contact</loc>
+    <loc>https://bfa85d8e.admin-1gk.pages.dev/contact</loc>
     <lastmod>2026-09-01T00:00:00+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>http://localhost:3000/faq</loc>
+    <loc>https://bfa85d8e.admin-1gk.pages.dev/faq</loc>
     <lastmod>2026-09-01T00:00:00+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>http://localhost:3000/privacy</loc>
+    <loc>https://bfa85d8e.admin-1gk.pages.dev/privacy</loc>
     <lastmod>2026-09-01T00:00:00+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>http://localhost:3000/terms</loc>
+    <loc>https://bfa85d8e.admin-1gk.pages.dev/terms</loc>
     <lastmod>2026-09-01T00:00:00+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>http://localhost:3000/disclaimer</loc>
+    <loc>https://bfa85d8e.admin-1gk.pages.dev/disclaimer</loc>
     <lastmod>2026-09-01T00:00:00+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>http://localhost:3000/notice</loc>
+    <loc>https://bfa85d8e.admin-1gk.pages.dev/notice</loc>
     <lastmod>2026-09-01T00:00:00+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>http://localhost:3000/ethics</loc>
+    <loc>https://bfa85d8e.admin-1gk.pages.dev/ethics</loc>
     <lastmod>2026-09-01T00:00:00+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>http://localhost:3000/responsibility</loc>
+    <loc>https://bfa85d8e.admin-1gk.pages.dev/responsibility</loc>
     <lastmod>2026-09-01T00:00:00+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>http://localhost:3000/report-removal</loc>
+    <loc>https://bfa85d8e.admin-1gk.pages.dev/report-removal</loc>
     <lastmod>2026-09-01T00:00:00+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
