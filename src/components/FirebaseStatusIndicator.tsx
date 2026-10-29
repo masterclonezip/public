@@ -140,8 +140,15 @@ export const FirebaseStatusIndicator: React.FC = () => {
 
   useEffect(() => {
     checkStatus();
-    const interval = setInterval(checkStatus, 300000); // 5 minutes
-    return () => clearInterval(interval);
+    const handleHydrated = () => {
+      checkStatus();
+    };
+    window.addEventListener('firebase_runtime_hydrated', handleHydrated);
+    const interval = setInterval(checkStatus, 120000); // 2 minutes
+    return () => {
+      window.removeEventListener('firebase_runtime_hydrated', handleHydrated);
+      clearInterval(interval);
+    };
   }, [checkStatus]);
 
   const isLive = result.status === 'live';

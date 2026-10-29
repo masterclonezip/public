@@ -1,1 +1,31 @@
-{"apps":[],"settings":{"site_title":"","site_description":"","site_tagline":"","logo_url":"","favicon_url":"","primary_color":"#10b981","contact_email":"","telegram_url":"","youtube_url":"","twitter_url":"","facebook_url":"","instagram_url":"","footer_text":"","copyright_text":"","seo_title":"","seo_description":"","seo_keywords":"","og_image":"","custom_head_scripts":"","maintenance_mode":false,"banners":[],"categories":[],"quick_links":[],"website_faqs":[],"developers":[],"disclaimer_text":"","ethics_discrimination_text":"","privacy_content":"","terms_content":"","responsibility_content":"","report_removal_content":"","important_notice":"","about_content":"","disclaimer_heading":"","ethics_heading":"","portal_heading":"","important_notice_heading":""},"news":[],"videos":[],"reviews":[]}
+{
+  "apps": [],
+  "news": [],
+  "videos": [],
+  "quickLinks": [],
+  "websiteFaqs": [],
+  "developers": [],
+  "settings": {
+    "site_title": "",
+    "site_description": "",
+    "site_tagline": "",
+    "logo_url": "",
+    "favicon_url": "",
+    "primary_color": "#10b981",
+    "contact_email": "",
+    "telegram_url": "",
+    "youtube_url": "",
+    "twitter_url": "",
+    "facebook_url": "",
+    "instagram_url": "",
+    "footer_text": "",
+    "copyright_text": "",
+    "seo_title": "",
+    "seo_description": "",
+    "seo_keywords": "",
+    "og_image": "",
+    "custom_head_scripts": "",
+    "maintenance_mode": false
+  },
+  "lastUpdated": ""
+}

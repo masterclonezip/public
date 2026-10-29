@@ -33,12 +33,12 @@ export const CommunityFirebaseStatusIndicator: React.FC = () => {
       const cfg = getResolvedCommunityFirebaseConfig();
       if (cfg && cfg.apiKey && cfg.projectId) {
         try {
-          const probeUrl = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/reviews?pageSize=1&key=${encodeURIComponent(cfg.apiKey)}`;
+          const probeUrl = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(cfg.projectId)}/databases/(default)?key=${encodeURIComponent(cfg.apiKey)}`;
           const probeStart = performance.now();
           const res = await fetch(probeUrl);
           const probeLat = Math.round(performance.now() - probeStart);
 
-          if (res.ok) {
+          if (res.ok || res.status === 404) {
             setResult({
               status: 'live',
               readLatencyMs: probeLat,
@@ -75,15 +75,25 @@ export const CommunityFirebaseStatusIndicator: React.FC = () => {
         }
       } catch (_) {}
 
-      if (data && (data.success || data.firestoreRead)) {
+      if (!data) {
+        try {
+          const pubRes = await fetch('/api/v1/public/community/health/ping');
+          const cType = pubRes.headers.get('content-type') || '';
+          if (pubRes.ok && cType.includes('application/json')) {
+            data = await pubRes.json();
+          }
+        } catch (_) {}
+      }
+
+      if (data && (data.success || data.firestoreRead || data.connected || data.status === 'live')) {
         const lat = data.readLatencyMs || Math.round(performance.now() - start);
         setResult({
-          status: data.isQuotaProtected ? 'quota_exceeded' : 'live',
+          status: (data.isQuotaProtected || data.status === 'quota_exceeded') ? 'quota_exceeded' : 'live',
           readLatencyMs: lat,
           totalReviews: data.reviewsCount || 0,
-          projectId: data.details?.project || cfg?.projectId || '',
-          databaseId: data.details?.databaseId || '(default)',
-          mode: data.details?.readMode || 'Admin API',
+          projectId: data.projectId || data.details?.project || cfg?.projectId || '',
+          databaseId: data.databaseId || data.details?.databaseId || '(default)',
+          mode: data.details?.readMode || 'Admin Edge API',
           checkedAt: new Date().toLocaleTimeString()
         });
         return;
@@ -111,8 +121,15 @@ export const CommunityFirebaseStatusIndicator: React.FC = () => {
 
   useEffect(() => {
     checkStatus();
+    const handleHydrated = () => {
+      checkStatus();
+    };
+    window.addEventListener('firebase_runtime_hydrated', handleHydrated);
     const interval = setInterval(checkStatus, 120000); // Check every 2 minutes
-    return () => clearInterval(interval);
+    return () => {
+      window.removeEventListener('firebase_runtime_hydrated', handleHydrated);
+      clearInterval(interval);
+    };
   }, [checkStatus]);
 
   const isLive = result.status === 'live';

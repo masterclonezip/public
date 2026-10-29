@@ -395,6 +395,14 @@ export default function Home() {
               {filteredApps.slice(0, visibleCount).map((app, index) => (
                 <AppListItem key={`${app.id}-${index}`} app={app} index={index + 1} />
               ))}
+              {filteredApps.length === 0 && (
+                <div className="p-8 text-center bg-zinc-50 dark:bg-zinc-900/60 rounded-2xl mx-1 mt-4 border border-zinc-200/80 dark:border-zinc-800">
+                  <h3 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-1.5">No apps available</h3>
+                  <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
+                    The application catalog is currently being updated. Please check back shortly.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         );

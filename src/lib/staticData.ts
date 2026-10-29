@@ -1,4 +1,4 @@
-// No secureStorage import to avoid Vercel build errors when secureStorage is stripped
+// Clean White-Label Master Static Dataset
 
 export interface Banner {
   id: string;
@@ -51,7 +51,6 @@ export interface GlobalSettings {
   social_links?: { facebook?: string; instagram?: string; twitter?: string; linkedin?: string; youtube?: string; };
   website_faqs?: Array<{ question: string; answer: string }>;
   developers?: Array<{ id?: string; name: string; role: string; bio?: string; image_url?: string; github?: string; twitter?: string; avatar_url?: string; social?: any }>;
-  // Static Pages Custom SEO
   disclaimer_meta_title?: string;
   disclaimer_meta_description?: string;
   ethics_meta_title?: string;
@@ -146,7 +145,6 @@ export interface AppConfig {
   features_html?: string;
   faqs?: {question: string; answer: string}[];
   link_configured?: boolean;
-  
   video_url?: string;
   is_top_chart?: boolean;
   top_chart_category?: string;
@@ -190,49 +188,22 @@ export const saveMockApps = (apps: any[]) => {
 };
 
 export const mockSettings: any = {
-  "site_title": "",
-  "meta_description": "",
-  "logo_url": "",
-  "favicon_url": "",
-  "helpline_whatsapp": "",
-  "helpline_telegram": "",
-  "support_email": "",
-  "disclaimer_text": "",
-  "ethics_discrimination_text": "",
-  "ticker_text": "",
-  "animations_enabled": true,
-  "categories": [],
-  "banners": [],
-  "quick_links": [],
-  "website_faqs": [],
-  "developers": [],
-  "site_description": "",
-  "site_tagline": "",
-  "primary_color": "#10b981",
-  "contact_email": "",
-  "telegram_url": "",
-  "youtube_url": "",
-  "twitter_url": "",
-  "facebook_url": "",
-  "instagram_url": "",
-  "footer_text": "",
-  "copyright_text": "",
-  "seo_title": "",
-  "seo_description": "",
-  "seo_keywords": "",
-  "og_image": "",
-  "custom_head_scripts": "",
-  "maintenance_mode": false,
-  "privacy_content": "",
-  "terms_content": "",
-  "responsibility_content": "",
-  "report_removal_content": "",
-  "important_notice": "",
-  "about_content": "",
-  "disclaimer_heading": "",
-  "ethics_heading": "",
-  "portal_heading": "",
-  "important_notice_heading": ""
+  site_title: "",
+  meta_description: "",
+  logo_url: "",
+  favicon_url: "",
+  helpline_whatsapp: "",
+  helpline_telegram: "",
+  support_email: "",
+  disclaimer_text: "",
+  ethics_discrimination_text: "",
+  ticker_text: "",
+  animations_enabled: true,
+  categories: [],
+  banners: [],
+  quick_links: [],
+  website_faqs: [],
+  developers: []
 };
 
 export const saveMockSettings = (settings: any) => {

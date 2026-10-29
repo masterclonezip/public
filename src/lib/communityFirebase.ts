@@ -222,7 +222,41 @@ const getEnvVal = (key: string): string | undefined => {
   return undefined;
 };
 
+let runtimeCommunityConfig: { projectId?: string; apiKey?: string; databaseId?: string; appId?: string } | null = null;
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('firebase_runtime_hydrated', (e: any) => {
+    const detail = e?.detail;
+    const cfg = detail?.communityFirebase || detail?.firebase;
+    if (cfg?.projectId && cfg?.apiKey) {
+      runtimeCommunityConfig = {
+        projectId: cfg.projectId,
+        apiKey: cfg.apiKey,
+        databaseId: cfg.databaseId || '(default)',
+        appId: cfg.appId || '',
+      };
+    }
+  });
+}
+
+export const setRuntimeCommunityFirebaseConfig = (cfg: { projectId?: string; apiKey?: string; databaseId?: string; appId?: string }) => {
+  runtimeCommunityConfig = cfg;
+};
+
 export const getResolvedCommunityFirebaseConfig = () => {
+  if (runtimeCommunityConfig?.projectId && runtimeCommunityConfig?.apiKey) {
+    const pId = runtimeCommunityConfig.projectId;
+    return {
+      projectId: pId,
+      appId: runtimeCommunityConfig.appId || '',
+      apiKey: runtimeCommunityConfig.apiKey,
+      authDomain: `${pId}.firebaseapp.com`,
+      firestoreDatabaseId: runtimeCommunityConfig.databaseId || '(default)',
+      storageBucket: `${pId}.firebasestorage.app`,
+      messagingSenderId: '',
+    };
+  }
+
   const rawProjectId =
     getEnvVal('VITE_COMMUNITY_FIREBASE_PROJECT_ID') ||
     getEnvVal('COMMUNITY_FIREBASE_PROJECT_ID') ||

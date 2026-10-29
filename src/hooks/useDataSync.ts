@@ -257,9 +257,20 @@ export function useDataSync() {
     }
   }, [checkIsQuotaError]);
 
-  // Initial load
+  // Initial load and runtime hydration listener
   useEffect(() => {
     loadData(false);
+    const handleHydrated = () => {
+      loadData(true);
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('firebase_runtime_hydrated', handleHydrated);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('firebase_runtime_hydrated', handleHydrated);
+      }
+    };
   }, [loadData]);
 
   // Monitor syncStates to clear loading

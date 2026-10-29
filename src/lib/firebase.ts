@@ -102,12 +102,12 @@ const firebaseConfig = {
     ''
 };
 
-export const isFirebaseConfigured = Boolean(
+export let isFirebaseConfigured = Boolean(
   firebaseConfig.projectId &&
   firebaseConfig.apiKey &&
   firebaseConfig.projectId !== 'unconfigured-project'
 );
-export const isFirebaseReal = isFirebaseConfigured;
+export let isFirebaseReal = isFirebaseConfigured;
 
 const safeInitConfig = isFirebaseConfigured
   ? firebaseConfig
@@ -139,6 +139,74 @@ try {
   db = {} as Firestore;
   auth = {} as Auth;
   storage = {} as FirebaseStorage;
+}
+
+let hydratedPromise: Promise<boolean> | null = null;
+
+export async function hydrateFirebaseRuntimeConfig(): Promise<boolean> {
+  if (isFirebaseConfigured) return true;
+  if (typeof window === 'undefined') return false;
+  if (hydratedPromise) return hydratedPromise;
+
+  hydratedPromise = (async () => {
+    try {
+      let data: any = null;
+      try {
+        const res = await fetch('/api/v1/admin/runtime-config');
+        if (res.ok) data = await res.json();
+      } catch (_) {}
+
+      if (!data?.firebase?.projectId) {
+        try {
+          const res = await fetch('/api/v1/public/runtime-config');
+          if (res.ok) data = await res.json();
+        } catch (_) {}
+      }
+
+      if (data?.firebase?.projectId && data?.firebase?.apiKey) {
+        firebaseConfig.projectId = data.firebase.projectId;
+        firebaseConfig.apiKey = data.firebase.apiKey;
+        if (data.firebase.appId) firebaseConfig.appId = data.firebase.appId;
+        if (data.firebase.authDomain) firebaseConfig.authDomain = data.firebase.authDomain;
+        if (data.firebase.databaseId) firebaseConfig.firestoreDatabaseId = data.firebase.databaseId;
+        if (data.firebase.storageBucket) firebaseConfig.storageBucket = data.firebase.storageBucket;
+        if (data.firebase.messagingSenderId) firebaseConfig.messagingSenderId = data.firebase.messagingSenderId;
+
+        isFirebaseConfigured = true;
+        isFirebaseReal = true;
+
+        try {
+          const existingApps = getApps();
+          app = existingApps.length === 0 ? initializeApp(firebaseConfig) : getApp();
+          try {
+            db = initializeFirestore(app, {
+              experimentalForceLongPolling: true,
+            }, firebaseConfig.firestoreDatabaseId || '(default)');
+          } catch {
+            db = getFirestore(app, firebaseConfig.firestoreDatabaseId || '(default)');
+          }
+          auth = getAuth(app);
+          storage = getStorage(app);
+        } catch (initErr) {
+          console.warn('[Firebase] Runtime re-init warning:', initErr);
+        }
+
+        window.dispatchEvent(new CustomEvent('firebase_runtime_hydrated', { detail: data }));
+        return true;
+      }
+    } catch (e) {
+      console.warn('[Firebase] Runtime config hydration failed:', e);
+    }
+    return false;
+  })();
+
+  return hydratedPromise;
+}
+
+if (typeof window !== 'undefined' && !isFirebaseConfigured) {
+  setTimeout(() => {
+    hydrateFirebaseRuntimeConfig();
+  }, 0);
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
