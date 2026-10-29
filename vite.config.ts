@@ -65,8 +65,18 @@ function adminAuthDevPlugin(env: Record<string, string>) {
         if (req.url && req.url.startsWith('/api/v1/admin/community/app-counts')) {
           const isForce = req.url.includes('force=true');
           const fetchFirestore = async () => {
-            const apiKey = env.VITE_COMMUNITY_FIREBASE_API_KEY || process.env.VITE_COMMUNITY_FIREBASE_API_KEY || '';
-            const projectId = env.VITE_COMMUNITY_FIREBASE_PROJECT_ID || process.env.VITE_COMMUNITY_FIREBASE_PROJECT_ID || '';
+            const apiKey =
+              env.VITE_COMMUNITY_FIREBASE_API_KEY ||
+              process.env.VITE_COMMUNITY_FIREBASE_API_KEY ||
+              env.VITE_FIREBASE_API_KEY ||
+              process.env.VITE_FIREBASE_API_KEY ||
+              '';
+            const projectId =
+              env.VITE_COMMUNITY_FIREBASE_PROJECT_ID ||
+              process.env.VITE_COMMUNITY_FIREBASE_PROJECT_ID ||
+              env.VITE_FIREBASE_PROJECT_ID ||
+              process.env.VITE_FIREBASE_PROJECT_ID ||
+              '';
             if (!apiKey || !projectId) {
               return null;
             }
