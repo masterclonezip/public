@@ -92,7 +92,7 @@ export function useDataActions(
         _rest_admin_bypass: ADMIN_BYPASS_KEY
       });
 
-      if (isNewApp || numChunks !== prevNumChunks || apps.length === 0) {
+      if (isNewApp || numChunks !== prevNumChunks || apps.length <= 1) {
         await writeFirestoreDoc('store_data', 'apps_meta', {
           count: nextApps.length,
           totalApps: nextApps.length,
@@ -108,7 +108,7 @@ export function useDataActions(
       }
     } catch (err: any) {
       console.warn('[useDataActions] Targeted Firestore saveAppSingle notice:', err);
-      lastError = `Firestore write failed: ${err?.message || 'Unknown Firestore error'}`;
+      lastError = err?.message || 'Firestore write failed';
     }
 
     // 2. Sync to backend server API (passes persistedToFirestore so Edge skips duplicate Firestore reads/writes)
@@ -123,19 +123,21 @@ export function useDataActions(
         body: JSON.stringify({ app: normalizedApp, persistedToFirestore: savedToFirestore })
       });
       const cType = res.headers.get('content-type') || '';
-      if (res.ok && cType.includes('application/json')) {
-        const data = await res.json();
-        if (data && (data.app || data.success)) {
-          savedApp = { ...normalizedApp, ...(data.app || {}) };
-          savedToServer = true;
-        }
-      } else if (!res.ok && !savedToFirestore) {
-        lastError = `Server returned HTTP ${res.status}`;
+      const data = cType.includes('application/json') ? await res.json().catch(() => null) : null;
+      if (res.ok && data && (data.app || data.success !== false)) {
+        savedApp = { ...normalizedApp, ...(data.app || {}) };
+        savedToServer = true;
+      } else if (!savedToFirestore) {
+        lastError = data?.error || lastError || `Server returned HTTP ${res.status}`;
       }
     } catch (err: any) {
       if (!savedToFirestore) {
-        lastError = err?.message || 'Server endpoint unreachable';
+        lastError = lastError || err?.message || 'Server endpoint unreachable';
       }
+    }
+
+    if (!savedToServer && !savedToFirestore) {
+      throw new Error(lastError || 'Failed to save application to Firebase database.');
     }
 
     setApps(prev => {
@@ -147,10 +149,6 @@ export function useDataActions(
       }
       return [...prev, savedApp];
     });
-
-    if (!savedToServer && !savedToFirestore) {
-      console.warn(`[useDataActions] Remote sync notice (saved locally): ${lastError || 'Could not connect to server or Firestore'}`);
-    }
 
     return savedApp;
   }, [getAdminToken, setApps, apps, settings?.site_title]);
@@ -205,7 +203,7 @@ export function useDataActions(
       }
     } catch (err: any) {
       console.warn('[useDataActions] Targeted Firestore delete notice:', err);
-      lastError = `Firestore delete failed: ${err?.message || 'Unknown error'}`;
+      lastError = err?.message || 'Firestore delete failed';
     }
 
     // 2. Sync deletion to backend server API (passes persistedToFirestore so Edge skips duplicate reads/writes)
@@ -220,22 +218,23 @@ export function useDataActions(
         body: JSON.stringify({ id: appId, persistedToFirestore: deletedOnFirestore })
       });
       const cType = res.headers.get('content-type') || '';
-      if (res.ok && cType.includes('application/json')) {
+      const data = cType.includes('application/json') ? await res.json().catch(() => null) : null;
+      if (res.ok && (!data || data.success !== false)) {
         deletedOnServer = true;
-      } else if (!res.ok && !deletedOnFirestore) {
-        lastError = `Server returned HTTP ${res.status}`;
+      } else if (!deletedOnFirestore) {
+        lastError = data?.error || lastError || `Server returned HTTP ${res.status}`;
       }
     } catch (err: any) {
       if (!deletedOnFirestore) {
-        lastError = err?.message || 'Server endpoint unreachable';
+        lastError = lastError || err?.message || 'Server endpoint unreachable';
       }
     }
 
-    setApps(prev => prev.filter(a => a.id !== appId && a.slug !== appId));
-
     if (!deletedOnServer && !deletedOnFirestore) {
-      console.warn(`[useDataActions] Remote deletion notice (deleted locally): ${lastError || 'Could not connect to server or Firestore'}`);
+      throw new Error(lastError || 'Failed to delete application from Firebase database.');
     }
+
+    setApps(prev => prev.filter(a => a.id !== appId && a.slug !== appId));
   }, [getAdminToken, setApps, apps]);
 
   const saveSettingsSection = useCallback(async (section: string, data: any) => {
@@ -276,11 +275,11 @@ export function useDataActions(
 
       // Keep dedicated collection documents in sync when saving those specific sections
       if (section === 'website_faqs' && Array.isArray(data)) {
-        await writeFirestoreDoc('store_data', 'faqs', { items: data, count: data.length, updated_at: nowIso, updatedAt: nowIso });
+        await writeFirestoreDoc('store_data', 'faqs', { items: data, count: data.length, updated_at: nowIso, updatedAt: nowIso, _rest_admin_bypass: ADMIN_BYPASS_KEY });
       } else if (section === 'quick_links' && Array.isArray(data)) {
-        await writeFirestoreDoc('store_data', 'quick_links', { items: data, count: data.length, updated_at: nowIso, updatedAt: nowIso });
+        await writeFirestoreDoc('store_data', 'quick_links', { items: data, count: data.length, updated_at: nowIso, updatedAt: nowIso, _rest_admin_bypass: ADMIN_BYPASS_KEY });
       } else if (section === 'developers' && Array.isArray(data)) {
-        await writeFirestoreDoc('store_data', 'developers', { items: data, count: data.length, updated_at: nowIso, updatedAt: nowIso });
+        await writeFirestoreDoc('store_data', 'developers', { items: data, count: data.length, updated_at: nowIso, updatedAt: nowIso, _rest_admin_bypass: ADMIN_BYPASS_KEY });
       }
 
       if (okSettings) {
@@ -288,7 +287,7 @@ export function useDataActions(
       }
     } catch (err: any) {
       console.warn('[useDataActions] Targeted Firestore settings save notice:', err);
-      lastError = `Firestore settings write failed: ${err?.message || 'Unknown error'}`;
+      lastError = err?.message || 'Firestore settings write failed';
     }
 
     // 2. Sync to backend server API
@@ -303,26 +302,27 @@ export function useDataActions(
         body: JSON.stringify({ section, data, settings: mergedSettings, persistedToFirestore: savedToFirestore })
       });
       const cType = res.headers.get('content-type') || '';
-      if (res.ok && cType.includes('application/json')) {
-        resData = await res.json();
+      const parsed = cType.includes('application/json') ? await res.json().catch(() => null) : null;
+      if (res.ok && (!parsed || parsed.success !== false)) {
+        resData = parsed;
         savedToServer = true;
-      } else if (!res.ok && !savedToFirestore) {
-        lastError = `Server returned HTTP ${res.status}`;
+      } else if (!savedToFirestore) {
+        lastError = parsed?.error || lastError || `Server returned HTTP ${res.status}`;
       }
     } catch (err: any) {
       if (!savedToFirestore) {
-        lastError = err?.message || 'Server endpoint unreachable';
+        lastError = lastError || err?.message || 'Server endpoint unreachable';
       }
+    }
+
+    if (!savedToServer && !savedToFirestore) {
+      throw new Error(lastError || 'Failed to save settings to Firebase database.');
     }
 
     if (resData && resData.settings && Object.keys(resData.settings).length > 2) {
       setSettings(resData.settings);
     } else {
       setSettings(mergedSettings);
-    }
-
-    if (!savedToServer && !savedToFirestore) {
-      console.warn(`[useDataActions] Settings sync notice (saved locally): ${lastError || 'Could not connect to server or Firestore'}`);
     }
 
     return resData || { success: true, settings: mergedSettings };
@@ -405,7 +405,7 @@ export function useDataActions(
       }
     } catch (err: any) {
       console.warn('[useDataActions] Firestore saveApps notice:', err);
-      lastError = `Firestore apps write failed: ${err?.message || 'Unknown error'}`;
+      lastError = err?.message || 'Firestore apps write failed';
     }
 
     try {
@@ -419,19 +419,20 @@ export function useDataActions(
         body: JSON.stringify({ apps: normalizedApps, persistedToFirestore: savedToFirestore })
       });
       const cType = res.headers.get('content-type') || '';
-      if (res.ok && cType.includes('application/json')) {
+      const data = cType.includes('application/json') ? await res.json().catch(() => null) : null;
+      if (res.ok && (!data || data.success !== false)) {
         savedToServer = true;
-      } else if (!res.ok && !savedToFirestore) {
-        lastError = `Server returned HTTP ${res.status}`;
+      } else if (!savedToFirestore) {
+        lastError = data?.error || lastError || `Server returned HTTP ${res.status}`;
       }
     } catch (err: any) {
       if (!savedToFirestore) {
-        lastError = err?.message || 'Server endpoint unreachable';
+        lastError = lastError || err?.message || 'Server endpoint unreachable';
       }
     }
 
     if (!savedToServer && !savedToFirestore) {
-      throw new Error(`Failed to save apps catalog to database: ${lastError || 'Could not connect to server or Firestore'}`);
+      throw new Error(lastError || 'Failed to save apps catalog to Firebase database.');
     }
 
     setApps(normalizedApps);
@@ -495,7 +496,7 @@ export function useDataActions(
       }
     } catch (err: any) {
       console.warn('[useDataActions] Firestore saveSettings notice:', err);
-      lastError = `Firestore write failed: ${err?.message || 'Unknown error'}`;
+      lastError = err?.message || 'Firestore write failed';
     }
 
     try {
@@ -509,19 +510,20 @@ export function useDataActions(
         body: JSON.stringify({ settings: settingsWithTime, persistedToFirestore: savedToFirestore })
       });
       const cType = res.headers.get('content-type') || '';
-      if (res.ok && cType.includes('application/json')) {
+      const data = cType.includes('application/json') ? await res.json().catch(() => null) : null;
+      if (res.ok && (!data || data.success !== false)) {
         savedToServer = true;
-      } else if (!res.ok && !savedToFirestore) {
-        lastError = `Server returned HTTP ${res.status}`;
+      } else if (!savedToFirestore) {
+        lastError = data?.error || lastError || `Server returned HTTP ${res.status}`;
       }
     } catch (err: any) {
       if (!savedToFirestore) {
-        lastError = err?.message || 'Server endpoint unreachable';
+        lastError = lastError || err?.message || 'Server endpoint unreachable';
       }
     }
 
     if (!savedToServer && !savedToFirestore) {
-      throw new Error(`Failed to save settings: ${lastError || 'Could not connect to server or Firestore'}`);
+      throw new Error(lastError || 'Failed to save settings to Firebase database.');
     }
 
     setSettings(settingsWithTime);
@@ -579,7 +581,7 @@ export function useDataActions(
       }
     } catch (err: any) {
       console.warn('[useDataActions] Firestore saveNews notice:', err);
-      lastError = `Firestore news write failed: ${err?.message || 'Unknown error'}`;
+      lastError = err?.message || 'Firestore news write failed';
     }
 
     try {
@@ -593,22 +595,23 @@ export function useDataActions(
         body: JSON.stringify({ news: cleanNews, persistedToFirestore: savedToFirestore })
       });
       const cType = res.headers.get('content-type') || '';
-      if (res.ok && cType.includes('application/json')) {
+      const data = cType.includes('application/json') ? await res.json().catch(() => null) : null;
+      if (res.ok && (!data || data.success !== false)) {
         savedToServer = true;
-      } else if (!res.ok && !savedToFirestore) {
-        lastError = `Server returned HTTP ${res.status}`;
+      } else if (!savedToFirestore) {
+        lastError = data?.error || lastError || `Server returned HTTP ${res.status}`;
       }
     } catch (err: any) {
       if (!savedToFirestore) {
-        lastError = err?.message || 'Server endpoint unreachable';
+        lastError = lastError || err?.message || 'Server endpoint unreachable';
       }
     }
 
-    setNews(cleanNews);
-
     if (!savedToServer && !savedToFirestore) {
-      console.warn(`[useDataActions] News sync notice (saved locally): ${lastError || 'Could not connect to server or Firestore'}`);
+      throw new Error(lastError || 'Failed to save news to Firebase database.');
     }
+
+    setNews(cleanNews);
   }, [getAdminToken, setNews, news, settings?.site_title]);
 
   const saveVideos = useCallback(async (newVideos: VideoItem[]) => {
@@ -663,7 +666,7 @@ export function useDataActions(
       }
     } catch (err: any) {
       console.warn('[useDataActions] Firestore saveVideos notice:', err);
-      lastError = `Firestore videos write failed: ${err?.message || 'Unknown error'}`;
+      lastError = err?.message || 'Firestore videos write failed';
     }
 
     try {
@@ -677,22 +680,23 @@ export function useDataActions(
         body: JSON.stringify({ videos: cleanVideos, persistedToFirestore: savedToFirestore })
       });
       const cType = res.headers.get('content-type') || '';
-      if (res.ok && cType.includes('application/json')) {
+      const data = cType.includes('application/json') ? await res.json().catch(() => null) : null;
+      if (res.ok && (!data || data.success !== false)) {
         savedToServer = true;
-      } else if (!res.ok && !savedToFirestore) {
-        lastError = `Server returned HTTP ${res.status}`;
+      } else if (!savedToFirestore) {
+        lastError = data?.error || lastError || `Server returned HTTP ${res.status}`;
       }
     } catch (err: any) {
       if (!savedToFirestore) {
-        lastError = err?.message || 'Server endpoint unreachable';
+        lastError = lastError || err?.message || 'Server endpoint unreachable';
       }
     }
 
-    setVideos(cleanVideos);
-
     if (!savedToServer && !savedToFirestore) {
-      console.warn(`[useDataActions] Videos sync notice (saved locally): ${lastError || 'Could not connect to server or Firestore'}`);
+      throw new Error(lastError || 'Failed to save videos to Firebase database.');
     }
+
+    setVideos(cleanVideos);
   }, [getAdminToken, setVideos, videos, settings?.site_title]);
 
   const updateLocalContainerBackup = useCallback(async (

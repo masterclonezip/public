@@ -516,7 +516,16 @@ export default function AdminDashboard() {
             }}
             handleAddNews={handleAddNews}
             handleNewsChange={handleNewsChange}
-            handleDeleteNews={handleDeleteNews}
+            handleDeleteNews={async (id: string) => {
+              const nextNews = newsList.filter((n: any) => n.id !== id);
+              handleDeleteNews(id);
+              try {
+                await saveNews(nextNews);
+                toast('News article deleted permanently.', 'success');
+              } catch (err: any) {
+                toast('Failed to delete news article: ' + (err?.message || 'Error'), 'error');
+              }
+            }}
             handleAddCategory={handleAddCategory}
             handleRemoveCategory={async (cat: string) => {
               const nextCats = categoriesList.filter((c: string) => c !== cat);

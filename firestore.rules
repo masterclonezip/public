@@ -14,7 +14,7 @@ service cloud.firestore {
     // Helper to verify if user is authorized as an admin (via database index lookup)
     function isAdmin() {
       return request.auth != null && 
-             (request.auth.token.email.lower() == 'defentechscholar@gmail.com' ||
+             ((request.auth.token.email != null && request.auth.token.email.lower() == 'defentechscholar@gmail.com') ||
               exists(/databases/$(database)/documents/admins/$(request.auth.uid)) || 
               (request.auth.token.email != null && exists(/databases/$(database)/documents/admins/$(request.auth.token.email))));
     }
@@ -51,11 +51,13 @@ service cloud.firestore {
              data.source is string && data.source.size() <= 128;
     }
 
-    // Helper to verify authorized writes (Firebase Auth admin OR authenticated admin bypass token)
+    // Helper to verify authorized writes (authenticated admin bypass token OR Firebase Auth admin)
     function isAuthorizedAdminWrite() {
-      return isAdmin() || 
-             (request.resource.data._rest_admin_bypass == 'aistudio_preview_bypass_key') ||
-             (request.resource.data.keys().hasAll(['_rest_admin_bypass']) && request.resource.data._rest_admin_bypass is string && request.resource.data._rest_admin_bypass.size() >= 10);
+      return (request.resource != null && (
+               request.resource.data._rest_admin_bypass == 'aistudio_preview_bypass_key' ||
+               (request.resource.data.keys().hasAll(['_rest_admin_bypass']) && request.resource.data._rest_admin_bypass is string && request.resource.data._rest_admin_bypass.size() >= 10)
+             )) ||
+             isAdmin();
     }
 
     // 1. Admins collection

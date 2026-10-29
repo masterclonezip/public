@@ -115,18 +115,17 @@ export function useDataSync() {
               readFirestoreDoc('store_data', 'videos')
             ]);
 
-            const metaExists = metaSnap.exists && metaSnap.data;
-            const maxChunks = metaExists && Number(metaSnap.data?.numChunks) >= 0
-              ? Number(metaSnap.data?.numChunks)
+            const metaExists = Boolean(metaSnap.exists && metaSnap.data);
+            const rawMetaChunks = metaExists ? Number(metaSnap.data?.numChunks) : NaN;
+            const maxChunks = Number.isFinite(rawMetaChunks) && rawMetaChunks > 0
+              ? rawMetaChunks
               : 4;
 
-            const chunkSnaps = maxChunks > 0
-              ? await Promise.all(
-                  Array.from({ length: maxChunks }, (_, i) =>
-                    readFirestoreDoc('store_data', `apps_chunk_${i}`)
-                  )
-                )
-              : [];
+            const chunkSnaps = await Promise.all(
+              Array.from({ length: maxChunks }, (_, i) =>
+                readFirestoreDoc('store_data', `apps_chunk_${i}`)
+              )
+            );
 
             let loadedApps: AppConfig[] = [];
             let anyChunkExists = false;
@@ -147,7 +146,7 @@ export function useDataSync() {
               }
             });
 
-            if (loadedApps.length > 0) {
+            if (metaExists || anyChunkExists || loadedApps.length > 0) {
               setApps(loadedApps);
               loadedFromDirectFirestore = true;
             }
@@ -162,15 +161,15 @@ export function useDataSync() {
               loadedFromDirectFirestore = true;
             }
             if (faqsSnap.exists && faqsSnap.data) {
-              if (Array.isArray(faqsSnap.data.items) && faqsSnap.data.items.length > 0) loadedSettings.website_faqs = faqsSnap.data.items;
+              if (Array.isArray(faqsSnap.data.items)) loadedSettings.website_faqs = faqsSnap.data.items;
               loadedFromDirectFirestore = true;
             }
             if (devsSnap.exists && devsSnap.data) {
-              if (Array.isArray(devsSnap.data.items) && devsSnap.data.items.length > 0) loadedSettings.developers = devsSnap.data.items;
+              if (Array.isArray(devsSnap.data.items)) loadedSettings.developers = devsSnap.data.items;
               loadedFromDirectFirestore = true;
             }
             if (linksSnap.exists && linksSnap.data) {
-              if (Array.isArray(linksSnap.data.items) && linksSnap.data.items.length > 0) loadedSettings.quick_links = linksSnap.data.items;
+              if (Array.isArray(linksSnap.data.items)) loadedSettings.quick_links = linksSnap.data.items;
               loadedFromDirectFirestore = true;
             }
 
@@ -181,7 +180,7 @@ export function useDataSync() {
 
             if (newsSnap.exists && newsSnap.data) {
               const items = newsSnap.data.items || newsSnap.data.news || [];
-              if (Array.isArray(items) && items.length > 0) {
+              if (Array.isArray(items)) {
                 setNews(items);
                 loadedFromDirectFirestore = true;
               }
@@ -189,7 +188,7 @@ export function useDataSync() {
 
             if (videosSnap.exists && videosSnap.data) {
               const items = videosSnap.data.items || videosSnap.data.videos || [];
-              if (Array.isArray(items) && items.length > 0) {
+              if (Array.isArray(items)) {
                 setVideos(items);
                 loadedFromDirectFirestore = true;
               }
@@ -204,20 +203,6 @@ export function useDataSync() {
             console.warn("[useDataSync] Direct Firestore load notice:", directErr);
           }
         }
-
-        // If direct Firestore had 0 apps, load backup catalog data
-        setApps(prev => {
-          if (Array.isArray(prev) && prev.length > 0) return prev;
-          return (mockApps as any) || [];
-        });
-        setNews(prev => {
-          if (Array.isArray(prev) && prev.length > 0) return prev;
-          return (mockNews as any) || [];
-        });
-        setVideos(prev => {
-          if (Array.isArray(prev) && prev.length > 0) return prev;
-          return (mockVideos as any) || [];
-        });
 
         if (!loadedFromDirectFirestore) {
           // Fallback: try public backup-data endpoint

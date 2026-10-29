@@ -12,6 +12,8 @@ export interface AdminSession {
   refreshToken: string;
   email: string;
   expiresAt: number; // epoch ms
+  firebaseIdToken?: string;
+  firebaseRefreshToken?: string;
 }
 
 export interface AuthResult {
@@ -21,6 +23,7 @@ export interface AuthResult {
 }
 
 import { safeEncrypt, getFallbackAes } from "../lib/cryptoUtils";
+import { firebaseConfig, hydrateFirebaseRuntimeConfig } from "../lib/firebase";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
@@ -227,7 +230,51 @@ export async function signInAdmin(
   code?: string
 ): Promise<AuthResult & { mfaRequired?: boolean }> {
   try {
+    await hydrateFirebaseRuntimeConfig().catch(() => {});
+    const activeApiKey = FIREBASE_API_KEY || firebaseConfig.apiKey || "";
+    const hasActiveApiKey = isRealValue(activeApiKey);
     let lastServerError = "";
+
+    const tryAcquireFirebaseAuthToken = async (): Promise<{ idToken?: string; refreshToken?: string }> => {
+      if (!hasActiveApiKey) return {};
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 3500);
+        const res = await fetch(
+          `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(activeApiKey)}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: email.trim(), password, returnSecureToken: true }),
+            signal: controller.signal,
+          }
+        );
+        clearTimeout(timer);
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.idToken) return { idToken: data.idToken, refreshToken: data.refreshToken };
+        } else {
+          // Try auto-provisioning admin account in Firebase Auth if not yet created
+          const signUpCtrl = new AbortController();
+          const signUpTimer = setTimeout(() => signUpCtrl.abort(), 3000);
+          const signUpRes = await fetch(
+            `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${encodeURIComponent(activeApiKey)}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: email.trim(), password, returnSecureToken: true }),
+              signal: signUpCtrl.signal,
+            }
+          );
+          clearTimeout(signUpTimer);
+          if (signUpRes.ok) {
+            const signUpData = await signUpRes.json();
+            if (signUpData?.idToken) return { idToken: signUpData.idToken, refreshToken: signUpData.refreshToken };
+          }
+        }
+      } catch (_) {}
+      return {};
+    };
 
     // Step 1: Fast Backend Direct Login (/api/v1/admin/login) — <50ms on Express & Cloudflare Pages
     try {
@@ -250,11 +297,13 @@ export async function signInAdmin(
         }
 
         if (directRes.ok && directData.token) {
+          const fbTokens = await tryAcquireFirebaseAuthToken();
           const session: AdminSession = {
             idToken: directData.token,
             refreshToken: directData.session?.refreshToken || "SERVER_SESSION",
             email: email.toLowerCase().trim(),
             expiresAt: Date.now() + TOKEN_LIFETIME_MS,
+            ...(fbTokens.idToken ? { firebaseIdToken: fbTokens.idToken, firebaseRefreshToken: fbTokens.refreshToken } : {}),
           };
           saveSession(session);
           return { ok: true, session };
@@ -269,39 +318,16 @@ export async function signInAdmin(
     }
 
     // Step 2: Try Firebase REST sign-in if API key is real
-    let idToken = "";
-    let refreshToken = "SERVER_SESSION";
-    if (IS_API_KEY_REAL) {
-      try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 6000);
-        const res = await fetch(
-          `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password, returnSecureToken: true }),
-            signal: controller.signal,
-          }
-        );
-        clearTimeout(timer);
-        if (res.ok) {
-          const data = await res.json();
-          idToken = data.idToken;
-          refreshToken = data.refreshToken;
-        }
-      } catch (fbErr) {
-        console.warn("Firebase REST sign-in notice:", fbErr);
-      }
-    }
-
-    if (idToken) {
+    const fbTokens = await tryAcquireFirebaseAuthToken();
+    if (fbTokens.idToken) {
       const userEmail = email.toLowerCase().trim();
       const session: AdminSession = {
-        idToken,
-        refreshToken,
+        idToken: fbTokens.idToken,
+        refreshToken: fbTokens.refreshToken || "SERVER_SESSION",
         email: userEmail,
         expiresAt: Date.now() + TOKEN_LIFETIME_MS,
+        firebaseIdToken: fbTokens.idToken,
+        firebaseRefreshToken: fbTokens.refreshToken,
       };
       saveSession(session);
       return { ok: true, session };

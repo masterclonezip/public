@@ -173,7 +173,7 @@ export async function syncFromFirestore(): Promise<any> {
         if (parsedMeta.numChunks !== undefined) numChunks = Number(parsedMeta.numChunks);
       }
 
-      const chunksToProbe = metaExists ? Math.max(0, numChunks) : 20;
+      const chunksToProbe = metaExists ? Math.max(1, numChunks || 1) : 4;
       const chunkFetches = [];
       for (let i = 0; i < chunksToProbe; i++) {
         chunkFetches.push(
@@ -224,7 +224,8 @@ export async function syncFromFirestore(): Promise<any> {
       const videosParsed = videosRes?.fields ? parseFirestoreDoc(videosRes.fields) : null;
       const videos = Array.isArray(videosParsed?.items) ? videosParsed.items : fallbackData.videos;
 
-      const mergedApps = (metaExists || anyChunkFound)
+      const fromFirestore = Boolean(metaExists || anyChunkFound);
+      const mergedApps = fromFirestore
         ? remoteApps
         : (fallbackData.apps || []);
 
@@ -233,7 +234,8 @@ export async function syncFromFirestore(): Promise<any> {
         settings,
         news,
         videos,
-        reviews: fallbackData.reviews || []
+        reviews: fallbackData.reviews || [],
+        fromFirestore
       };
     }
   } catch (restErr) {

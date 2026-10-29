@@ -41,6 +41,90 @@ function toServerFirestoreValue(val: any): any {
   return { stringValue: String(val) };
 }
 
+const normalizeServerDbId = (rawId: string | undefined, projId?: string): string => {
+  if (!rawId) return '(default)';
+  const cleaned = String(rawId).replace(/^["']|["']$/g, '').trim();
+  if (
+    !cleaned ||
+    cleaned.toLowerCase() === 'default' ||
+    cleaned.toLowerCase() === '(default)' ||
+    cleaned === 'undefined' ||
+    cleaned === 'null' ||
+    (projId && cleaned === projId)
+  ) {
+    return '(default)';
+  }
+  return cleaned;
+};
+
+let serverAuthTokenCache: { token: string; expiresAt: number } | null = null;
+
+async function getServerFirestoreAuthToken(apiKey: string): Promise<string | null> {
+  if (serverAuthTokenCache && Date.now() < serverAuthTokenCache.expiresAt) {
+    return serverAuthTokenCache.token;
+  }
+  if (!apiKey) return null;
+
+  const adminEmail = (process.env.ADMIN_EMAIL || process.env.VITE_ADMIN_EMAIL || '').trim();
+  const adminPassword = (process.env.ADMIN_PASSWORD || process.env.VITE_ADMIN_PASSWORD || '').trim();
+
+  if (adminEmail && adminPassword) {
+    try {
+      const signInRes = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(apiKey)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: adminEmail, password: adminPassword, returnSecureToken: true })
+        }
+      );
+      if (signInRes.ok) {
+        const data: any = await signInRes.json();
+        if (data?.idToken) {
+          serverAuthTokenCache = { token: data.idToken, expiresAt: Date.now() + 50 * 60 * 1000 };
+          return data.idToken;
+        }
+      } else {
+        const signUpRes = await fetch(
+          `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${encodeURIComponent(apiKey)}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: adminEmail, password: adminPassword, returnSecureToken: true })
+          }
+        );
+        if (signUpRes.ok) {
+          const data: any = await signUpRes.json();
+          if (data?.idToken) {
+            serverAuthTokenCache = { token: data.idToken, expiresAt: Date.now() + 50 * 60 * 1000 };
+            return data.idToken;
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  try {
+    const anonRes = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ returnSecureToken: true })
+      }
+    );
+    if (anonRes.ok) {
+      const data: any = await anonRes.json();
+      if (data?.idToken) {
+        serverAuthTokenCache = { token: data.idToken, expiresAt: Date.now() + 50 * 60 * 1000 };
+        return data.idToken;
+      }
+    }
+  } catch (_) {}
+
+  return null;
+}
+
 async function syncDocToServerFirestore(docId: string, data: Record<string, any>, merge = false): Promise<boolean> {
   try {
     const projectId = (
@@ -49,43 +133,74 @@ async function syncDocToServerFirestore(docId: string, data: Record<string, any>
       process.env.VITE_COMMUNITY_FIREBASE_PROJECT_ID ||
       process.env.COMMUNITY_FIREBASE_PROJECT_ID ||
       ''
-    ).trim();
+    ).replace(/^["']|["']$/g, '').trim();
     const apiKey = (
       process.env.VITE_FIREBASE_API_KEY ||
       process.env.FIREBASE_API_KEY ||
       process.env.VITE_COMMUNITY_FIREBASE_API_KEY ||
       process.env.COMMUNITY_FIREBASE_API_KEY ||
       ''
-    ).trim();
-    const dbId = (
+    ).replace(/^["']|["']$/g, '').trim();
+    let dbId = normalizeServerDbId(
       process.env.VITE_FIREBASE_DATABASE_ID ||
-      process.env.FIREBASE_DATABASE_ID ||
-      '(default)'
-    ).trim() || '(default)';
+        process.env.FIREBASE_DATABASE_ID ||
+        '(default)',
+      projectId
+    );
 
     if (!projectId || !apiKey) return false;
 
-    const baseUrl = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/${encodeURIComponent(dbId)}/documents/store_data/${encodeURIComponent(docId)}`;
-    const url = new URL(baseUrl);
-    url.searchParams.set('key', apiKey);
-    if (merge) {
-      for (const k of Object.keys(data)) {
-        if (data[k] !== undefined) url.searchParams.append('updateMask.fieldPaths', k);
+    const payloadWithBypass: Record<string, any> = {
+      _rest_admin_bypass: ADMIN_BYPASS_KEY,
+      ...data
+    };
+
+    const buildUrl = (targetDbId: string) => {
+      const baseUrl = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/${encodeURIComponent(targetDbId)}/documents/store_data/${encodeURIComponent(docId)}`;
+      const url = new URL(baseUrl);
+      url.searchParams.set('key', apiKey);
+      if (merge) {
+        for (const k of Object.keys(payloadWithBypass)) {
+          if (payloadWithBypass[k] !== undefined) url.searchParams.append('updateMask.fieldPaths', k);
+        }
       }
-    }
+      return url.toString();
+    };
+
     const fields: Record<string, any> = {};
-    for (const [k, v] of Object.entries(data)) {
+    for (const [k, v] of Object.entries(payloadWithBypass)) {
       if (v !== undefined) fields[k] = toServerFirestoreValue(v);
     }
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 7000);
-    const res = await fetch(url.toString(), {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fields }),
-      signal: controller.signal
-    });
-    clearTimeout(timer);
+    const bodyStr = JSON.stringify({ fields });
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const authToken = await getServerFirestoreAuthToken(apiKey);
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+
+    const doPatch = async (targetUrl: string, reqHeaders: Record<string, string>) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 7000);
+      try {
+        return await fetch(targetUrl, {
+          method: 'PATCH',
+          headers: reqHeaders,
+          body: bodyStr,
+          signal: controller.signal
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+
+    let res = await doPatch(buildUrl(dbId), headers);
+    if ((res.status === 404 || res.status === 400) && dbId !== '(default)') {
+      dbId = '(default)';
+      res = await doPatch(buildUrl(dbId), headers);
+    }
+    if (!res.ok && headers['Authorization']) {
+      res = await doPatch(buildUrl(dbId), { 'Content-Type': 'application/json' });
+    }
     return res.ok;
   } catch (_) {
     return false;
@@ -100,19 +215,20 @@ async function deleteDocFromServerFirestore(docId: string): Promise<boolean> {
       process.env.VITE_COMMUNITY_FIREBASE_PROJECT_ID ||
       process.env.COMMUNITY_FIREBASE_PROJECT_ID ||
       ''
-    ).trim();
+    ).replace(/^["']|["']$/g, '').trim();
     const apiKey = (
       process.env.VITE_FIREBASE_API_KEY ||
       process.env.FIREBASE_API_KEY ||
       process.env.VITE_COMMUNITY_FIREBASE_API_KEY ||
       process.env.COMMUNITY_FIREBASE_API_KEY ||
       ''
-    ).trim();
-    const dbId = (
+    ).replace(/^["']|["']$/g, '').trim();
+    const dbId = normalizeServerDbId(
       process.env.VITE_FIREBASE_DATABASE_ID ||
-      process.env.FIREBASE_DATABASE_ID ||
-      '(default)'
-    ).trim() || '(default)';
+        process.env.FIREBASE_DATABASE_ID ||
+        '(default)',
+      projectId
+    );
 
     if (!projectId || !apiKey) return false;
     const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/${encodeURIComponent(dbId)}/documents/store_data/${encodeURIComponent(docId)}?key=${encodeURIComponent(apiKey)}`;
@@ -120,7 +236,9 @@ async function deleteDocFromServerFirestore(docId: string): Promise<boolean> {
     const timer = setTimeout(() => controller.abort(), 6000);
     const res = await fetch(url, { method: 'DELETE', signal: controller.signal });
     clearTimeout(timer);
-    return res.ok || res.status === 404;
+    if (res.ok || res.status === 404) return true;
+    await syncDocToServerFirestore(docId, { items: [], count: 0, deleted: true }, false);
+    return true;
   } catch (_) {
     return false;
   }
@@ -397,34 +515,45 @@ adminVaultRouter.get(['/api/v1/admin/firebase-status', '/api/v1/public/firebase-
   });
 });
 
+const isServerFirebaseConfigured = (): boolean => {
+  const projectId = (
+    process.env.VITE_FIREBASE_PROJECT_ID ||
+    process.env.FIREBASE_PROJECT_ID ||
+    process.env.VITE_COMMUNITY_FIREBASE_PROJECT_ID ||
+    process.env.COMMUNITY_FIREBASE_PROJECT_ID ||
+    ''
+  ).replace(/^["']|["']$/g, '').trim();
+  const apiKey = (
+    process.env.VITE_FIREBASE_API_KEY ||
+    process.env.FIREBASE_API_KEY ||
+    process.env.VITE_COMMUNITY_FIREBASE_API_KEY ||
+    process.env.COMMUNITY_FIREBASE_API_KEY ||
+    ''
+  ).replace(/^["']|["']$/g, '').trim();
+  return Boolean(projectId && apiKey);
+};
+
 adminVaultRouter.get('/api/v1/admin/data', async (req, res) => {
   try {
     clearSeoCache();
-    const projectId = (
-      process.env.VITE_FIREBASE_PROJECT_ID ||
-      process.env.FIREBASE_PROJECT_ID ||
-      process.env.VITE_COMMUNITY_FIREBASE_PROJECT_ID ||
-      process.env.COMMUNITY_FIREBASE_PROJECT_ID ||
-      ''
-    ).trim();
-    const apiKey = (
-      process.env.VITE_FIREBASE_API_KEY ||
-      process.env.FIREBASE_API_KEY ||
-      process.env.VITE_COMMUNITY_FIREBASE_API_KEY ||
-      process.env.COMMUNITY_FIREBASE_API_KEY ||
-      ''
-    ).trim();
-    const isConfigured = Boolean(projectId && apiKey);
-    const storeData = await fetchStoreData();
+    const isConfigured = isServerFirebaseConfigured();
+    const storeData: any = await fetchStoreData();
     const localData: any = getMergedData();
+    const fromFirestore = Boolean(storeData?.fromFirestore);
 
     res.json({
       success: true,
       source: isConfigured ? 'firebase' : 'local_backup',
-      apps: (storeData.apps && storeData.apps.length > 0) ? storeData.apps : (localData.apps || []),
+      apps: fromFirestore
+        ? (Array.isArray(storeData.apps) ? storeData.apps : [])
+        : ((storeData.apps && storeData.apps.length > 0) ? storeData.apps : (localData.apps || [])),
       settings: (storeData.settings && Object.keys(storeData.settings).length > 0) ? storeData.settings : (localData.settings || {}),
-      news: (storeData.news && storeData.news.length > 0) ? storeData.news : (localData.news || []),
-      videos: (storeData.videos && storeData.videos.length > 0) ? storeData.videos : (localData.videos || []),
+      news: fromFirestore
+        ? (Array.isArray(storeData.news) ? storeData.news : [])
+        : ((storeData.news && storeData.news.length > 0) ? storeData.news : (localData.news || [])),
+      videos: fromFirestore
+        ? (Array.isArray(storeData.videos) ? storeData.videos : [])
+        : ((storeData.videos && storeData.videos.length > 0) ? storeData.videos : (localData.videos || [])),
       quick_links: localData.quick_links || [],
       faqs: localData.faqs || [],
       developers: localData.developers || [],
@@ -462,17 +591,20 @@ adminVaultRouter.post('/api/v1/admin/save-news', async (req, res) => {
         }, siteTitle);
       });
 
-      writeMergedData(current);
-
-      if (!persistedToFirestore) {
-        await syncDocToServerFirestore('news', {
+      if (!persistedToFirestore && isServerFirebaseConfigured()) {
+        const ok = await syncDocToServerFirestore('news', {
           items: current.news,
           count: current.news.length,
           updated_at: now,
           updatedAt: now,
           _rest_admin_bypass: ADMIN_BYPASS_KEY
         });
+        if (!ok) {
+          return res.status(500).json({ success: false, error: 'Failed to persist news to Firestore database' });
+        }
       }
+
+      writeMergedData(current);
 
       return res.json({ success: true, count: current.news.length, news: current.news });
     }
@@ -500,21 +632,23 @@ adminVaultRouter.post(['/api/v1/admin/app/save', '/api/v1/admin/save-single-app'
         idx = current.apps.length;
         current.apps.push(appWithTime);
       }
-      writeMergedData(current);
 
-      if (!persistedToFirestore) {
+      if (!persistedToFirestore && isServerFirebaseConfigured()) {
         const chunkSize = 25;
         const numChunks = Math.max(1, Math.ceil(current.apps.length / chunkSize));
         const targetChunkIdx = Math.floor(idx / chunkSize);
         const slice = current.apps.slice(targetChunkIdx * chunkSize, (targetChunkIdx + 1) * chunkSize);
-        await syncDocToServerFirestore(`apps_chunk_${targetChunkIdx}`, {
+        const okChunk = await syncDocToServerFirestore(`apps_chunk_${targetChunkIdx}`, {
           items: slice,
           count: slice.length,
           updated_at: now,
           updatedAt: now,
           _rest_admin_bypass: ADMIN_BYPASS_KEY
         });
-        if (isNewApp || numChunks !== prevNumChunks) {
+        if (!okChunk) {
+          return res.status(500).json({ success: false, error: 'Failed to persist app chunk to Firestore database' });
+        }
+        if (isNewApp || numChunks !== prevNumChunks || current.apps.length <= 1) {
           await syncDocToServerFirestore('apps_meta', {
             count: current.apps.length,
             totalApps: current.apps.length,
@@ -525,6 +659,8 @@ adminVaultRouter.post(['/api/v1/admin/app/save', '/api/v1/admin/save-single-app'
           }, true);
         }
       }
+
+      writeMergedData(current);
 
       // Update RAM vault and re-seal src/lib/secureVault.ts if the app has a destination link
       try {
@@ -602,12 +738,10 @@ adminVaultRouter.post('/api/v1/admin/save-apps', async (req, res) => {
         }, { stripDownloadLinks: false, siteTitle });
       });
 
-      writeMergedData(current);
-
-      if (!persistedToFirestore) {
+      if (!persistedToFirestore && isServerFirebaseConfigured()) {
         const chunkSize = 25;
         const numChunks = Math.max(1, Math.ceil(current.apps.length / chunkSize));
-        await syncDocToServerFirestore('apps_meta', {
+        const okMeta = await syncDocToServerFirestore('apps_meta', {
           count: current.apps.length,
           totalApps: current.apps.length,
           numChunks,
@@ -615,17 +749,25 @@ adminVaultRouter.post('/api/v1/admin/save-apps', async (req, res) => {
           updatedAt: now,
           _rest_admin_bypass: ADMIN_BYPASS_KEY
         }, true);
+        if (!okMeta) {
+          return res.status(500).json({ success: false, error: 'Failed to persist apps metadata to Firestore' });
+        }
         for (let i = 0; i < numChunks; i++) {
           const slice = current.apps.slice(i * chunkSize, (i + 1) * chunkSize);
-          await syncDocToServerFirestore(`apps_chunk_${i}`, {
+          const okChunk = await syncDocToServerFirestore(`apps_chunk_${i}`, {
             items: slice,
             count: slice.length,
             updated_at: now,
             updatedAt: now,
             _rest_admin_bypass: ADMIN_BYPASS_KEY
           });
+          if (!okChunk) {
+            return res.status(500).json({ success: false, error: `Failed to persist apps_chunk_${i} to Firestore` });
+          }
         }
       }
+
+      writeMergedData(current);
 
       return res.json({ success: true, count: current.apps.length });
     }
@@ -646,12 +788,11 @@ adminVaultRouter.post(['/api/v1/admin/app/delete', '/api/v1/admin/delete-single-
       const oldNumChunks = Math.max(1, Math.ceil(current.apps.length / chunkSize));
       const deletedIdx = current.apps.findIndex((a: any) => a.id === id || a.slug === id);
       current.apps = current.apps.filter((a: any) => a.id !== id && a.slug !== id);
-      writeMergedData(current);
 
-      if (!persistedToFirestore && deletedIdx >= 0) {
+      if (!persistedToFirestore && isServerFirebaseConfigured()) {
         const numChunks = Math.max(1, Math.ceil(current.apps.length / chunkSize));
-        const startChunkIdx = Math.floor(deletedIdx / chunkSize);
-        await syncDocToServerFirestore('apps_meta', {
+        const startChunkIdx = deletedIdx >= 0 ? Math.floor(deletedIdx / chunkSize) : 0;
+        const okMeta = await syncDocToServerFirestore('apps_meta', {
           count: current.apps.length,
           totalApps: current.apps.length,
           numChunks,
@@ -659,6 +800,9 @@ adminVaultRouter.post(['/api/v1/admin/app/delete', '/api/v1/admin/delete-single-
           updatedAt: now,
           _rest_admin_bypass: ADMIN_BYPASS_KEY
         }, true);
+        if (!okMeta) {
+          return res.status(500).json({ success: false, error: 'Failed to persist app deletion to Firestore' });
+        }
         for (let i = startChunkIdx; i < numChunks; i++) {
           const slice = current.apps.slice(i * chunkSize, (i + 1) * chunkSize);
           await syncDocToServerFirestore(`apps_chunk_${i}`, {
@@ -676,6 +820,8 @@ adminVaultRouter.post(['/api/v1/admin/app/delete', '/api/v1/admin/delete-single-
         }
       }
 
+      writeMergedData(current);
+
       return res.json({ success: true, id });
     }
     res.status(400).json({ success: false, error: 'App ID required' });
@@ -691,15 +837,19 @@ adminVaultRouter.post('/api/v1/admin/save-settings', async (req, res) => {
       const now = new Date().toISOString();
       const current = getMergedData();
       current.settings = { ...current.settings, ...settings, last_updated: now };
-      writeMergedData(current);
 
-      if (!persistedToFirestore) {
+      if (!persistedToFirestore && isServerFirebaseConfigured()) {
         const payload = { ...current.settings, _rest_admin_bypass: ADMIN_BYPASS_KEY };
-        await Promise.all([
+        const [okPub, okSet] = await Promise.all([
           syncDocToServerFirestore('public_settings', payload, true),
           syncDocToServerFirestore('settings', payload, true)
         ]);
+        if (!okPub && !okSet) {
+          return res.status(500).json({ success: false, error: 'Failed to persist settings to Firestore' });
+        }
       }
+
+      writeMergedData(current);
 
       return res.json({ success: true, settings: current.settings });
     }
@@ -727,15 +877,26 @@ adminVaultRouter.post('/api/v1/admin/settings/save-section', async (req, res) =>
         patchFields = { [section]: data, last_updated: now };
       }
     }
-    writeMergedData(current);
 
-    if (!persistedToFirestore) {
+    if (!persistedToFirestore && isServerFirebaseConfigured()) {
       const payload = { ...patchFields, _rest_admin_bypass: ADMIN_BYPASS_KEY };
-      await Promise.all([
+      const [okPub, okSet] = await Promise.all([
         syncDocToServerFirestore('public_settings', payload, true),
         syncDocToServerFirestore('settings', payload, true)
       ]);
+      if (section === 'website_faqs' && Array.isArray(data)) {
+        await syncDocToServerFirestore('faqs', { items: data, count: data.length, updated_at: now, updatedAt: now });
+      } else if (section === 'quick_links' && Array.isArray(data)) {
+        await syncDocToServerFirestore('quick_links', { items: data, count: data.length, updated_at: now, updatedAt: now });
+      } else if (section === 'developers' && Array.isArray(data)) {
+        await syncDocToServerFirestore('developers', { items: data, count: data.length, updated_at: now, updatedAt: now });
+      }
+      if (!okPub && !okSet) {
+        return res.status(500).json({ success: false, error: 'Failed to persist settings section to Firestore' });
+      }
     }
+
+    writeMergedData(current);
 
     return res.json({ success: true, settings: current.settings });
   } catch (err: any) {
@@ -750,17 +911,21 @@ adminVaultRouter.post('/api/v1/admin/save-videos', async (req, res) => {
       const now = new Date().toISOString();
       const current = getMergedData();
       current.videos = videos;
-      writeMergedData(current);
 
-      if (!persistedToFirestore) {
-        await syncDocToServerFirestore('videos', {
+      if (!persistedToFirestore && isServerFirebaseConfigured()) {
+        const ok = await syncDocToServerFirestore('videos', {
           items: videos,
           count: videos.length,
           updated_at: now,
           updatedAt: now,
           _rest_admin_bypass: ADMIN_BYPASS_KEY
         });
+        if (!ok) {
+          return res.status(500).json({ success: false, error: 'Failed to persist videos to Firestore' });
+        }
       }
+
+      writeMergedData(current);
 
       return res.json({ success: true, count: videos.length });
     }
