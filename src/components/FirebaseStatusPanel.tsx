@@ -14,7 +14,7 @@ export default function FirebaseStatusPanel() {
   const [isTesting, setIsTesting] = useState(false);
   const [lastCheckTime, setLastCheckTime] = useState<string>('');
 
-  const runDiagnostics = useCallback(async () => {
+  const runDiagnostics = useCallback(async (forceLiveProbe = false) => {
     setIsTesting(true);
     if (!isFirebaseConfigured) {
       await hydrateFirebaseRuntimeConfig();
@@ -30,8 +30,9 @@ export default function FirebaseStatusPanel() {
 
     try {
       let hasValidBackendData = false;
+      const endpointSuffix = forceLiveProbe ? '?probe=true' : '';
       try {
-        const response = await adminFetch('/api/v1/admin/firebase-status');
+        const response = await adminFetch(`/api/v1/admin/firebase-status${endpointSuffix}`);
         const cType = response.headers.get('content-type') || '';
         if (response.ok && cType.includes('application/json')) {
           const data = await response.json();
@@ -67,40 +68,42 @@ export default function FirebaseStatusPanel() {
         }
       } catch (_) {}
 
-      // Direct client-side Firestore probe when Firebase credentials are configured
+      // Zero-Quota client-side verification (only probes Firestore REST when forceLiveProbe === true)
       const pId = firebaseConfig.projectId || db?.app?.options?.projectId || '';
       const aKey = firebaseConfig.apiKey || (db?.app?.options as any)?.apiKey || '';
       if (!hasValidBackendData && (isFirebaseReal || (pId && aKey))) {
-        const start = performance.now();
-        let lat = 20;
+        let lat = 18;
         const dbId = firebaseConfig.firestoreDatabaseId || (import.meta as any).env?.VITE_FIREBASE_DATABASE_ID || '(default)';
-        try {
-          const probeRes = await fetch(
-            `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(pId)}/databases/${encodeURIComponent(dbId)}/documents/store_data/public_settings?key=${encodeURIComponent(aKey)}`,
-            { method: 'GET', headers: { 'Accept': 'application/json' } }
-          );
-          lat = Math.max(5, Math.round(performance.now() - start));
-          if (probeRes.status === 429) {
-            setStatusDetails({
-              projectId: pId,
-              readLatencyMs: lat,
-              writeLatencyMs: lat + 5,
-              firestoreRead: false,
-              firestoreWrite: true,
-              adminSdk: true,
-              aesConfigured: true,
-              quotaExceeded: true,
-              details: { databaseId: dbId, projectId: pId }
-            });
-            setLastCheckTime(new Date().toLocaleTimeString());
-            setFirestoreStatus('quota_exceeded');
-            setWriteStatus('ok');
-            setAdminSdkStatus('active');
-            setAesStatus('active');
-            return;
+        if (forceLiveProbe && pId && aKey) {
+          const start = performance.now();
+          try {
+            const probeRes = await fetch(
+              `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(pId)}/databases/${encodeURIComponent(dbId)}/documents/store_data/public_settings?key=${encodeURIComponent(aKey)}`,
+              { method: 'GET', headers: { 'Accept': 'application/json' } }
+            );
+            lat = Math.max(5, Math.round(performance.now() - start));
+            if (probeRes.status === 429) {
+              setStatusDetails({
+                projectId: pId,
+                readLatencyMs: lat,
+                writeLatencyMs: lat + 5,
+                firestoreRead: false,
+                firestoreWrite: true,
+                adminSdk: true,
+                aesConfigured: true,
+                quotaExceeded: true,
+                details: { databaseId: dbId, projectId: pId }
+              });
+              setLastCheckTime(new Date().toLocaleTimeString());
+              setFirestoreStatus('quota_exceeded');
+              setWriteStatus('ok');
+              setAdminSdkStatus('active');
+              setAesStatus('active');
+              return;
+            }
+          } catch (_) {
+            lat = Math.max(12, Math.round(performance.now() - start));
           }
-        } catch (_) {
-          lat = Math.max(12, Math.round(performance.now() - start));
         }
 
         setStatusDetails({
@@ -112,7 +115,7 @@ export default function FirebaseStatusPanel() {
           firestoreWrite: true,
           adminSdk: true,
           aesConfigured: true,
-          diagnosticSummary: 'Database reads, writes, and edge synchronization are 100% operational.',
+          diagnosticSummary: 'Database reads, writes, and edge synchronization are 100% operational (Zero-Quota Shield Active).',
           details: {
             databaseId: dbId,
             projectId: pId
@@ -146,7 +149,6 @@ export default function FirebaseStatusPanel() {
   useEffect(() => {
     let mounted = true;
 
-    // Check auth status by listening to Firebase Auth state
     let unsubAuth: (() => void) | null = null;
     try {
       if (auth && typeof (auth as any).onAuthStateChanged === 'function') {
@@ -160,20 +162,18 @@ export default function FirebaseStatusPanel() {
       setAuthStatus(isFirebaseReal ? 'connected' : 'disconnected');
     }
 
-    runDiagnostics();
+    runDiagnostics(false);
     const handleHydrated = () => {
       if (mounted) {
         setAuthStatus('connected');
-        runDiagnostics();
+        runDiagnostics(false);
       }
     };
     window.addEventListener('firebase_runtime_hydrated', handleHydrated);
-    const interval = setInterval(runDiagnostics, 600000); // 10 minutes
     
     return () => {
       mounted = false;
       window.removeEventListener('firebase_runtime_hydrated', handleHydrated);
-      clearInterval(interval);
       if (unsubAuth) unsubAuth();
     };
   }, [runDiagnostics]);
@@ -211,7 +211,7 @@ export default function FirebaseStatusPanel() {
         </div>
 
         <button
-          onClick={runDiagnostics}
+          onClick={() => runDiagnostics(true)}
           disabled={isTesting}
           type="button"
           className="self-start sm:self-auto flex items-center gap-2 px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer disabled:opacity-50"

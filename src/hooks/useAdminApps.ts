@@ -93,7 +93,7 @@ export const useAdminApps = (apps: any[], loading: boolean, isAdminUser: boolean
           cachedSecureMapRef.current = secureMap;
           
           // Map incoming apps with decrypted links
-          const sourceApps = (Array.isArray(apps) && apps.length > 0) ? apps : (appsList.length > 0 ? appsList : (mockApps || []));
+          const sourceApps = Array.isArray(apps) ? apps : (appsList.length > 0 ? appsList : (mockApps || []));
           const mergedApps = sourceApps.map(a => {
             const rawUrl = a.more_information_url || a.encrypted_link || '';
             const preservedCipher = (rawUrl && typeof rawUrl === 'string' && rawUrl.startsWith('U2FsdGVkX1'))
@@ -128,7 +128,7 @@ export const useAdminApps = (apps: any[], loading: boolean, isAdminUser: boolean
           setIsInitialized(true);
         } catch (err) {
           setFetchFailed(true);
-          setAppsList(prev => (Array.isArray(prev) && prev.length > 0 ? prev : (Array.isArray(apps) && apps.length > 0 ? apps : (mockApps || []))));
+          setAppsList(prev => (Array.isArray(prev) && prev.length > 0 ? prev : (Array.isArray(apps) ? apps : (mockApps || []))));
           setIsInitialized(true);
         }
       };
@@ -138,7 +138,7 @@ export const useAdminApps = (apps: any[], loading: boolean, isAdminUser: boolean
 
   // 2. Authoritative Sync: Whenever fresh apps arrive from the server (multi-device sync), adopt them directly
   useEffect(() => {
-    if (Array.isArray(apps) && apps.length > 0) {
+    if (Array.isArray(apps)) {
       const secureMap = cachedSecureMapRef.current;
       const mapped = apps
         .filter(a => !deletedAppIdsRef.current.has(a.id) && !deletedAppIdsRef.current.has(a.slug))

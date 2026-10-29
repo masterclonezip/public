@@ -22,7 +22,7 @@ export default function AdminDashboard() {
     apps, settings, news, videos, 
     saveApps, saveSettings, saveNews, saveVideos,
     saveAppSingle, deleteAppSingle, saveSettingsSection,
-    loading, refreshAll, reloadServerData, dataSource, isRefreshing: dataRefreshing, lastSyncTime,
+    loading, loadedFromServer, refreshAll, reloadServerData, dataSource, isRefreshing: dataRefreshing, lastSyncTime,
     gitConfig, gitConfigLoading, saveGitConfig, pushAllToGitHub
   } = useData();
 
@@ -97,13 +97,14 @@ export default function AdminDashboard() {
 
   const { user, checkingAuth, isAdminUser, sessionTimeLeft, handleLogout } = useAdminAuth();
   
-  // When admin logs in or dashboard mounts with active admin user, automatically pull latest live data and pre-warm atomic reviews
+  // When admin logs in, ensure live data is loaded once without duplicating useDataSync's initial fetch
   useEffect(() => {
     if (isAdminUser === true) {
-      reloadServerData(true);
-      fetchAdminAppReviewCounts().catch(() => {});
+      if (!loadedFromServer && !loading) {
+        reloadServerData(true);
+      }
     }
-  }, [isAdminUser, reloadServerData]);
+  }, [isAdminUser, loadedFromServer, loading, reloadServerData]);
 
   const { 
     appsList, setAppsList, fetchFailed, cachedSecureMapRef, syncSecureVault, recordAppDeletion
@@ -112,8 +113,11 @@ export default function AdminDashboard() {
   useEffect(() => {
     const safeList = Array.isArray(appsList) ? appsList : [];
     registerCatalogAppsForReviews(safeList);
-    recalculateAndBroadcastAtomicStats(safeList);
-  }, [appsList]);
+    recalculateAndBroadcastAtomicStats(safeList, false);
+    if (isAdminUser === true && safeList.length > 0) {
+      fetchAdminAppReviewCounts().catch(() => {});
+    }
+  }, [appsList, isAdminUser]);
 
   const {
     newsList, setNewsList,
@@ -362,6 +366,7 @@ export default function AdminDashboard() {
           recordAppDeletion(id);
           await deleteAppSingle(id);
           setAppsList(prev => prev.filter(a => a.id !== id));
+          if (editingAppId === id) setEditingAppId(null);
           triggerHaptic();
           toast('App deleted successfully.', 'success');
         } catch (err: any) { toast('Delete failed: ' + (err?.message || 'Unknown error'), 'error'); }
@@ -455,7 +460,7 @@ export default function AdminDashboard() {
             handleSaveNews={async (list?: any) => {
               setSaving(true);
               try {
-                const targetList = (list && Array.isArray(list) && list.length > 0) ? list : newsList;
+                const targetList = Array.isArray(list) ? list : newsList;
                 await saveNews(targetList);
                 triggerHaptic();
                 toast('News saved and synchronized successfully!', 'success');
@@ -465,14 +470,15 @@ export default function AdminDashboard() {
                 setSaving(false);
               }
             }}
-            handleSaveCategories={(e) => { e.preventDefault(); handleSaveSettingsBase({ categories: categoriesList }); }}
-            handleSaveQuickLinks={(e) => { e.preventDefault(); handleSaveSettingsBase({ quick_links: quickLinksList }); }}
-            handleSaveWebsiteFaqs={(e) => { e.preventDefault(); handleSaveSettingsBase({ website_faqs: websiteFaqsList }); }}
-            handleSaveDevelopers={(e) => { e.preventDefault(); handleSaveSettingsBase({ developers: developersList }); }}
-            handleSaveVideos={async () => {
+            handleSaveCategories={(e) => { e?.preventDefault?.(); handleSaveSettingsBase({ categories: categoriesList }); }}
+            handleSaveQuickLinks={(e) => { e?.preventDefault?.(); handleSaveSettingsBase({ quick_links: quickLinksList }); }}
+            handleSaveWebsiteFaqs={(e) => { e?.preventDefault?.(); handleSaveSettingsBase({ website_faqs: websiteFaqsList }); }}
+            handleSaveDevelopers={(e) => { e?.preventDefault?.(); handleSaveSettingsBase({ developers: developersList }); }}
+            handleSaveVideos={async (customList?: any) => {
               setSaving(true);
               try {
-                await saveVideos(videosList);
+                const targetList = Array.isArray(customList) ? customList : videosList;
+                await saveVideos(targetList);
                 triggerHaptic();
                 toast('Videos saved and synchronized successfully!', 'success');
               } catch (err: any) {
@@ -487,24 +493,86 @@ export default function AdminDashboard() {
             setNewCatInput={setNewCatInput}
             handleAddBanner={handleAddBanner}
             handleBannerChange={handleBannerChange}
-            handleDeleteBanner={handleDeleteBanner}
-            handleClearAllBanners={handleClearAllBanners}
+            handleDeleteBanner={async (id: string) => {
+              const nextBanners = banners.filter((b: any) => b.id !== id);
+              handleDeleteBanner(id);
+              try {
+                await saveSettingsSection('banners', nextBanners);
+                toast('Banner deleted.', 'success');
+              } catch (err: any) {
+                toast('Failed to persist banner deletion: ' + (err?.message || 'Error'), 'error');
+              }
+            }}
+            handleClearAllBanners={async () => {
+              handleClearAllBanners();
+              try {
+                await saveSettingsSection('banners', []);
+                toast('All banners cleared.', 'success');
+              } catch (err: any) {
+                toast('Failed to clear banners: ' + (err?.message || 'Error'), 'error');
+              }
+            }}
             handleAddNews={handleAddNews}
             handleNewsChange={handleNewsChange}
             handleDeleteNews={handleDeleteNews}
             handleAddCategory={handleAddCategory}
-            handleRemoveCategory={handleRemoveCategory}
+            handleRemoveCategory={async (cat: string) => {
+              const nextCats = categoriesList.filter((c: string) => c !== cat);
+              handleRemoveCategory(cat);
+              try {
+                await saveSettingsSection('categories', nextCats);
+                toast(`Category "${cat}" deleted.`, 'success');
+              } catch (err: any) {
+                toast('Failed to delete category: ' + (err?.message || 'Error'), 'error');
+              }
+            }}
             handleAddVideo={handleAddVideo}
-            handleDeleteVideo={handleDeleteVideo}
+            handleDeleteVideo={async (id: string) => {
+              const nextVideos = videosList.filter((v: any) => v.id !== id);
+              handleDeleteVideo(id);
+              try {
+                await saveVideos(nextVideos);
+                toast('Video deleted permanently.', 'success');
+              } catch (err: any) {
+                toast('Failed to delete video: ' + (err?.message || 'Error'), 'error');
+              }
+            }}
             handleVideosChange={handleVideosChange}
             handleAddWebsiteFaq={handleAddWebsiteFaq}
-            handleRemoveWebsiteFaq={handleRemoveWebsiteFaq}
+            handleRemoveWebsiteFaq={async (index: number) => {
+              const nextFaqs = websiteFaqsList.filter((_: any, i: number) => i !== index);
+              handleRemoveWebsiteFaq(index);
+              try {
+                await saveSettingsSection('website_faqs', nextFaqs);
+                toast('FAQ deleted.', 'success');
+              } catch (err: any) {
+                toast('Failed to delete FAQ: ' + (err?.message || 'Error'), 'error');
+              }
+            }}
             handleWebsiteFaqChange={handleWebsiteFaqChange}
             handleAddQuickLink={handleAddQuickLink}
-            handleRemoveQuickLink={handleRemoveQuickLink}
+            handleRemoveQuickLink={async (index: number) => {
+              const nextLinks = quickLinksList.filter((_: any, i: number) => i !== index);
+              handleRemoveQuickLink(index);
+              try {
+                await saveSettingsSection('quick_links', nextLinks);
+                toast('Quick link deleted.', 'success');
+              } catch (err: any) {
+                toast('Failed to delete quick link: ' + (err?.message || 'Error'), 'error');
+              }
+            }}
             handleQuickLinkChange={handleQuickLinkChange}
             handleAddDeveloper={handleAddDeveloper}
-            handleRemoveDeveloper={handleRemoveDeveloper}
+            handleRemoveDeveloper={async (index: number) => {
+              const nextDevs = developersList.filter((_: any, i: number) => i !== index);
+              handleRemoveDeveloper(index);
+              try {
+                await saveSettingsSection('developers', nextDevs);
+                toast('Developer profile deleted.', 'success');
+              } catch (err: any) {
+                toast('Failed to delete developer: ' + (err?.message || 'Error'), 'error');
+              }
+            }}
             handleDeveloperChange={handleDeveloperChange}
             onTabChange={handleTabChange}
           />
@@ -512,7 +580,7 @@ export default function AdminDashboard() {
       </main>
 
       {confirmConfig.isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60  animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[1000000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-200">
             <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">{confirmConfig.title}</h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 font-medium leading-relaxed">{confirmConfig.message}</p>

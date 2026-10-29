@@ -544,7 +544,7 @@ const ADMIN_ATOMIC_STATS_KEY = 'admin_atomic_review_stats';
 let _inMemoryCloudReviews: AdminReviewItem[] | null = null;
 let _cloudHydratedTimestamp = 0;
 let _cloudHydrationPromise: Promise<AdminReviewItem[]> | null = null;
-const CLOUD_HYDRATION_TTL_MS = 10 * 60 * 1000; // 10 minutes session cache (Zero background polling)
+const CLOUD_HYDRATION_TTL_MS = 30 * 60 * 1000; // 30 minutes session cache (Zero background polling)
 
 async function safeAdminFetch(url: string, opts?: any): Promise<Response> {
   const headers: Record<string, string> = { ...(opts?.headers || {}) };
@@ -767,6 +767,19 @@ export function normalizeAdminReviewRecord(raw: any, appsOverride?: any[]): Admi
  * Only called during initial session hydration or explicit manual sync (Zero background polling).
  */
 export async function fetchAllFirestoreRestReviews(force = false): Promise<AdminReviewItem[]> {
+  if (!force && !_inMemoryCloudReviews && typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(ADMIN_CLOUD_REVIEWS_CACHE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.items) && (Date.now() - Number(parsed.ts || 0) < CLOUD_HYDRATION_TTL_MS)) {
+          _inMemoryCloudReviews = parsed.items;
+          _cloudHydratedTimestamp = Number(parsed.ts);
+          return _inMemoryCloudReviews;
+        }
+      }
+    } catch (_) {}
+  }
   if (!force && _inMemoryCloudReviews && (Date.now() - _cloudHydratedTimestamp < CLOUD_HYDRATION_TTL_MS)) {
     return _inMemoryCloudReviews;
   }
@@ -801,11 +814,12 @@ export async function fetchAllFirestoreRestReviews(force = false): Promise<Admin
     try {
       const cfg = getResolvedCommunityFirebaseConfig();
       if (cfg.projectId && cfg.apiKey) {
+        const dbId = encodeURIComponent(cfg.firestoreDatabaseId || '(default)');
         let nextPageToken = '';
         let pagesFetched = 0;
-        const baseUrl = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/reviews?pageSize=250&key=${cfg.apiKey}`;
+        const baseUrl = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(cfg.projectId)}/databases/${dbId}/documents/reviews?pageSize=250&key=${encodeURIComponent(cfg.apiKey)}`;
 
-        while (pagesFetched < 15) {
+        while (pagesFetched < 10) {
           pagesFetched++;
           const pageUrl = baseUrl + (nextPageToken ? `&pageToken=${encodeURIComponent(nextPageToken)}` : '');
           const res = await fetch(pageUrl);
@@ -1324,10 +1338,12 @@ function scheduleAtomicStatsFirestoreSync() {
   }, 600);
 }
 
-export function recalculateAndBroadcastAtomicStats(apps?: any[]) {
+export function recalculateAndBroadcastAtomicStats(apps?: any[], persistToCloud = true) {
   const computed = computeAuthoritativeAtomicCatalogStats(apps);
   saveLiveAtomicReviewStats(computed, true);
-  scheduleAtomicStatsFirestoreSync();
+  if (persistToCloud) {
+    scheduleAtomicStatsFirestoreSync();
+  }
   return computed;
 }
 
@@ -1390,7 +1406,8 @@ export async function persistAuthoritativeAtomicCatalogStats(apps?: any[]): Prom
       appCounts: { mapValue: { fields: appCountsFields } }
     };
 
-    const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/community_store/catalog_stats?key=${cfg.apiKey}`;
+    const dbId = encodeURIComponent(cfg.firestoreDatabaseId || '(default)');
+    const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(cfg.projectId)}/databases/${dbId}/documents/community_store/catalog_stats?key=${encodeURIComponent(cfg.apiKey)}`;
     await fetch(url, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -1443,6 +1460,13 @@ export async function fetchAdminAppReviewCounts(force = false): Promise<{
   };
   appCounts: Record<string, AppReviewCountsData>;
 }> {
+  const targetApps = getCatalogAppsForReviews();
+  if (targetApps.length === 0 && !force) {
+    const empty = computeAuthoritativeAtomicCatalogStats([]);
+    saveLiveAtomicReviewStats(empty, true);
+    return empty;
+  }
+
   // Ensure static bundle is loaded into memory
   await getStaticReviewsBundle();
 
@@ -1451,7 +1475,6 @@ export async function fetchAdminAppReviewCounts(force = false): Promise<{
     await fetchAllFirestoreRestReviews(force);
   }
 
-  const targetApps = getCatalogAppsForReviews();
   const computed = computeAuthoritativeAtomicCatalogStats(targetApps);
 
   // If still 0 reviews after hydration (e.g., offline / no review docs), check catalog_stats document once ONLY if catalog apps exist
@@ -1459,7 +1482,8 @@ export async function fetchAdminAppReviewCounts(force = false): Promise<{
     try {
       const cfg = getResolvedCommunityFirebaseConfig();
       if (cfg.projectId && cfg.apiKey) {
-        const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/community_store/catalog_stats?key=${cfg.apiKey}`;
+        const dbId = encodeURIComponent(cfg.firestoreDatabaseId || '(default)');
+        const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(cfg.projectId)}/databases/${dbId}/documents/community_store/catalog_stats?key=${encodeURIComponent(cfg.apiKey)}`;
         const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
@@ -1699,7 +1723,7 @@ export async function createAdminReviewItem(
         created_at: finalReview.timestamp,
         updated_at: new Date().toISOString()
       });
-      const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/reviews?documentId=${encodeURIComponent(finalReview.id)}&key=${cfg.apiKey}`;
+      const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/${encodeURIComponent(cfg.firestoreDatabaseId || '(default)')}/documents/reviews?documentId=${encodeURIComponent(finalReview.id)}&key=${cfg.apiKey}`;
       await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1759,7 +1783,7 @@ export async function batchCreateAdminReviews(
               created_at: rev.timestamp,
               updated_at: new Date().toISOString()
             });
-            const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/reviews?documentId=${encodeURIComponent(rev.id)}&key=${cfg.apiKey}`;
+            const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/${encodeURIComponent(cfg.firestoreDatabaseId || '(default)')}/documents/reviews?documentId=${encodeURIComponent(rev.id)}&key=${cfg.apiKey}`;
             await fetch(url, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -1806,7 +1830,7 @@ export async function updateAdminReviewItem(
       const fields = convertToFirestoreFields({ ...cleanUpdates, updated_at: new Date().toISOString() });
       const allKeys = Array.from(new Set([...Object.keys(cleanUpdates), 'updated_at']));
       const updateMask = allKeys.map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
-      const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/reviews/${encodeURIComponent(reviewId)}?${updateMask}&key=${cfg.apiKey}`;
+      const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/${encodeURIComponent(cfg.firestoreDatabaseId || '(default)')}/documents/reviews/${encodeURIComponent(reviewId)}?${updateMask}&key=${cfg.apiKey}`;
       await fetch(url, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -1839,7 +1863,7 @@ export async function setAdminReviewStatus(
   try {
     const cfg = getResolvedCommunityFirebaseConfig();
     if (cfg.projectId && cfg.apiKey) {
-      const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/reviews/${encodeURIComponent(reviewId)}?updateMask.fieldPaths=status&updateMask.fieldPaths=updated_at&key=${cfg.apiKey}`;
+      const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/${encodeURIComponent(cfg.firestoreDatabaseId || '(default)')}/documents/reviews/${encodeURIComponent(reviewId)}?updateMask.fieldPaths=status&updateMask.fieldPaths=updated_at&key=${cfg.apiKey}`;
       const fields = convertToFirestoreFields({ status, updated_at: new Date().toISOString() });
       await fetch(url, {
         method: 'PATCH',
@@ -1871,7 +1895,7 @@ export async function toggleAdminReviewPin(
   try {
     const cfg = getResolvedCommunityFirebaseConfig();
     if (cfg.projectId && cfg.apiKey) {
-      const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/reviews/${encodeURIComponent(reviewId)}?updateMask.fieldPaths=isPinned&updateMask.fieldPaths=updated_at&key=${cfg.apiKey}`;
+      const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/${encodeURIComponent(cfg.firestoreDatabaseId || '(default)')}/documents/reviews/${encodeURIComponent(reviewId)}?updateMask.fieldPaths=isPinned&updateMask.fieldPaths=updated_at&key=${cfg.apiKey}`;
       const fields = convertToFirestoreFields({ isPinned, updated_at: new Date().toISOString() });
       await fetch(url, {
         method: 'PATCH',
@@ -1914,7 +1938,7 @@ export async function deleteAdminReviewItem(
   try {
     const cfg = getResolvedCommunityFirebaseConfig();
     if (cfg.projectId && cfg.apiKey) {
-      const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/reviews/${encodeURIComponent(reviewId)}?key=${cfg.apiKey}`;
+      const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/${encodeURIComponent(cfg.firestoreDatabaseId || '(default)')}/documents/reviews/${encodeURIComponent(reviewId)}?key=${cfg.apiKey}`;
       await fetch(url, { method: 'DELETE' });
     }
   } catch (_) {}
@@ -1962,15 +1986,15 @@ export async function performBulkReviewsAction(
         reviewIds.map(async (id) => {
           try {
             if (action === 'delete') {
-              const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/reviews/${encodeURIComponent(id)}?key=${cfg.apiKey}`;
+              const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/${encodeURIComponent(cfg.firestoreDatabaseId || '(default)')}/documents/reviews/${encodeURIComponent(id)}?key=${cfg.apiKey}`;
               await fetch(url, { method: 'DELETE' });
             } else if (action === 'pin' || action === 'unpin') {
-              const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/reviews/${encodeURIComponent(id)}?updateMask.fieldPaths=isPinned&updateMask.fieldPaths=updated_at&key=${cfg.apiKey}`;
+              const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/${encodeURIComponent(cfg.firestoreDatabaseId || '(default)')}/documents/reviews/${encodeURIComponent(id)}?updateMask.fieldPaths=isPinned&updateMask.fieldPaths=updated_at&key=${cfg.apiKey}`;
               const fields = convertToFirestoreFields({ isPinned: action === 'pin', updated_at: new Date().toISOString() });
               await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) });
             } else {
               const st = action === 'publish' ? 'published' : (action === 'pending' ? 'pending' : 'rejected');
-              const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/reviews/${encodeURIComponent(id)}?updateMask.fieldPaths=status&updateMask.fieldPaths=updated_at&key=${cfg.apiKey}`;
+              const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/${encodeURIComponent(cfg.firestoreDatabaseId || '(default)')}/documents/reviews/${encodeURIComponent(id)}?updateMask.fieldPaths=status&updateMask.fieldPaths=updated_at&key=${cfg.apiKey}`;
               const fields = convertToFirestoreFields({ status: st, updated_at: new Date().toISOString() });
               await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) });
             }
@@ -2011,7 +2035,7 @@ export async function submitAdminReplyToReview(
   try {
     const cfg = getResolvedCommunityFirebaseConfig();
     if (cfg.projectId && cfg.apiKey) {
-      const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/reviews/${encodeURIComponent(reviewId)}?updateMask.fieldPaths=adminReply&updateMask.fieldPaths=updated_at&key=${cfg.apiKey}`;
+      const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/${encodeURIComponent(cfg.firestoreDatabaseId || '(default)')}/documents/reviews/${encodeURIComponent(reviewId)}?updateMask.fieldPaths=adminReply&updateMask.fieldPaths=updated_at&key=${cfg.apiKey}`;
       const fields = convertToFirestoreFields({ adminReply: replyObj, updated_at: new Date().toISOString() });
       await fetch(url, {
         method: 'PATCH',
@@ -2614,7 +2638,7 @@ export async function fetchAdminReportsList(params: {
   try {
     const cfg = getResolvedCommunityFirebaseConfig();
     if (cfg.projectId && cfg.apiKey) {
-      const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/reports?pageSize=100&key=${cfg.apiKey}`;
+      const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/${encodeURIComponent(cfg.firestoreDatabaseId || '(default)')}/documents/reports?pageSize=100&key=${cfg.apiKey}`;
       const restRes = await fetch(url);
       if (restRes.ok) {
         const restData = await restRes.json();
@@ -2671,7 +2695,7 @@ export async function updateAdminReportItem(
     const cfg = getResolvedCommunityFirebaseConfig();
     if (cfg.projectId && cfg.apiKey) {
       const updateMask = Object.keys(updates).map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
-      const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/reports/${encodeURIComponent(reportId)}?${updateMask}&key=${cfg.apiKey}`;
+      const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/${encodeURIComponent(cfg.firestoreDatabaseId || '(default)')}/documents/reports/${encodeURIComponent(reportId)}?${updateMask}&key=${cfg.apiKey}`;
       const fields = convertToFirestoreFields({ ...updates, updated_at: new Date().toISOString() });
       await fetch(url, {
         method: 'PATCH',
@@ -2696,7 +2720,7 @@ export async function deleteAdminReportItem(reportId: string): Promise<boolean> 
   try {
     const cfg = getResolvedCommunityFirebaseConfig();
     if (cfg.projectId && cfg.apiKey) {
-      const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/reports/${encodeURIComponent(reportId)}?key=${cfg.apiKey}`;
+      const url = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/${encodeURIComponent(cfg.firestoreDatabaseId || '(default)')}/documents/reports/${encodeURIComponent(reportId)}?key=${cfg.apiKey}`;
       await fetch(url, { method: 'DELETE' });
     }
   } catch (_) {}

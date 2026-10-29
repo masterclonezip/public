@@ -19,7 +19,7 @@ export const useAdminSettings = (settings: any, news: any[], videos: any[]) => {
 
   // Synchronize news directly when fresh server data arrives
   useEffect(() => {
-    if (Array.isArray(news) && news.length > 0) {
+    if (Array.isArray(news)) {
       const mapped = news
         .filter(n => !deletedNewsIdsRef.current.has(n.id))
         .map(n => {
@@ -49,7 +49,7 @@ export const useAdminSettings = (settings: any, news: any[], videos: any[]) => {
 
   // Synchronize videos directly when fresh server data arrives
   useEffect(() => {
-    if (Array.isArray(videos) && videos.length > 0) {
+    if (Array.isArray(videos)) {
       const brand = settings?.site_title || '';
       setVideosList(
         videos
@@ -215,10 +215,15 @@ export const useAdminSettings = (settings: any, news: any[], videos: any[]) => {
     const newId = Math.random().toString(36).substr(2, 9);
     setVideosList(prev => [...prev, {
       id: newId,
+      slug: `video-${newId}`,
       title: 'New Video',
+      youtube_url: '',
       url: '',
       thumbnail: '',
       description: '',
+      seo_title: '',
+      seo_description: '',
+      seo_keywords: '',
       created_at: new Date().toISOString()
     }]);
   };
@@ -232,6 +237,14 @@ export const useAdminSettings = (settings: any, news: any[], videos: any[]) => {
     setVideosList(prev => prev.map(v => {
       if (v.id !== id) return v;
       const updated: any = { ...v, [field]: value, updated_at: new Date().toISOString() };
+      if (field === 'title' && (!v.slug || v.slug.startsWith('video-') || v.slug === 'new-video')) {
+        updated.slug = value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      }
+      if (field === 'youtube_url') {
+        updated.url = value;
+      } else if (field === 'url') {
+        updated.youtube_url = value;
+      }
       if (field === 'seo_title') {
         updated.meta_title = value;
       } else if (field === 'meta_title') {

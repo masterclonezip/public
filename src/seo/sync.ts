@@ -156,13 +156,15 @@ export async function syncFromFirestore(): Promise<any> {
         metaRes = await fetch(`${baseUrl}/apps_meta${apiKeyParam}`);
       }
       let numChunks = 1;
+      let metaExists = false;
       if (metaRes.ok) {
+        metaExists = true;
         const metaJson: any = await metaRes.json();
         const parsedMeta = parseFirestoreDoc(metaJson.fields);
-        if (parsedMeta.numChunks) numChunks = Number(parsedMeta.numChunks);
+        if (parsedMeta.numChunks !== undefined) numChunks = Number(parsedMeta.numChunks);
       }
 
-      const chunksToProbe = Math.max(numChunks, 20);
+      const chunksToProbe = metaExists ? Math.max(0, numChunks) : 20;
       const chunkFetches = [];
       for (let i = 0; i < chunksToProbe; i++) {
         chunkFetches.push(
@@ -173,8 +175,10 @@ export async function syncFromFirestore(): Promise<any> {
       }
       const chunkResults = await Promise.all(chunkFetches);
       const remoteApps: any[] = [];
+      let anyChunkFound = false;
       for (const c of chunkResults) {
         if (c && c.fields) {
+          anyChunkFound = true;
           const parsed = parseFirestoreDoc(c.fields);
           if (Array.isArray(parsed.items)) {
             remoteApps.push(...parsed.items);
@@ -204,18 +208,15 @@ export async function syncFromFirestore(): Promise<any> {
       );
 
       const newsParsed = newsRes?.fields ? parseFirestoreDoc(newsRes.fields) : null;
-      const remoteNews = Array.isArray(newsParsed?.items) ? newsParsed.items : [];
-      const news = remoteNews.length > 0 ? remoteNews.map((n: any) => cleanItemSeo({ ...n })) : fallbackData.news;
+      const news = Array.isArray(newsParsed?.items)
+        ? newsParsed.items.map((n: any) => cleanItemSeo({ ...n }))
+        : fallbackData.news;
 
       const videosParsed = videosRes?.fields ? parseFirestoreDoc(videosRes.fields) : null;
       const videos = Array.isArray(videosParsed?.items) ? videosParsed.items : fallbackData.videos;
 
-      const minFullCatalogThreshold = fallbackData.apps?.length > 0
-        ? Math.max(1, Math.floor(fallbackData.apps.length * 0.85))
-        : 0;
-      const isAuthoritative = remoteApps.length >= minFullCatalogThreshold;
-      const mergedApps = remoteApps.length > 0
-        ? mergeItemsByTimestamp(fallbackData.apps, remoteApps, isAuthoritative)
+      const mergedApps = (metaExists || anyChunkFound)
+        ? remoteApps
         : (fallbackData.apps || []);
 
       return {

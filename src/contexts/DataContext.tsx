@@ -89,23 +89,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     try {
       sync.setSyncVersion(v => v + 1);
       sync.setLastSyncTime(new Date().toLocaleTimeString());
-      
-      const res = await adminFetch('/api/v1/admin/data');
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.apps) && data.apps.length > 0) sync.setApps(data.apps);
-        if (data.settings && Object.keys(data.settings).length > 0) sync.setSettings(data.settings);
-        if (Array.isArray(data.news) && data.news.length > 0) sync.setNews(data.news);
-        if (Array.isArray(data.videos) && data.videos.length > 0) sync.setVideos(data.videos);
-        toast('Platform data synchronized with Firestore.', 'success');
-      }
+      await sync.reloadServerData(true);
+      toast('Platform data synchronized with Firestore.', 'success');
     } catch (err: any) {
       console.warn("Refresh error:", err);
       toast('Sync completed with local state.', 'info');
     } finally {
       sync.setLoading(false);
     }
-  }, [sync.setLoading, sync.setSyncVersion, sync.setLastSyncTime, sync.setApps, sync.setSettings, sync.setNews, sync.setVideos]);
+  }, [sync.setLoading, sync.setSyncVersion, sync.setLastSyncTime, sync.reloadServerData]);
 
   const resolvedSettings = useMemo(() => {
     const envLogo = String((import.meta as any).env?.VITE_SITE_LOGO_URL || '').trim();

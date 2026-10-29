@@ -122,29 +122,49 @@ let db: Firestore;
 let auth: Auth;
 let storage: FirebaseStorage;
 
-try {
-  app = getApps().length === 0 ? initializeApp(safeInitConfig) : getApp();
+function bindLiveFirebaseApp() {
   try {
-    db = initializeFirestore(app, {
-      experimentalForceLongPolling: true,
-    }, firebaseConfig.firestoreDatabaseId || '(default)');
-  } catch {
-    db = getFirestore(app, firebaseConfig.firestoreDatabaseId || '(default)');
+    const existingApps = getApps();
+    const targetName = isFirebaseConfigured ? `live-${firebaseConfig.projectId}` : '[DEFAULT]';
+    const matchingApp = existingApps.find(
+      (a) => a.name === targetName || (isFirebaseConfigured && a.options?.projectId === firebaseConfig.projectId)
+    );
+
+    if (matchingApp) {
+      app = matchingApp;
+    } else if (existingApps.length === 0) {
+      app = initializeApp(isFirebaseConfigured ? firebaseConfig : safeInitConfig);
+    } else if (isFirebaseConfigured) {
+      app = initializeApp(firebaseConfig, targetName);
+    } else {
+      app = getApp();
+    }
+
+    const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
+    try {
+      db = initializeFirestore(app, {
+        experimentalForceLongPolling: true,
+      }, dbId);
+    } catch {
+      db = getFirestore(app, dbId);
+    }
+    auth = getAuth(app);
+    storage = getStorage(app);
+  } catch (error) {
+    console.warn('[Firebase] Initialization skipped or running in offline mode:', error);
+    app = {} as FirebaseApp;
+    db = {} as Firestore;
+    auth = {} as Auth;
+    storage = {} as FirebaseStorage;
   }
-  auth = getAuth(app);
-  storage = getStorage(app);
-} catch (error) {
-  console.warn('[Firebase] Initialization skipped or running in offline mode:', error);
-  app = {} as FirebaseApp;
-  db = {} as Firestore;
-  auth = {} as Auth;
-  storage = {} as FirebaseStorage;
 }
+
+bindLiveFirebaseApp();
 
 let hydratedPromise: Promise<boolean> | null = null;
 
 export async function hydrateFirebaseRuntimeConfig(): Promise<boolean> {
-  if (isFirebaseConfigured) return true;
+  if (isFirebaseConfigured && app?.options?.projectId === firebaseConfig.projectId) return true;
   if (typeof window === 'undefined') return false;
   if (hydratedPromise) return hydratedPromise;
 
@@ -175,29 +195,17 @@ export async function hydrateFirebaseRuntimeConfig(): Promise<boolean> {
         isFirebaseConfigured = true;
         isFirebaseReal = true;
 
-        try {
-          const existingApps = getApps();
-          app = existingApps.length === 0 ? initializeApp(firebaseConfig) : getApp();
-          try {
-            db = initializeFirestore(app, {
-              experimentalForceLongPolling: true,
-            }, firebaseConfig.firestoreDatabaseId || '(default)');
-          } catch {
-            db = getFirestore(app, firebaseConfig.firestoreDatabaseId || '(default)');
-          }
-          auth = getAuth(app);
-          storage = getStorage(app);
-        } catch (initErr) {
-          console.warn('[Firebase] Runtime re-init warning:', initErr);
-        }
+        bindLiveFirebaseApp();
 
         window.dispatchEvent(new CustomEvent('firebase_runtime_hydrated', { detail: data }));
         return true;
       }
     } catch (e) {
       console.warn('[Firebase] Runtime config hydration failed:', e);
+    } finally {
+      hydratedPromise = null;
     }
-    return false;
+    return isFirebaseConfigured;
   })();
 
   return hydratedPromise;
@@ -207,6 +215,186 @@ if (typeof window !== 'undefined' && !isFirebaseConfigured) {
   setTimeout(() => {
     hydrateFirebaseRuntimeConfig();
   }, 0);
+}
+
+export function toFirestoreRestValue(val: any): any {
+  if (val === null || val === undefined) return { nullValue: null };
+  if (typeof val === 'boolean') return { booleanValue: val };
+  if (typeof val === 'number') {
+    if (Number.isInteger(val)) return { integerValue: String(val) };
+    return { doubleValue: val };
+  }
+  if (typeof val === 'string') return { stringValue: val };
+  if (Array.isArray(val)) {
+    return { arrayValue: { values: val.map(toFirestoreRestValue) } };
+  }
+  if (typeof val === 'object') {
+    const fields: Record<string, any> = {};
+    for (const [k, v] of Object.entries(val)) {
+      if (v !== undefined) {
+        fields[k] = toFirestoreRestValue(v);
+      }
+    }
+    return { mapValue: { fields } };
+  }
+  return { stringValue: String(val) };
+}
+
+export function fromFirestoreRestValue(field: any): any {
+  if (!field || typeof field !== 'object') return null;
+  if ('stringValue' in field) return field.stringValue;
+  if ('integerValue' in field) return Number(field.integerValue);
+  if ('doubleValue' in field) return Number(field.doubleValue);
+  if ('booleanValue' in field) return Boolean(field.booleanValue);
+  if ('nullValue' in field) return null;
+  if ('timestampValue' in field) return field.timestampValue;
+  if ('arrayValue' in field) {
+    return (field.arrayValue?.values || []).map(fromFirestoreRestValue);
+  }
+  if ('mapValue' in field) {
+    return fromFirestoreRestDocument(field.mapValue?.fields || {});
+  }
+  return null;
+}
+
+export function fromFirestoreRestDocument(fields: Record<string, any> | undefined): Record<string, any> {
+  if (!fields) return {};
+  const result: Record<string, any> = {};
+  for (const [k, v] of Object.entries(fields)) {
+    result[k] = fromFirestoreRestValue(v);
+  }
+  return result;
+}
+
+export async function writeFirestoreDoc(
+  collectionName: string,
+  docId: string,
+  data: Record<string, any>,
+  options?: { merge?: boolean } | boolean
+): Promise<boolean> {
+  await hydrateFirebaseRuntimeConfig();
+  if (!isFirebaseConfigured || !firebaseConfig.projectId) {
+    throw new Error('Firebase is not configured. Check your FIREBASE_PROJECT_ID and FIREBASE_API_KEY environment variables.');
+  }
+
+  const shouldMerge = typeof options === 'boolean' ? options : Boolean(options?.merge);
+
+  let sdkSucceeded = false;
+  if (db && app?.options?.projectId === firebaseConfig.projectId) {
+    try {
+      const { doc, setDoc } = await import('firebase/firestore');
+      if (shouldMerge) {
+        await setDoc(doc(db, collectionName, docId), data, { merge: true });
+      } else {
+        await setDoc(doc(db, collectionName, docId), data);
+      }
+      sdkSucceeded = true;
+    } catch (sdkErr) {
+      console.warn(`[Firebase] SDK setDoc fallback to REST for ${collectionName}/${docId}:`, sdkErr);
+    }
+  }
+
+  if (sdkSucceeded) return true;
+
+  const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
+  const baseUrl = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(firebaseConfig.projectId)}/databases/${encodeURIComponent(dbId)}/documents/${encodeURIComponent(collectionName)}/${encodeURIComponent(docId)}`;
+  const url = new URL(baseUrl);
+  if (firebaseConfig.apiKey) url.searchParams.set('key', firebaseConfig.apiKey);
+
+  if (shouldMerge) {
+    for (const key of Object.keys(data)) {
+      if (data[key] !== undefined) {
+        url.searchParams.append('updateMask.fieldPaths', key);
+      }
+    }
+  }
+
+  const fields: Record<string, any> = {};
+  for (const [k, v] of Object.entries(data)) {
+    if (v !== undefined) {
+      fields[k] = toFirestoreRestValue(v);
+    }
+  }
+
+  let headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  try {
+    if (auth?.currentUser) {
+      const token = await auth.currentUser.getIdToken();
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+    }
+  } catch (_) {}
+
+  let res = await fetch(url.toString(), {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ fields })
+  });
+
+  if (!res.ok && headers['Authorization']) {
+    delete headers['Authorization'];
+    res = await fetch(url.toString(), {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ fields })
+    });
+  }
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Firestore write failed (${res.status}): ${errText.slice(0, 200)}`);
+  }
+
+  return true;
+}
+
+export async function readFirestoreDoc(
+  collectionName: string,
+  docId: string
+): Promise<{ exists: boolean; data: Record<string, any> | null }> {
+  await hydrateFirebaseRuntimeConfig();
+  if (!isFirebaseConfigured || !firebaseConfig.projectId) {
+    return { exists: false, data: null };
+  }
+
+  if (db && app?.options?.projectId === firebaseConfig.projectId) {
+    try {
+      const { doc, getDoc } = await import('firebase/firestore');
+      const snap = await getDoc(doc(db, collectionName, docId));
+      if (snap.exists()) {
+        return { exists: true, data: snap.data() as Record<string, any> };
+      }
+      return { exists: false, data: null };
+    } catch (_) {}
+  }
+
+  const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
+  const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(firebaseConfig.projectId)}/databases/${encodeURIComponent(dbId)}/documents/${encodeURIComponent(collectionName)}/${encodeURIComponent(docId)}${firebaseConfig.apiKey ? `?key=${encodeURIComponent(firebaseConfig.apiKey)}` : ''}`;
+  const res = await fetch(url);
+  if (res.status === 404) return { exists: false, data: null };
+  if (!res.ok) return { exists: false, data: null };
+  const json = await res.json();
+  return { exists: true, data: fromFirestoreRestDocument(json.fields) };
+}
+
+export async function deleteFirestoreDoc(
+  collectionName: string,
+  docId: string
+): Promise<boolean> {
+  await hydrateFirebaseRuntimeConfig();
+  if (!isFirebaseConfigured || !firebaseConfig.projectId) return false;
+
+  if (db && app?.options?.projectId === firebaseConfig.projectId) {
+    try {
+      const { doc, deleteDoc } = await import('firebase/firestore');
+      await deleteDoc(doc(db, collectionName, docId));
+      return true;
+    } catch (_) {}
+  }
+
+  const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
+  const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(firebaseConfig.projectId)}/databases/${encodeURIComponent(dbId)}/documents/${encodeURIComponent(collectionName)}/${encodeURIComponent(docId)}${firebaseConfig.apiKey ? `?key=${encodeURIComponent(firebaseConfig.apiKey)}` : ''}`;
+  await fetch(url, { method: 'DELETE' }).catch(() => {});
+  return true;
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {

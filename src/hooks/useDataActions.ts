@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
 import { AppConfig, GlobalSettings, NewsItem, VideoItem } from '../types';
 import { adminFetch } from '../services/adminAuthService';
-import { db, isFirebaseReal } from '../lib/firebase';
+import { writeFirestoreDoc, deleteFirestoreDoc, hydrateFirebaseRuntimeConfig } from '../lib/firebase';
 import { formatPageTitle, cleanSettingsMetaTitles } from '../lib/seoUtils';
 import { structureHtmlFragment } from '../lib/safeHtmlPublic';
 
@@ -37,6 +37,7 @@ export function useDataActions(
 ) {
 
   const saveAppSingle = useCallback(async (singleApp: any) => {
+    await hydrateFirebaseRuntimeConfig();
     const brand = settings?.site_title || '';
     const rawTitle = (singleApp.seo_title || singleApp.meta_title || '').trim();
     const exactAdminTitle = rawTitle ? formatPageTitle(rawTitle, '', brand) : '';
@@ -63,7 +64,54 @@ export function useDataActions(
     let savedToFirestore = false;
     let lastError: string | null = null;
 
-    // 1. Save to backend server API
+    // 1. Targeted Firestore persistence FIRST: ONLY write the specific chunk containing this app (0 reads, 1 write)!
+    try {
+      const prevChunkSize = 25;
+      const prevNumChunks = Math.max(1, Math.ceil(apps.length / prevChunkSize));
+      const nextApps = [...apps];
+      let targetIdx = nextApps.findIndex(a => a.id === savedApp.id || (savedApp.slug && a.slug === savedApp.slug));
+      const isNewApp = targetIdx < 0;
+      if (targetIdx >= 0) {
+        nextApps[targetIdx] = { ...nextApps[targetIdx], ...savedApp };
+      } else {
+        targetIdx = nextApps.length;
+        nextApps.push(savedApp);
+      }
+
+      const chunkSize = 25;
+      const numChunks = Math.max(1, Math.ceil(nextApps.length / chunkSize));
+      const targetChunkIdx = Math.floor(targetIdx / chunkSize);
+      const slice = nextApps.slice(targetChunkIdx * chunkSize, (targetChunkIdx + 1) * chunkSize);
+      const nowIso = new Date().toISOString();
+
+      const chunkOk = await writeFirestoreDoc('store_data', `apps_chunk_${targetChunkIdx}`, {
+        items: slice,
+        count: slice.length,
+        updated_at: nowIso,
+        updatedAt: nowIso,
+        _rest_admin_bypass: ADMIN_BYPASS_KEY
+      });
+
+      if (isNewApp || numChunks !== prevNumChunks || apps.length === 0) {
+        await writeFirestoreDoc('store_data', 'apps_meta', {
+          count: nextApps.length,
+          totalApps: nextApps.length,
+          numChunks,
+          updated_at: nowIso,
+          updatedAt: nowIso,
+          _rest_admin_bypass: ADMIN_BYPASS_KEY
+        }, true);
+      }
+
+      if (chunkOk) {
+        savedToFirestore = true;
+      }
+    } catch (err: any) {
+      console.warn('[useDataActions] Targeted Firestore saveAppSingle notice:', err);
+      lastError = `Firestore write failed: ${err?.message || 'Unknown Firestore error'}`;
+    }
+
+    // 2. Sync to backend server API (passes persistedToFirestore so Edge skips duplicate Firestore reads/writes)
     try {
       const idToken = await getAdminToken();
       const res = await adminFetch('/api/v1/admin/app/save', {
@@ -72,7 +120,7 @@ export function useDataActions(
           'Content-Type': 'application/json',
           ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {})
         },
-        body: JSON.stringify({ app: normalizedApp })
+        body: JSON.stringify({ app: normalizedApp, persistedToFirestore: savedToFirestore })
       });
       const cType = res.headers.get('content-type') || '';
       if (res.ok && cType.includes('application/json')) {
@@ -81,51 +129,12 @@ export function useDataActions(
           savedApp = { ...normalizedApp, ...(data.app || {}) };
           savedToServer = true;
         }
-      } else if (!res.ok) {
+      } else if (!res.ok && !savedToFirestore) {
         lastError = `Server returned HTTP ${res.status}`;
       }
     } catch (err: any) {
-      lastError = err?.message || 'Server endpoint unreachable';
-    }
-
-    // 2. Always persist to Firestore as well so cloud chunks and apps_meta stay 100% synchronized
-    if (isFirebaseReal && db) {
-      try {
-        const { doc, setDoc, deleteDoc } = await import('firebase/firestore');
-        const nextApps = [...apps];
-        const idx = nextApps.findIndex(a => a.id === savedApp.id || (savedApp.slug && a.slug === savedApp.slug));
-        if (idx >= 0) {
-          nextApps[idx] = { ...nextApps[idx], ...savedApp };
-        } else {
-          nextApps.push(savedApp);
-        }
-
-        const chunkSize = 25;
-        const numChunks = Math.max(1, Math.ceil(nextApps.length / chunkSize));
-        for (let i = 0; i < numChunks; i++) {
-          const slice = nextApps.slice(i * chunkSize, (i + 1) * chunkSize);
-          await setDoc(doc(db, 'store_data', `apps_chunk_${i}`), { 
-            items: slice, 
-            count: slice.length, 
-            updated_at: new Date().toISOString(),
-            _rest_admin_bypass: ADMIN_BYPASS_KEY
-          });
-        }
-        for (let i = numChunks; i < 16; i++) {
-          await deleteDoc(doc(db, 'store_data', `apps_chunk_${i}`)).catch(() => undefined);
-        }
-        await setDoc(doc(db, 'store_data', 'apps_meta'), {
-          count: nextApps.length,
-          numChunks,
-          updated_at: new Date().toISOString(),
-          _rest_admin_bypass: ADMIN_BYPASS_KEY
-        }, { merge: true });
-        savedToFirestore = true;
-      } catch (err: any) {
-        console.warn("[useDataActions] Direct Firestore saveAppSingle notice:", err);
-        if (!savedToServer) {
-          lastError = `Firestore write failed: ${err?.message || 'Unknown Firestore error'}`;
-        }
+      if (!savedToFirestore) {
+        lastError = err?.message || 'Server endpoint unreachable';
       }
     }
 
@@ -144,13 +153,62 @@ export function useDataActions(
     });
 
     return savedApp;
-  }, [getAdminToken, setApps, apps]);
+  }, [getAdminToken, setApps, apps, settings?.site_title]);
 
   const deleteAppSingle = useCallback(async (appId: string) => {
+    await hydrateFirebaseRuntimeConfig();
     let deletedOnServer = false;
     let deletedOnFirestore = false;
     let lastError: string | null = null;
 
+    // 1. Targeted Firestore deletion FIRST: only rewrite chunks from the deleted index onward (0 reads)
+    try {
+      const prevChunkSize = 25;
+      const prevNumChunks = Math.max(1, Math.ceil(apps.length / prevChunkSize));
+      const deletedIdx = apps.findIndex(a => a.id === appId || a.slug === appId);
+      const startChunkIdx = deletedIdx >= 0 ? Math.floor(deletedIdx / prevChunkSize) : 0;
+
+      const nextApps = apps.filter(a => a.id !== appId && a.slug !== appId);
+      const numChunks = Math.max(1, Math.ceil(nextApps.length / prevChunkSize));
+      const nowIso = new Date().toISOString();
+
+      let allOk = true;
+      for (let i = startChunkIdx; i < numChunks; i++) {
+        const slice = nextApps.slice(i * prevChunkSize, (i + 1) * prevChunkSize);
+        const ok = await writeFirestoreDoc('store_data', `apps_chunk_${i}`, {
+          items: slice,
+          count: slice.length,
+          updated_at: nowIso,
+          updatedAt: nowIso,
+          _rest_admin_bypass: ADMIN_BYPASS_KEY
+        });
+        if (!ok) allOk = false;
+      }
+
+      if (prevNumChunks > numChunks) {
+        for (let i = numChunks; i < prevNumChunks; i++) {
+          await deleteFirestoreDoc('store_data', `apps_chunk_${i}`);
+        }
+      }
+
+      await writeFirestoreDoc('store_data', 'apps_meta', {
+        count: nextApps.length,
+        totalApps: nextApps.length,
+        numChunks,
+        updated_at: nowIso,
+        updatedAt: nowIso,
+        _rest_admin_bypass: ADMIN_BYPASS_KEY
+      }, true);
+
+      if (allOk) {
+        deletedOnFirestore = true;
+      }
+    } catch (err: any) {
+      console.warn('[useDataActions] Targeted Firestore delete notice:', err);
+      lastError = `Firestore delete failed: ${err?.message || 'Unknown error'}`;
+    }
+
+    // 2. Sync deletion to backend server API (passes persistedToFirestore so Edge skips duplicate reads/writes)
     try {
       const idToken = await getAdminToken();
       const res = await adminFetch('/api/v1/admin/app/delete', {
@@ -159,49 +217,17 @@ export function useDataActions(
           'Content-Type': 'application/json',
           ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {})
         },
-        body: JSON.stringify({ id: appId })
+        body: JSON.stringify({ id: appId, persistedToFirestore: deletedOnFirestore })
       });
       const cType = res.headers.get('content-type') || '';
       if (res.ok && cType.includes('application/json')) {
         deletedOnServer = true;
-      } else if (!res.ok) {
+      } else if (!res.ok && !deletedOnFirestore) {
         lastError = `Server returned HTTP ${res.status}`;
       }
     } catch (err: any) {
-      lastError = err?.message || 'Server endpoint unreachable';
-    }
-
-    // Always synchronize deletion with Firestore chunks + apps_meta
-    if (isFirebaseReal && db) {
-      try {
-        const { doc, setDoc, deleteDoc } = await import('firebase/firestore');
-        const nextApps = apps.filter(a => a.id !== appId && a.slug !== appId);
-        const chunkSize = 25;
-        const numChunks = Math.max(1, Math.ceil(nextApps.length / chunkSize));
-        for (let i = 0; i < numChunks; i++) {
-          const slice = nextApps.slice(i * chunkSize, (i + 1) * chunkSize);
-          await setDoc(doc(db, 'store_data', `apps_chunk_${i}`), { 
-            items: slice, 
-            count: slice.length, 
-            updated_at: new Date().toISOString(),
-            _rest_admin_bypass: ADMIN_BYPASS_KEY
-          });
-        }
-        for (let i = numChunks; i < 16; i++) {
-          await deleteDoc(doc(db, 'store_data', `apps_chunk_${i}`)).catch(() => undefined);
-        }
-        await setDoc(doc(db, 'store_data', 'apps_meta'), {
-          count: nextApps.length,
-          numChunks,
-          updated_at: new Date().toISOString(),
-          _rest_admin_bypass: ADMIN_BYPASS_KEY
-        }, { merge: true });
-        deletedOnFirestore = true;
-      } catch (err: any) {
-        console.warn("[useDataActions] Direct Firestore delete notice:", err);
-        if (!deletedOnServer) {
-          lastError = `Firestore delete failed: ${err?.message || 'Unknown error'}`;
-        }
+      if (!deletedOnFirestore) {
+        lastError = err?.message || 'Server endpoint unreachable';
       }
     }
 
@@ -213,20 +239,59 @@ export function useDataActions(
   }, [getAdminToken, setApps, apps]);
 
   const saveSettingsSection = useCallback(async (section: string, data: any) => {
+    await hydrateFirebaseRuntimeConfig();
     let savedToServer = false;
     let savedToFirestore = false;
     let resData: any = null;
     let lastError: string | null = null;
 
+    const nowIso = new Date().toISOString();
     let mergedSettings: any = { ...settings };
+    let sectionDelta: Record<string, any> = {};
+
     if (section === 'general' || section === 'seo') {
-      mergedSettings = { ...mergedSettings, ...(data || {}) };
+      const cleanedDelta = cleanSettingsMetaTitles({ ...(data || {}) });
+      mergedSettings = { ...mergedSettings, ...cleanedDelta, last_updated: nowIso };
+      sectionDelta = { ...cleanedDelta, last_updated: nowIso };
     } else {
       mergedSettings[section] = data;
+      mergedSettings = cleanSettingsMetaTitles(mergedSettings);
+      mergedSettings.last_updated = nowIso;
+      sectionDelta = { [section]: data, last_updated: nowIso };
     }
-    mergedSettings = cleanSettingsMetaTitles(mergedSettings);
-    mergedSettings.last_updated = new Date().toISOString();
 
+    // 1. Targeted Firestore write FIRST: merge ONLY the modified section fields (0 reads)!
+    try {
+      const payloadToSave = {
+        ...sectionDelta,
+        _rest_admin_bypass: ADMIN_BYPASS_KEY,
+      };
+      const okSettings = await writeFirestoreDoc('store_data', 'settings', payloadToSave, true);
+
+      const publicPayload = { ...payloadToSave } as any;
+      delete publicPayload.turnstile_secret_key;
+      delete publicPayload.cloudinary_api_secret;
+      delete publicPayload.gemini_api_key;
+      await writeFirestoreDoc('store_data', 'public_settings', publicPayload, true);
+
+      // Keep dedicated collection documents in sync when saving those specific sections
+      if (section === 'website_faqs' && Array.isArray(data)) {
+        await writeFirestoreDoc('store_data', 'faqs', { items: data, count: data.length, updated_at: nowIso, updatedAt: nowIso });
+      } else if (section === 'quick_links' && Array.isArray(data)) {
+        await writeFirestoreDoc('store_data', 'quick_links', { items: data, count: data.length, updated_at: nowIso, updatedAt: nowIso });
+      } else if (section === 'developers' && Array.isArray(data)) {
+        await writeFirestoreDoc('store_data', 'developers', { items: data, count: data.length, updated_at: nowIso, updatedAt: nowIso });
+      }
+
+      if (okSettings) {
+        savedToFirestore = true;
+      }
+    } catch (err: any) {
+      console.warn('[useDataActions] Targeted Firestore settings save notice:', err);
+      lastError = `Firestore settings write failed: ${err?.message || 'Unknown error'}`;
+    }
+
+    // 2. Sync to backend server API
     try {
       const idToken = await getAdminToken();
       const res = await adminFetch('/api/v1/admin/settings/save-section', {
@@ -235,41 +300,18 @@ export function useDataActions(
           'Content-Type': 'application/json',
           ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {})
         },
-        body: JSON.stringify({ section, data, settings: mergedSettings })
+        body: JSON.stringify({ section, data, settings: mergedSettings, persistedToFirestore: savedToFirestore })
       });
       const cType = res.headers.get('content-type') || '';
       if (res.ok && cType.includes('application/json')) {
         resData = await res.json();
         savedToServer = true;
-      } else if (!res.ok) {
+      } else if (!res.ok && !savedToFirestore) {
         lastError = `Server returned HTTP ${res.status}`;
       }
     } catch (err: any) {
-      lastError = err?.message || 'Server endpoint unreachable';
-    }
-
-    // Always synchronize settings to Firestore as well
-    if (isFirebaseReal && db) {
-      try {
-        const { doc, setDoc } = await import('firebase/firestore');
-        const payloadToSave = {
-          ...mergedSettings,
-          _rest_admin_bypass: ADMIN_BYPASS_KEY,
-          last_updated: mergedSettings.last_updated
-        };
-
-        await setDoc(doc(db, 'store_data', 'settings'), payloadToSave, { merge: true });
-        const publicPayload = { ...payloadToSave } as any;
-        delete publicPayload.turnstile_secret_key;
-        delete publicPayload.cloudinary_api_secret;
-        delete publicPayload.gemini_api_key;
-        await setDoc(doc(db, 'store_data', 'public_settings'), publicPayload, { merge: true });
-        savedToFirestore = true;
-      } catch (err: any) {
-        console.warn("[useDataActions] Direct Firestore settings save notice:", err);
-        if (!savedToServer) {
-          lastError = `Firestore settings write failed: ${err?.message || 'Unknown error'}`;
-        }
+      if (!savedToFirestore) {
+        lastError = err?.message || 'Server endpoint unreachable';
       }
     }
 
@@ -277,7 +319,7 @@ export function useDataActions(
       throw new Error(`Failed to save settings section "${section}": ${lastError || 'Could not connect to server or Firestore'}`);
     }
 
-    if (resData && resData.settings) {
+    if (resData && resData.settings && Object.keys(resData.settings).length > 2) {
       setSettings(resData.settings);
     } else {
       setSettings(mergedSettings);
@@ -287,6 +329,7 @@ export function useDataActions(
   }, [getAdminToken, setSettings, settings]);
 
   const saveApps = useCallback(async (newApps: AppConfig[]) => {
+    await hydrateFirebaseRuntimeConfig();
     const now = new Date().toISOString();
     const existingById = new Map<string, any>();
     const existingBySlug = new Map<string, any>();
@@ -329,6 +372,43 @@ export function useDataActions(
     let lastError: string | null = null;
 
     try {
+      const chunkSize = 25;
+      const prevNumChunks = Math.max(1, Math.ceil((apps?.length || 0) / chunkSize));
+      const numChunks = Math.max(1, Math.ceil(normalizedApps.length / chunkSize));
+      let allOk = true;
+      for (let i = 0; i < numChunks; i++) {
+        const slice = normalizedApps.slice(i * chunkSize, (i + 1) * chunkSize);
+        const ok = await writeFirestoreDoc('store_data', `apps_chunk_${i}`, {
+          items: slice,
+          count: slice.length,
+          updated_at: now,
+          updatedAt: now,
+          _rest_admin_bypass: ADMIN_BYPASS_KEY
+        });
+        if (!ok) allOk = false;
+      }
+      if (prevNumChunks > numChunks) {
+        for (let i = numChunks; i < prevNumChunks; i++) {
+          await deleteFirestoreDoc('store_data', `apps_chunk_${i}`);
+        }
+      }
+      await writeFirestoreDoc('store_data', 'apps_meta', {
+        count: normalizedApps.length,
+        totalApps: normalizedApps.length,
+        numChunks,
+        updated_at: now,
+        updatedAt: now,
+        _rest_admin_bypass: ADMIN_BYPASS_KEY
+      }, true);
+      if (allOk) {
+        savedToFirestore = true;
+      }
+    } catch (err: any) {
+      console.warn('[useDataActions] Firestore saveApps notice:', err);
+      lastError = `Firestore apps write failed: ${err?.message || 'Unknown error'}`;
+    }
+
+    try {
       const idToken = await getAdminToken();
       const res = await adminFetch('/api/v1/admin/save-apps', {
         method: 'POST',
@@ -336,47 +416,17 @@ export function useDataActions(
           'Content-Type': 'application/json',
           ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {})
         },
-        body: JSON.stringify({ apps: normalizedApps })
+        body: JSON.stringify({ apps: normalizedApps, persistedToFirestore: savedToFirestore })
       });
       const cType = res.headers.get('content-type') || '';
       if (res.ok && cType.includes('application/json')) {
         savedToServer = true;
-      } else if (!res.ok) {
+      } else if (!res.ok && !savedToFirestore) {
         lastError = `Server returned HTTP ${res.status}`;
       }
     } catch (err: any) {
-      lastError = err?.message || 'Server endpoint unreachable';
-    }
-
-    if (isFirebaseReal && db) {
-      try {
-        const { doc, setDoc, deleteDoc } = await import('firebase/firestore');
-        const chunkSize = 25;
-        const numChunks = Math.max(1, Math.ceil(normalizedApps.length / chunkSize));
-        for (let i = 0; i < numChunks; i++) {
-          const slice = normalizedApps.slice(i * chunkSize, (i + 1) * chunkSize);
-          await setDoc(doc(db, 'store_data', `apps_chunk_${i}`), { 
-            items: slice, 
-            count: slice.length, 
-            updated_at: new Date().toISOString(),
-            _rest_admin_bypass: ADMIN_BYPASS_KEY
-          });
-        }
-        for (let i = numChunks; i < 16; i++) {
-          await deleteDoc(doc(db, 'store_data', `apps_chunk_${i}`)).catch(() => undefined);
-        }
-        await setDoc(doc(db, 'store_data', 'apps_meta'), {
-          count: normalizedApps.length,
-          numChunks,
-          updated_at: new Date().toISOString(),
-          _rest_admin_bypass: ADMIN_BYPASS_KEY
-        }, { merge: true });
-        savedToFirestore = true;
-      } catch (err: any) {
-        console.warn("[useDataActions] Direct Firestore saveApps notice:", err);
-        if (!savedToServer) {
-          lastError = `Firestore apps write failed: ${err?.message || 'Unknown error'}`;
-        }
+      if (!savedToFirestore) {
+        lastError = err?.message || 'Server endpoint unreachable';
       }
     }
 
@@ -405,12 +455,13 @@ export function useDataActions(
           body: JSON.stringify({ items: secureLinks })
         });
       } catch (e) {
-        console.warn("Failed encrypting secure links:", e);
+        console.warn('Failed encrypting secure links:', e);
       }
     }
-  }, [getAdminToken, setApps, apps]);
+  }, [getAdminToken, setApps, apps, settings?.site_title]);
 
   const saveSettings = useCallback(async (newSettings: Partial<GlobalSettings>) => {
+    await hydrateFirebaseRuntimeConfig();
     const now = new Date().toISOString();
     const currentSettings = settings || {} as GlobalSettings;
     const settingsWithTime: GlobalSettings = cleanSettingsMetaTitles({
@@ -429,6 +480,25 @@ export function useDataActions(
     let lastError: string | null = null;
 
     try {
+      const payloadToSave = {
+        ...settingsWithTime,
+        _rest_admin_bypass: ADMIN_BYPASS_KEY
+      };
+      const ok = await writeFirestoreDoc('store_data', 'settings', payloadToSave, true);
+      const publicPayload = { ...payloadToSave } as any;
+      delete publicPayload.turnstile_secret_key;
+      delete publicPayload.cloudinary_api_secret;
+      delete publicPayload.gemini_api_key;
+      await writeFirestoreDoc('store_data', 'public_settings', publicPayload, true);
+      if (ok) {
+        savedToFirestore = true;
+      }
+    } catch (err: any) {
+      console.warn('[useDataActions] Firestore saveSettings notice:', err);
+      lastError = `Firestore write failed: ${err?.message || 'Unknown error'}`;
+    }
+
+    try {
       const idToken = await getAdminToken();
       const res = await adminFetch('/api/v1/admin/save-settings', {
         method: 'POST',
@@ -436,37 +506,17 @@ export function useDataActions(
           'Content-Type': 'application/json',
           ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {})
         },
-        body: JSON.stringify({ settings: settingsWithTime })
+        body: JSON.stringify({ settings: settingsWithTime, persistedToFirestore: savedToFirestore })
       });
       const cType = res.headers.get('content-type') || '';
       if (res.ok && cType.includes('application/json')) {
         savedToServer = true;
-      } else if (!res.ok) {
+      } else if (!res.ok && !savedToFirestore) {
         lastError = `Server returned HTTP ${res.status}`;
       }
     } catch (err: any) {
-      lastError = err?.message || 'Server endpoint unreachable';
-    }
-
-    if (isFirebaseReal && db) {
-      try {
-        const { doc, setDoc } = await import('firebase/firestore');
-        const payloadToSave = {
-          ...settingsWithTime,
-          _rest_admin_bypass: ADMIN_BYPASS_KEY
-        };
-        await setDoc(doc(db, 'store_data', 'settings'), payloadToSave, { merge: true });
-        const publicPayload = { ...payloadToSave } as any;
-        delete publicPayload.turnstile_secret_key;
-        delete publicPayload.cloudinary_api_secret;
-        delete publicPayload.gemini_api_key;
-        await setDoc(doc(db, 'store_data', 'public_settings'), publicPayload, { merge: true });
-        savedToFirestore = true;
-      } catch (err: any) {
-        console.warn("[useDataActions] Direct Firestore saveSettings notice:", err);
-        if (!savedToServer) {
-          lastError = `Firestore write failed: ${err?.message || 'Unknown error'}`;
-        }
+      if (!savedToFirestore) {
+        lastError = err?.message || 'Server endpoint unreachable';
       }
     }
 
@@ -478,6 +528,7 @@ export function useDataActions(
   }, [settings, getAdminToken, setSettings]);
 
   const saveNews = useCallback(async (newNews: NewsItem[]) => {
+    await hydrateFirebaseRuntimeConfig();
     const now = new Date().toISOString();
     const existingById = new Map<string, any>();
     const existingBySlug = new Map<string, any>();
@@ -516,6 +567,22 @@ export function useDataActions(
     let lastError: string | null = null;
 
     try {
+      const ok = await writeFirestoreDoc('store_data', 'news', {
+        items: cleanNews,
+        count: cleanNews.length,
+        updated_at: now,
+        updatedAt: now,
+        _rest_admin_bypass: ADMIN_BYPASS_KEY
+      });
+      if (ok) {
+        savedToFirestore = true;
+      }
+    } catch (err: any) {
+      console.warn('[useDataActions] Firestore saveNews notice:', err);
+      lastError = `Firestore news write failed: ${err?.message || 'Unknown error'}`;
+    }
+
+    try {
       const idToken = await getAdminToken();
       const res = await adminFetch('/api/v1/admin/save-news', {
         method: 'POST',
@@ -523,33 +590,17 @@ export function useDataActions(
           'Content-Type': 'application/json',
           ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {})
         },
-        body: JSON.stringify({ news: cleanNews })
+        body: JSON.stringify({ news: cleanNews, persistedToFirestore: savedToFirestore })
       });
       const cType = res.headers.get('content-type') || '';
       if (res.ok && cType.includes('application/json')) {
         savedToServer = true;
-      } else if (!res.ok) {
+      } else if (!res.ok && !savedToFirestore) {
         lastError = `Server returned HTTP ${res.status}`;
       }
     } catch (err: any) {
-      lastError = err?.message || 'Server endpoint unreachable';
-    }
-
-    if (isFirebaseReal && db) {
-      try {
-        const { doc, setDoc } = await import('firebase/firestore');
-        await setDoc(doc(db, 'store_data', 'news'), { 
-          items: cleanNews, 
-          count: cleanNews.length, 
-          updated_at: new Date().toISOString(),
-          _rest_admin_bypass: ADMIN_BYPASS_KEY
-        }, { merge: true });
-        savedToFirestore = true;
-      } catch (err: any) {
-        console.warn("[useDataActions] Direct Firestore saveNews notice:", err);
-        if (!savedToServer) {
-          lastError = `Firestore news write failed: ${err?.message || 'Unknown error'}`;
-        }
+      if (!savedToFirestore) {
+        lastError = err?.message || 'Server endpoint unreachable';
       }
     }
 
@@ -558,9 +609,10 @@ export function useDataActions(
     }
 
     setNews(cleanNews);
-  }, [getAdminToken, setNews, news]);
+  }, [getAdminToken, setNews, news, settings?.site_title]);
 
   const saveVideos = useCallback(async (newVideos: VideoItem[]) => {
+    await hydrateFirebaseRuntimeConfig();
     const now = new Date().toISOString();
     const existingById = new Map<string, any>();
     const existingBySlug = new Map<string, any>();
@@ -599,6 +651,22 @@ export function useDataActions(
     let lastError: string | null = null;
 
     try {
+      const ok = await writeFirestoreDoc('store_data', 'videos', {
+        items: cleanVideos,
+        count: cleanVideos.length,
+        updated_at: now,
+        updatedAt: now,
+        _rest_admin_bypass: ADMIN_BYPASS_KEY
+      });
+      if (ok) {
+        savedToFirestore = true;
+      }
+    } catch (err: any) {
+      console.warn('[useDataActions] Firestore saveVideos notice:', err);
+      lastError = `Firestore videos write failed: ${err?.message || 'Unknown error'}`;
+    }
+
+    try {
       const idToken = await getAdminToken();
       const res = await adminFetch('/api/v1/admin/save-videos', {
         method: 'POST',
@@ -606,33 +674,17 @@ export function useDataActions(
           'Content-Type': 'application/json',
           ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {})
         },
-        body: JSON.stringify({ videos: cleanVideos })
+        body: JSON.stringify({ videos: cleanVideos, persistedToFirestore: savedToFirestore })
       });
       const cType = res.headers.get('content-type') || '';
       if (res.ok && cType.includes('application/json')) {
         savedToServer = true;
-      } else if (!res.ok) {
+      } else if (!res.ok && !savedToFirestore) {
         lastError = `Server returned HTTP ${res.status}`;
       }
     } catch (err: any) {
-      lastError = err?.message || 'Server endpoint unreachable';
-    }
-
-    if (isFirebaseReal && db) {
-      try {
-        const { doc, setDoc } = await import('firebase/firestore');
-        await setDoc(doc(db, 'store_data', 'videos'), { 
-          items: cleanVideos, 
-          count: cleanVideos.length, 
-          updated_at: new Date().toISOString(),
-          _rest_admin_bypass: ADMIN_BYPASS_KEY
-        }, { merge: true });
-        savedToFirestore = true;
-      } catch (err: any) {
-        console.warn("[useDataActions] Direct Firestore saveVideos notice:", err);
-        if (!savedToServer) {
-          lastError = `Firestore videos write failed: ${err?.message || 'Unknown error'}`;
-        }
+      if (!savedToFirestore) {
+        lastError = err?.message || 'Server endpoint unreachable';
       }
     }
 
@@ -641,7 +693,7 @@ export function useDataActions(
     }
 
     setVideos(cleanVideos);
-  }, [getAdminToken, setVideos, videos]);
+  }, [getAdminToken, setVideos, videos, settings?.site_title]);
 
   const updateLocalContainerBackup = useCallback(async (
     targetApps?: AppConfig[],

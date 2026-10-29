@@ -86,32 +86,29 @@ async function doFetchStoreData() {
   };
 
   // Guarantee arrays and custom SEO titles/descriptions are preserved
-  if (!mergedSettings.developers || mergedSettings.developers.length === 0) {
+  if (!Array.isArray(mergedSettings.developers)) {
     mergedSettings.developers = rawLiveSettings.developers || rawStaticSettings.developers || freshStatic.developers || [];
   }
-  if (!mergedSettings.website_faqs || mergedSettings.website_faqs.length === 0) {
+  if (!Array.isArray(mergedSettings.website_faqs)) {
     mergedSettings.website_faqs = rawLiveSettings.website_faqs || rawStaticSettings.website_faqs || [];
   }
-  if (!mergedSettings.quick_links || mergedSettings.quick_links.length === 0) {
+  if (!Array.isArray(mergedSettings.quick_links)) {
     mergedSettings.quick_links = rawLiveSettings.quick_links || rawStaticSettings.quick_links || [];
   }
-  if (!mergedSettings.categories || mergedSettings.categories.length === 0) {
+  if (!Array.isArray(mergedSettings.categories)) {
     mergedSettings.categories = rawLiveSettings.categories || rawStaticSettings.categories || [];
   }
-  if (!mergedSettings.banners || mergedSettings.banners.length === 0) {
+  if (!Array.isArray(mergedSettings.banners)) {
     mergedSettings.banners = rawLiveSettings.banners || rawStaticSettings.banners || [];
   }
 
-  const minCatalogThreshold = (freshStatic.apps && freshStatic.apps.length > 0)
-    ? Math.max(1, Math.floor(freshStatic.apps.length * 0.85))
-    : 1;
   const data = {
-    apps: (liveData?.apps && Array.isArray(liveData.apps) && liveData.apps.length >= minCatalogThreshold)
+    apps: Array.isArray(liveData?.apps)
       ? liveData.apps
-      : mergeItemsByTimestamp(freshStatic.apps || freshStatic.mockApps || [], liveData?.apps || [], false),
+      : (freshStatic.apps || freshStatic.mockApps || []),
     settings: mergedSettings,
-    news: (liveData?.news && Array.isArray(liveData.news) && liveData.news.length > 0) ? liveData.news : (freshStatic.news || freshStatic.mockNews || []),
-    videos: (liveData?.videos && Array.isArray(liveData.videos) && liveData.videos.length > 0) ? liveData.videos : (freshStatic.videos || freshStatic.mockVideos || []),
+    news: Array.isArray(liveData?.news) ? liveData.news : (freshStatic.news || freshStatic.mockNews || []),
+    videos: Array.isArray(liveData?.videos) ? liveData.videos : (freshStatic.videos || freshStatic.mockVideos || []),
     developers: mergedSettings.developers || []
   };
   

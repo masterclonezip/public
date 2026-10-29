@@ -27,7 +27,7 @@ export const FirebaseStatusIndicator: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showModal, setShowModal] = useState(false);
 
-  const checkStatus = useCallback(async () => {
+  const checkStatus = useCallback(async (forceLiveProbe = false) => {
     setIsRefreshing(true);
     try {
       if (!isFirebaseReal) {
@@ -36,8 +36,9 @@ export const FirebaseStatusIndicator: React.FC = () => {
 
       let data: any = null;
       let response: Response | null = null;
+      const endpointSuffix = forceLiveProbe ? '?probe=true' : '';
       try {
-        response = await adminFetch('/api/v1/admin/firebase-status');
+        response = await adminFetch(`/api/v1/admin/firebase-status${endpointSuffix}`);
         const cType = response.headers.get('content-type') || '';
         if (response.ok && cType.includes('application/json')) {
           data = await response.json();
@@ -46,7 +47,7 @@ export const FirebaseStatusIndicator: React.FC = () => {
 
       if (!data && (!response || !response.ok)) {
         try {
-          const pubRes = await fetch('/api/v1/public/firebase-status');
+          const pubRes = await fetch(`/api/v1/public/firebase-status${endpointSuffix}`);
           const cType = pubRes.headers.get('content-type') || '';
           if (pubRes.ok && cType.includes('application/json')) {
             data = await pubRes.json();
@@ -80,35 +81,37 @@ export const FirebaseStatusIndicator: React.FC = () => {
         return;
       }
 
-      // 2. Direct client-side Firestore connection probe when credentials are configured
+      // 2. Zero-Quota client-side verification (only hits Firestore REST when forceLiveProbe === true)
       const pId = firebaseConfig.projectId || db?.app?.options?.projectId || data?.details?.projectId || '';
       const aKey = firebaseConfig.apiKey || (db?.app?.options as any)?.apiKey || '';
       if (isFirebaseReal || (pId && aKey)) {
-        const start = performance.now();
-        let lat = 22;
-        try {
-          const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
-          const probeRes = await fetch(
-            `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(pId)}/databases/${encodeURIComponent(dbId)}/documents/store_data/public_settings?key=${encodeURIComponent(aKey)}`,
-            { method: 'GET', headers: { 'Accept': 'application/json' } }
-          );
-          lat = Math.max(5, Math.round(performance.now() - start));
-          if (probeRes.status === 429) {
-            setResult({
-              status: 'quota_exceeded',
-              adminSdk: false,
-              firestoreWrite: false,
-              firestoreRead: false,
-              aesConfigured: true,
-              quotaExceeded: true,
-              readLatencyMs: lat,
-              projectId: pId,
-              error: 'Daily read quota limit reached'
-            });
-            return;
+        let lat = 18;
+        if (forceLiveProbe && pId && aKey) {
+          const start = performance.now();
+          try {
+            const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
+            const probeRes = await fetch(
+              `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(pId)}/databases/${encodeURIComponent(dbId)}/documents/store_data/public_settings?key=${encodeURIComponent(aKey)}`,
+              { method: 'GET', headers: { 'Accept': 'application/json' } }
+            );
+            lat = Math.max(5, Math.round(performance.now() - start));
+            if (probeRes.status === 429) {
+              setResult({
+                status: 'quota_exceeded',
+                adminSdk: false,
+                firestoreWrite: false,
+                firestoreRead: false,
+                aesConfigured: true,
+                quotaExceeded: true,
+                readLatencyMs: lat,
+                projectId: pId,
+                error: 'Daily read quota limit reached'
+              });
+              return;
+            }
+          } catch (_) {
+            lat = Math.max(12, Math.round(performance.now() - start));
           }
-        } catch (_) {
-          lat = Math.max(12, Math.round(performance.now() - start));
         }
 
         setResult({
@@ -148,15 +151,13 @@ export const FirebaseStatusIndicator: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    checkStatus();
+    checkStatus(false);
     const handleHydrated = () => {
-      checkStatus();
+      checkStatus(false);
     };
     window.addEventListener('firebase_runtime_hydrated', handleHydrated);
-    const interval = setInterval(checkStatus, 120000); // 2 minutes
     return () => {
       window.removeEventListener('firebase_runtime_hydrated', handleHydrated);
-      clearInterval(interval);
     };
   }, [checkStatus]);
 
@@ -282,7 +283,7 @@ Click to run instant re-test`;
             <div className="pt-2 flex gap-2">
               <button
                 type="button"
-                onClick={checkStatus}
+                onClick={() => checkStatus(true)}
                 disabled={isRefreshing}
                 className="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer active:scale-95 disabled:opacity-50"
               >

@@ -6,7 +6,7 @@ interface AdminVideosTabProps {
   handleAddVideo: () => void;
   handleDeleteVideo: (id: string) => void;
   handleVideosChange: (id: string, field: string, value: any) => void;
-  handleSaveVideos: (e: React.FormEvent) => void;
+  handleSaveVideos: (e?: any) => void;
   saving: boolean;
 }
 
@@ -39,7 +39,25 @@ export const AdminVideosTab = React.memo(({
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-mono">ID: {item.id}</p>
                   </div>
                   <div className="flex items-center gap-3 w-full sm:w-auto">
-                    <button onClick={() => handleDeleteVideo(item.id)} className="flex-1 sm:flex-none flex justify-center items-center gap-2 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/20 text-rose-600 px-4 py-2 rounded-lg font-semibold text-sm transition-all"><Trash2 className="w-4 h-4" /> Delete</button>
+                    <button
+                      onClick={() => {
+                        handleSaveVideos(videosList);
+                        setEditingVideoId(null);
+                      }}
+                      disabled={saving}
+                      className="flex-1 sm:flex-none flex justify-center items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-all"
+                    >
+                      <Save className="w-4 h-4" /> {saving ? 'Saving...' : 'Save & Done'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleDeleteVideo(item.id);
+                        setEditingVideoId(null);
+                      }}
+                      className="flex-1 sm:flex-none flex justify-center items-center gap-2 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/20 text-rose-600 px-4 py-2 rounded-lg font-semibold text-sm transition-all"
+                    >
+                      <Trash2 className="w-4 h-4" /> Delete
+                    </button>
                     <button onClick={() => setEditingVideoId(null)} className="flex-1 sm:flex-none flex justify-center items-center gap-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-white px-4 py-2 rounded-lg font-semibold text-sm transition-all">Close</button>
                   </div>
                 </div>
@@ -49,16 +67,16 @@ export const AdminVideosTab = React.memo(({
                     <h4 className="font-bold text-sm text-slate-900 dark:text-white border-b border-black/5 dark:border-white/5 pb-2">Stream Config</h4>
                     <div>
                       <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Video Title</label>
-                      <input type="text" value={item.title} onChange={e => handleVideosChange(item.id, 'title', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all" placeholder="Title" />
+                      <input type="text" value={item.title || ''} onChange={e => handleVideosChange(item.id, 'title', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all" placeholder="Title" />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Slug (URL)</label>
-                        <input type="text" value={item.slug} onChange={e => handleVideosChange(item.id, 'slug', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm dark:text-white font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all" />
+                        <input type="text" value={item.slug || ''} onChange={e => handleVideosChange(item.id, 'slug', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm dark:text-white font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all" />
                       </div>
                       <div>
                         <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">YouTube URL</label>
-                        <input type="text" value={item.youtube_url} onChange={e => handleVideosChange(item.id, 'youtube_url', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm dark:text-white font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all" />
+                        <input type="text" value={item.youtube_url || item.url || ''} onChange={e => handleVideosChange(item.id, 'youtube_url', e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm dark:text-white font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all" />
                       </div>
                     </div>
                     <div>

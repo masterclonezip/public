@@ -2,15 +2,15 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { AppConfig, GlobalSettings, NewsItem, VideoItem } from '../types';
 import { mockApps, mockSettings, mockNews, mockVideos } from '../lib/staticData';
 import { adminFetch } from '../services/adminAuthService';
-import { db, isFirebaseReal } from '../lib/firebase';
+import { db, isFirebaseReal, hydrateFirebaseRuntimeConfig, readFirestoreDoc } from '../lib/firebase';
 
 export function useDataSync() {
   const initialData = (typeof window !== 'undefined' && (window as any).__INITIAL_DATA__) || null;
 
-  const [apps, setApps] = useState<AppConfig[]>(() => (initialData?.apps && initialData.apps.length > 0) ? initialData.apps : (mockApps || []));
+  const [apps, setApps] = useState<AppConfig[]>(() => Array.isArray(initialData?.apps) ? initialData.apps : (mockApps || []));
   const [settings, setSettings] = useState<GlobalSettings>(() => initialData?.settings || mockSettings || {} as GlobalSettings);
-  const [news, setNews] = useState<NewsItem[]>(() => (initialData?.news && Array.isArray(initialData.news) && initialData.news.length > 0) ? initialData.news : (mockNews || []));
-  const [videos, setVideos] = useState<VideoItem[]>(() => (initialData?.videos && Array.isArray(initialData.videos) && initialData.videos.length > 0) ? initialData.videos : (mockVideos || []));
+  const [news, setNews] = useState<NewsItem[]>(() => Array.isArray(initialData?.news) ? initialData.news : (mockNews || []));
+  const [videos, setVideos] = useState<VideoItem[]>(() => Array.isArray(initialData?.videos) ? initialData.videos : (mockVideos || []));
   
   const [loading, setLoading] = useState(!initialData);
   const [loadedFromServer, setLoadedFromServer] = useState(!!initialData);
@@ -56,6 +56,8 @@ export function useDataSync() {
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setIsRefreshing(true);
     try {
+      await hydrateFirebaseRuntimeConfig();
+
       let data: any = null;
       try {
         const res = await adminFetch('/api/v1/admin/data');
@@ -66,8 +68,8 @@ export function useDataSync() {
         console.warn("adminFetch /api/v1/admin/data error:", adminErr);
       }
 
-      // If admin data fetch succeeded
-      if (data && (Array.isArray(data.apps) || data.settings)) {
+      // If admin data fetch succeeded with real Firestore or local_backup data (not an empty static_fallback)
+      if (data && data.source !== 'static_fallback' && (Array.isArray(data.apps) || data.settings)) {
         if (data.source === 'firebase' || data.source === 'local_backup') {
           setDataSource(data.source);
         } else {
@@ -76,7 +78,7 @@ export function useDataSync() {
         if (data.quotaExceeded) {
           setQuotaExceeded(true);
         }
-        if (Array.isArray(data.apps) && data.apps.length > 0) {
+        if (Array.isArray(data.apps)) {
           setApps(data.apps);
         }
         if (data.settings && typeof data.settings === 'object' && Object.keys(data.settings).length > 0) {
@@ -89,46 +91,50 @@ export function useDataSync() {
           setVideos(data.videos);
         }
       } else {
-        // Direct Firestore load for static hosts (Cloudflare Pages)
+        // Direct Firestore load (SDK + REST fallback) for static hosts / Cloudflare Pages
         let loadedFromDirectFirestore = false;
-        if (isFirebaseReal && db) {
+        if (isFirebaseReal) {
           try {
-            const { doc, getDoc } = await import('firebase/firestore');
-            const chunkPromises = Array.from({ length: 16 }, (_, i) => 
-              getDoc(doc(db, 'store_data', `apps_chunk_${i}`)).catch(() => null)
-            );
             const [
               metaSnap,
-              chunks, 
-              settingsSnap, 
-              publicSettingsSnap, 
-              faqsSnap, 
-              devsSnap, 
-              linksSnap, 
-              newsSnap, 
+              settingsSnap,
+              publicSettingsSnap,
+              faqsSnap,
+              devsSnap,
+              linksSnap,
+              newsSnap,
               videosSnap
             ] = await Promise.all([
-              getDoc(doc(db, 'store_data', 'apps_meta')).catch(() => null),
-              Promise.all(chunkPromises),
-              getDoc(doc(db, 'store_data', 'settings')).catch(() => null),
-              getDoc(doc(db, 'store_data', 'public_settings')).catch(() => null),
-              getDoc(doc(db, 'store_data', 'faqs')).catch(() => null),
-              getDoc(doc(db, 'store_data', 'developers')).catch(() => null),
-              getDoc(doc(db, 'store_data', 'quick_links')).catch(() => null),
-              getDoc(doc(db, 'store_data', 'news')).catch(() => null),
-              getDoc(doc(db, 'store_data', 'videos')).catch(() => null)
+              readFirestoreDoc('store_data', 'apps_meta'),
+              readFirestoreDoc('store_data', 'settings'),
+              readFirestoreDoc('store_data', 'public_settings'),
+              readFirestoreDoc('store_data', 'faqs'),
+              readFirestoreDoc('store_data', 'developers'),
+              readFirestoreDoc('store_data', 'quick_links'),
+              readFirestoreDoc('store_data', 'news'),
+              readFirestoreDoc('store_data', 'videos')
             ]);
 
-            const maxChunks = (metaSnap && metaSnap.exists && metaSnap.exists() && Number(metaSnap.data()?.numChunks) > 0)
-              ? Number(metaSnap.data()?.numChunks)
-              : chunks.length;
+            const metaExists = metaSnap.exists && metaSnap.data;
+            const maxChunks = metaExists && Number(metaSnap.data?.numChunks) >= 0
+              ? Number(metaSnap.data?.numChunks)
+              : 4;
+
+            const chunkSnaps = maxChunks > 0
+              ? await Promise.all(
+                  Array.from({ length: maxChunks }, (_, i) =>
+                    readFirestoreDoc('store_data', `apps_chunk_${i}`)
+                  )
+                )
+              : [];
 
             let loadedApps: AppConfig[] = [];
+            let anyChunkExists = false;
             const seenAppKeys = new Set<string>();
-            chunks.slice(0, maxChunks).forEach(chunk => {
-              if (chunk && chunk.exists && chunk.exists()) {
-                const chunkData = chunk.data();
-                const items = chunkData.items || chunkData.apps || [];
+            chunkSnaps.forEach(chunk => {
+              if (chunk.exists && chunk.data) {
+                anyChunkExists = true;
+                const items = chunk.data.items || chunk.data.apps || [];
                 if (Array.isArray(items)) {
                   items.forEach((item: any) => {
                     const key = item.id || item.slug;
@@ -141,33 +147,30 @@ export function useDataSync() {
               }
             });
 
-            if (loadedApps.length > 0) {
+            if (metaExists || anyChunkExists || loadedApps.length > 0) {
               setApps(loadedApps);
               loadedFromDirectFirestore = true;
             }
 
             let loadedSettings: any = {};
-            if (settingsSnap && settingsSnap.exists && settingsSnap.exists()) {
-              loadedSettings = { ...loadedSettings, ...settingsSnap.data() };
+            if (settingsSnap.exists && settingsSnap.data) {
+              loadedSettings = { ...loadedSettings, ...settingsSnap.data };
               loadedFromDirectFirestore = true;
             }
-            if (publicSettingsSnap && publicSettingsSnap.exists && publicSettingsSnap.exists()) {
-              loadedSettings = { ...loadedSettings, ...publicSettingsSnap.data() };
+            if (publicSettingsSnap.exists && publicSettingsSnap.data) {
+              loadedSettings = { ...loadedSettings, ...publicSettingsSnap.data };
               loadedFromDirectFirestore = true;
             }
-            if (faqsSnap && faqsSnap.exists && faqsSnap.exists()) {
-              const fData = faqsSnap.data();
-              if (Array.isArray(fData?.items)) loadedSettings.website_faqs = fData.items;
+            if (faqsSnap.exists && faqsSnap.data) {
+              if (Array.isArray(faqsSnap.data.items)) loadedSettings.website_faqs = faqsSnap.data.items;
               loadedFromDirectFirestore = true;
             }
-            if (devsSnap && devsSnap.exists && devsSnap.exists()) {
-              const dData = devsSnap.data();
-              if (Array.isArray(dData?.items)) loadedSettings.developers = dData.items;
+            if (devsSnap.exists && devsSnap.data) {
+              if (Array.isArray(devsSnap.data.items)) loadedSettings.developers = devsSnap.data.items;
               loadedFromDirectFirestore = true;
             }
-            if (linksSnap && linksSnap.exists && linksSnap.exists()) {
-              const lData = linksSnap.data();
-              if (Array.isArray(lData?.items)) loadedSettings.quick_links = lData.items;
+            if (linksSnap.exists && linksSnap.data) {
+              if (Array.isArray(linksSnap.data.items)) loadedSettings.quick_links = linksSnap.data.items;
               loadedFromDirectFirestore = true;
             }
 
@@ -176,18 +179,16 @@ export function useDataSync() {
               loadedFromDirectFirestore = true;
             }
 
-            if (newsSnap && newsSnap.exists && newsSnap.exists()) {
-              const newsData = newsSnap.data();
-              const items = newsData.items || newsData.news || [];
+            if (newsSnap.exists && newsSnap.data) {
+              const items = newsSnap.data.items || newsSnap.data.news || [];
               if (Array.isArray(items)) {
                 setNews(items);
                 loadedFromDirectFirestore = true;
               }
             }
 
-            if (videosSnap && videosSnap.exists && videosSnap.exists()) {
-              const vidData = videosSnap.data();
-              const items = vidData.items || vidData.videos || [];
+            if (videosSnap.exists && videosSnap.data) {
+              const items = videosSnap.data.items || videosSnap.data.videos || [];
               if (Array.isArray(items)) {
                 setVideos(items);
                 loadedFromDirectFirestore = true;
@@ -226,12 +227,11 @@ export function useDataSync() {
             }
           } catch (_) {}
 
-          // Guarantee mockApps fallback if apps are still empty
-          setApps(prev => (prev && prev.length > 0 ? prev : (mockApps as any || [])));
+          setApps(prev => (Array.isArray(prev) ? prev : (mockApps as any || [])));
           setSettings(prev => (prev && Object.keys(prev).length > 0 ? prev : (mockSettings as any || {} as GlobalSettings)));
-          setNews(prev => (prev && prev.length > 0 ? prev : (mockNews as any || [])));
-          setVideos(prev => (prev && prev.length > 0 ? prev : (mockVideos as any || [])));
-          setDataSource('local_backup');
+          setNews(prev => (Array.isArray(prev) ? prev : (mockNews as any || [])));
+          setVideos(prev => (Array.isArray(prev) ? prev : (mockVideos as any || [])));
+          setDataSource(isFirebaseReal ? 'firebase' : 'local_backup');
         }
       }
 
