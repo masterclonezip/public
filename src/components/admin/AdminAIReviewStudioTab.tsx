@@ -141,15 +141,22 @@ export const AdminAIReviewStudioTab: React.FC<AdminAIReviewStudioTabProps> = ({
     return status;
   }, []);
 
+  useEffect(() => {
+    registerCatalogAppsForReviews(Array.isArray(appsList) ? appsList : []);
+  }, [appsList]);
+
   // Initial Cloud Settings Sync + Live Connection Check
   useEffect(() => {
     let mounted = true;
+    registerCatalogAppsForReviews(Array.isArray(appsList) ? appsList : []);
 
     fetchAdminAppReviewCounts()
       .then(counts => {
         if (!mounted || !counts) return;
         const mapped: Record<string, number> = {};
-        Object.entries(counts).forEach(([k, v]: [string, any]) => {
+        const rawMap = counts.appCounts || counts || {};
+        Object.entries(rawMap).forEach(([k, v]: [string, any]) => {
+          if (k === 'globalStats' || k === 'appCounts') return;
           mapped[k] = typeof v === 'number' ? v : v?.total || 0;
         });
         setAppReviewCounts(mapped);

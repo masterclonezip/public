@@ -20,16 +20,18 @@ let _runtimeStaticReviews: Record<string, any[]> | null =
     : {};
 
 let _registeredCatalogApps: any[] = [];
+let _hasRegisteredCatalogApps = false;
 
 export function registerCatalogAppsForReviews(apps?: any[]) {
-  if (Array.isArray(apps) && apps.length > 0) {
+  if (Array.isArray(apps)) {
     _registeredCatalogApps = apps;
+    _hasRegisteredCatalogApps = true;
   }
 }
 
 export function getCatalogAppsForReviews(): any[] {
-  if (_registeredCatalogApps.length > 0) return _registeredCatalogApps;
-  if (typeof window !== 'undefined' && Array.isArray((window as any).__INITIAL_DATA__?.apps) && (window as any).__INITIAL_DATA__.apps.length > 0) {
+  if (_hasRegisteredCatalogApps) return _registeredCatalogApps;
+  if (typeof window !== 'undefined' && Array.isArray((window as any).__INITIAL_DATA__?.apps)) {
     return (window as any).__INITIAL_DATA__.apps;
   }
   const rawStatic = (staticCatalogJson as any)?.apps || (staticCatalogJson as any)?.mockApps || [];
@@ -52,7 +54,7 @@ export function resolveCanonicalAppMeta(
   fallbackName?: string,
   appsOverride?: any[]
 ): CanonicalAppMeta {
-  const apps = (appsOverride && appsOverride.length > 0) ? appsOverride : getCatalogAppsForReviews();
+  const apps = Array.isArray(appsOverride) ? appsOverride : getCatalogAppsForReviews();
   const q1 = String(idOrSlugOrName || '').trim().toLowerCase();
   const q2 = String(secondarySlugOrId || '').trim().toLowerCase();
   const q3 = String(fallbackName || '').trim().toLowerCase();
@@ -87,7 +89,7 @@ export function resolveCanonicalAppMeta(
     name: resolvedName,
     icon_url: String(matched?.icon_url || ''),
     category: String(matched?.category || 'Apps'),
-    defaultRating: Number(matched?.rating) || 4.6,
+    defaultRating: Number(matched?.rating) || 0,
     canonicalKey
   };
 }
@@ -193,10 +195,25 @@ function formatFull(d: Date, includeTime: boolean, MONTHS: string[]): string {
   return `${day} ${month} ${year}, ${hours}:${minutes} ${ampm}`;
 }
 
+declare const __APP_BUILD_ENV__: Record<string, string> | undefined;
+
 const getEnvVal = (key: string): string | undefined => {
-  if (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env[key]) {
-    const v = String((import.meta as any).env[key]).trim();
-    if (v && v.length > 0 && !v.includes('!') && !v.includes('#')) return v;
+  try {
+    if (typeof __APP_BUILD_ENV__ !== 'undefined' && __APP_BUILD_ENV__ && __APP_BUILD_ENV__[key]) {
+      const v = String(__APP_BUILD_ENV__[key]).trim();
+      if (v && v.length > 0 && !v.includes('!') && !v.includes('#')) return v;
+    }
+  } catch {
+    // ignore
+  }
+  try {
+    const metaEnv = import.meta.env as Record<string, any> | undefined;
+    if (metaEnv && metaEnv[key]) {
+      const v = String(metaEnv[key]).trim();
+      if (v && v.length > 0 && !v.includes('!') && !v.includes('#')) return v;
+    }
+  } catch {
+    // ignore
   }
   if (typeof process !== 'undefined' && process.env && process.env[key]) {
     const v = String(process.env[key]).trim();
@@ -206,20 +223,39 @@ const getEnvVal = (key: string): string | undefined => {
 };
 
 export const getResolvedCommunityFirebaseConfig = () => {
-  const rawProjectId = getEnvVal('VITE_COMMUNITY_FIREBASE_PROJECT_ID') || getEnvVal('COMMUNITY_FIREBASE_PROJECT_ID') || '';
+  const rawProjectId =
+    getEnvVal('VITE_COMMUNITY_FIREBASE_PROJECT_ID') ||
+    getEnvVal('COMMUNITY_FIREBASE_PROJECT_ID') ||
+    getEnvVal('VITE_FIREBASE_PROJECT_ID') ||
+    getEnvVal('FIREBASE_PROJECT_ID') ||
+    '';
   const projectId = (rawProjectId && !rawProjectId.includes('{') && rawProjectId.length < 50) ? rawProjectId : '';
 
-  const rawDbId = getEnvVal('VITE_COMMUNITY_FIREBASE_DATABASE_ID') || getEnvVal('COMMUNITY_FIREBASE_DATABASE_ID');
+  const rawDbId =
+    getEnvVal('VITE_COMMUNITY_FIREBASE_DATABASE_ID') ||
+    getEnvVal('COMMUNITY_FIREBASE_DATABASE_ID') ||
+    getEnvVal('VITE_FIREBASE_DATABASE_ID') ||
+    getEnvVal('FIREBASE_DATABASE_ID');
   const firestoreDatabaseId = (rawDbId && !rawDbId.includes('{') && !rawDbId.includes('service_account') && rawDbId.length < 40)
     ? rawDbId
     : '(default)';
 
-  const rawApiKey = getEnvVal('VITE_COMMUNITY_FIREBASE_API_KEY') || getEnvVal('COMMUNITY_FIREBASE_API_KEY') || '';
+  const rawApiKey =
+    getEnvVal('VITE_COMMUNITY_FIREBASE_API_KEY') ||
+    getEnvVal('COMMUNITY_FIREBASE_API_KEY') ||
+    getEnvVal('VITE_FIREBASE_API_KEY') ||
+    getEnvVal('FIREBASE_API_KEY') ||
+    '';
   const apiKey = (rawApiKey && rawApiKey.startsWith('AIza') && rawApiKey.length > 20)
     ? rawApiKey
     : '';
 
-  const rawAppId = getEnvVal('VITE_COMMUNITY_FIREBASE_APP_ID') || getEnvVal('COMMUNITY_FIREBASE_APP_ID') || '';
+  const rawAppId =
+    getEnvVal('VITE_COMMUNITY_FIREBASE_APP_ID') ||
+    getEnvVal('COMMUNITY_FIREBASE_APP_ID') ||
+    getEnvVal('VITE_FIREBASE_APP_ID') ||
+    getEnvVal('FIREBASE_APP_ID') ||
+    '';
   const appId = (rawAppId && rawAppId.startsWith('1:') && rawAppId.length > 20)
     ? rawAppId
     : '';
@@ -228,10 +264,20 @@ export const getResolvedCommunityFirebaseConfig = () => {
     projectId,
     appId,
     apiKey,
-    authDomain: getEnvVal('VITE_COMMUNITY_FIREBASE_AUTH_DOMAIN') || (projectId ? `${projectId}.firebaseapp.com` : ''),
+    authDomain:
+      getEnvVal('VITE_COMMUNITY_FIREBASE_AUTH_DOMAIN') ||
+      getEnvVal('VITE_FIREBASE_AUTH_DOMAIN') ||
+      (projectId ? `${projectId}.firebaseapp.com` : ''),
     firestoreDatabaseId,
-    storageBucket: getEnvVal('VITE_COMMUNITY_FIREBASE_STORAGE_BUCKET') || (projectId ? `${projectId}.firebasestorage.app` : ''),
-    messagingSenderId: getEnvVal('VITE_COMMUNITY_FIREBASE_MESSAGING_ID') || getEnvVal('VITE_COMMUNITY_FIREBASE_MESSAGING_SENDER_ID') || '',
+    storageBucket:
+      getEnvVal('VITE_COMMUNITY_FIREBASE_STORAGE_BUCKET') ||
+      getEnvVal('VITE_FIREBASE_STORAGE_BUCKET') ||
+      (projectId ? `${projectId}.firebasestorage.app` : ''),
+    messagingSenderId:
+      getEnvVal('VITE_COMMUNITY_FIREBASE_MESSAGING_ID') ||
+      getEnvVal('VITE_COMMUNITY_FIREBASE_MESSAGING_SENDER_ID') ||
+      getEnvVal('VITE_FIREBASE_MESSAGING_SENDER_ID') ||
+      '',
   };
 };
 
@@ -339,7 +385,7 @@ export interface AdminCommunityStats {
   averageRating: number;
   ratingDistribution?: Record<string, number>;
   appCoverageCount?: number;
-  liveStatus: 'live' | 'checking' | 'error';
+  liveStatus: 'live' | 'checking' | 'error' | 'offline';
   statusMessage: string;
   projectId: string;
   topApps?: AdminCommunityTopApp[];
@@ -605,6 +651,11 @@ function markAdminDeleted(reviewId: string) {
 }
 
 function getCachedCloudReviewsSync(): AdminReviewItem[] {
+  const cfg = getResolvedCommunityFirebaseConfig();
+  const isCloudConfigured = Boolean(cfg.projectId && cfg.apiKey);
+  if (!isCloudConfigured) {
+    return _inMemoryCloudReviews || [];
+  }
   if (_inMemoryCloudReviews) return _inMemoryCloudReviews;
   if (typeof window !== 'undefined') {
     try {
@@ -773,7 +824,20 @@ export function getConsolidatedReviewsForApp(appIdParam?: string, appsOverride?:
   const rawParam = String(appIdParam || '').trim();
   const isAll = !rawParam || rawParam.toLowerCase() === 'all';
 
-  const targetMeta = !isAll ? resolveCanonicalAppMeta(rawParam, rawParam, '', appsOverride) : null;
+  const catalogApps = Array.isArray(appsOverride) ? appsOverride : getCatalogAppsForReviews();
+  if (isAll && catalogApps.length === 0) {
+    return [];
+  }
+
+  const validCatalogKeys = new Set<string>();
+  for (const a of catalogApps) {
+    if (!a) continue;
+    if (a.id) validCatalogKeys.add(String(a.id).trim().toLowerCase());
+    if (a.slug) validCatalogKeys.add(String(a.slug).trim().toLowerCase());
+    if (a.name) validCatalogKeys.add(String(a.name).trim().toLowerCase());
+  }
+
+  const targetMeta = !isAll ? resolveCanonicalAppMeta(rawParam, rawParam, '', catalogApps) : null;
   const matchKeys = new Set<string>();
   if (!isAll && targetMeta) {
     if (targetMeta.id) matchKeys.add(targetMeta.id.toLowerCase());
@@ -783,13 +847,24 @@ export function getConsolidatedReviewsForApp(appIdParam?: string, appsOverride?:
   }
 
   const matchesTargetApp = (rev: any): boolean => {
-    if (isAll) return true;
-    const rMeta = resolveCanonicalAppMeta(rev?.appId || rev?.app_id, rev?.appSlug, rev?.appName, appsOverride);
+    const rMeta = resolveCanonicalAppMeta(rev?.appId || rev?.app_id, rev?.appSlug, rev?.appName, catalogApps);
     const k1 = (rMeta.id || '').toLowerCase();
     const k2 = (rMeta.slug || '').toLowerCase();
     const k3 = (rMeta.name || '').toLowerCase();
     const raw1 = String(rev?.appId || rev?.app_id || '').trim().toLowerCase();
     const raw2 = String(rev?.appSlug || '').trim().toLowerCase();
+
+    if (isAll) {
+      if (validCatalogKeys.size === 0) return false;
+      return (
+        (Boolean(k1) && validCatalogKeys.has(k1)) ||
+        (Boolean(k2) && validCatalogKeys.has(k2)) ||
+        (Boolean(k3) && validCatalogKeys.has(k3)) ||
+        (Boolean(raw1) && validCatalogKeys.has(raw1)) ||
+        (Boolean(raw2) && validCatalogKeys.has(raw2))
+      );
+    }
+
     return (
       (Boolean(k1) && matchKeys.has(k1)) ||
       (Boolean(k2) && matchKeys.has(k2)) ||
@@ -913,10 +988,29 @@ export function computeAuthoritativeAtomicCatalogStats(apps?: any[]): {
   topApps: AdminCommunityTopApp[];
   recentReviews: AdminReviewItem[];
 } {
-  if (apps && apps.length > 0) {
+  if (Array.isArray(apps)) {
     registerCatalogAppsForReviews(apps);
   }
-  const targetApps = getCatalogAppsForReviews();
+  const targetApps = Array.isArray(apps) ? apps : getCatalogAppsForReviews();
+
+  if (targetApps.length === 0) {
+    return {
+      globalStats: {
+        total: 0,
+        published: 0,
+        pending: 0,
+        rejected: 0,
+        flagged: 0,
+        averageRating: 0,
+        ratingDistribution: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 },
+        appCoverageCount: 0
+      },
+      appCounts: {},
+      topApps: [],
+      recentReviews: []
+    };
+  }
+
   const allLedgerReviews = getConsolidatedReviewsForApp('all', targetApps);
 
   // Baseline fallback from catalog_stats ONLY if ledger has 0 reviews at all and cloud hasn't hydrated yet
@@ -926,7 +1020,7 @@ export function computeAuthoritativeAtomicCatalogStats(apps?: any[]): {
     (communityCatalogStatsJson as any)?.apps ||
     {};
 
-  // Group all ledger reviews by canonical app key
+  // Group all ledger reviews by canonical app key (STRICTLY restricted to existing catalog apps)
   const reviewsByCanonicalKey = new Map<string, AdminReviewItem[]>();
   const canonicalMetaByKey = new Map<string, CanonicalAppMeta>();
 
@@ -941,9 +1035,10 @@ export function computeAuthoritativeAtomicCatalogStats(apps?: any[]): {
 
   for (const rev of allLedgerReviews) {
     const meta = resolveCanonicalAppMeta(rev.appId, rev.appSlug, rev.appName, targetApps);
-    const cKey = meta.canonicalKey || String(rev.appSlug || rev.appId || 'unknown').toLowerCase().trim();
-    if (!canonicalMetaByKey.has(cKey)) {
-      canonicalMetaByKey.set(cKey, meta);
+    const cKey = meta.canonicalKey || String(rev.appSlug || rev.appId || '').toLowerCase().trim();
+    // Never aggregate orphaned reviews that do not belong to an actual app in targetApps
+    if (!cKey || !canonicalMetaByKey.has(cKey)) {
+      continue;
     }
     const list = reviewsByCanonicalKey.get(cKey) || [];
     list.push(rev);
@@ -1074,7 +1169,7 @@ export function computeAuthoritativeAtomicCatalogStats(apps?: any[]): {
 
   const avgGlobal = totalReviews > 0
     ? Math.round((globalRatingSum / totalReviews) * 10) / 10
-    : 4.7;
+    : 0;
 
   return {
     globalStats: {
@@ -1165,28 +1260,18 @@ export function getLiveAtomicReviewStatsSync(): {
   topApps?: AdminCommunityTopApp[];
   recentReviews?: AdminReviewItem[];
 } {
+  const targetApps = getCatalogAppsForReviews();
+  if (targetApps.length === 0) {
+    const emptyStats = computeAuthoritativeAtomicCatalogStats([]);
+    memoryAtomicStats = { ...emptyStats, lastSynced: Date.now() };
+    return emptyStats;
+  }
+
   // Always compute from the live unified ledger if we have any reviews or hydrated state
-  const computed = computeAuthoritativeAtomicCatalogStats();
+  const computed = computeAuthoritativeAtomicCatalogStats(targetApps);
   if (computed.globalStats.total > 0 || _cloudHydratedTimestamp > 0) {
     memoryAtomicStats = { ...computed, lastSynced: Date.now() };
     return computed;
-  }
-
-  if (memoryAtomicStats && Object.keys(memoryAtomicStats.appCounts).length > 0) {
-    return memoryAtomicStats;
-  }
-
-  if (typeof window !== 'undefined') {
-    try {
-      const raw = localStorage.getItem(ADMIN_ATOMIC_STATS_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && parsed.appCounts && Object.keys(parsed.appCounts).length > 0) {
-          memoryAtomicStats = parsed;
-          return parsed;
-        }
-      }
-    } catch (_) {}
   }
 
   return computed;
@@ -1332,10 +1417,11 @@ export async function fetchAdminAppReviewCounts(force = false): Promise<{
     await fetchAllFirestoreRestReviews(force);
   }
 
-  const computed = computeAuthoritativeAtomicCatalogStats();
+  const targetApps = getCatalogAppsForReviews();
+  const computed = computeAuthoritativeAtomicCatalogStats(targetApps);
 
-  // If still 0 reviews after hydration (e.g., offline / no review docs), check catalog_stats document once
-  if (computed.globalStats.total === 0) {
+  // If still 0 reviews after hydration (e.g., offline / no review docs), check catalog_stats document once ONLY if catalog apps exist
+  if (computed.globalStats.total === 0 && targetApps.length > 0) {
     try {
       const cfg = getResolvedCommunityFirebaseConfig();
       if (cfg.projectId && cfg.apiKey) {
@@ -1354,7 +1440,7 @@ export async function fetchAdminAppReviewCounts(force = false): Promise<{
                   pending: Number(parsed.pendingReviews) || 0,
                   rejected: Number(parsed.rejectedReviews) || 0,
                   flagged: Number(parsed.flaggedReviews) || 0,
-                  averageRating: Number(parsed.averageRating) || 4.7,
+                  averageRating: Number(parsed.averageRating) || 0,
                   ratingDistribution: parsed.ratingDistribution || { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 },
                   appCoverageCount: Number(parsed.appCoverageCount) || 0
                 },
@@ -1377,6 +1463,7 @@ export async function fetchAdminCommunityOverviewStats(force = false): Promise<A
   await fetchAdminAppReviewCounts(force);
   const live = computeAuthoritativeAtomicCatalogStats();
   const cfg = getResolvedCommunityFirebaseConfig();
+  const isConnected = Boolean(cfg.projectId && cfg.apiKey);
 
   return {
     totalReviews: live.globalStats.total,
@@ -1389,8 +1476,8 @@ export async function fetchAdminCommunityOverviewStats(force = false): Promise<A
     averageRating: live.globalStats.averageRating,
     ratingDistribution: live.globalStats.ratingDistribution,
     appCoverageCount: live.globalStats.appCoverageCount,
-    liveStatus: cfg.projectId ? 'live' : 'checking',
-    statusMessage: cfg.projectId ? `${cfg.projectId} Connected (Zero-Quota Shield)` : 'Local Atomic Engine Active',
+    liveStatus: isConnected ? 'live' : 'offline',
+    statusMessage: isConnected ? `${cfg.projectId} Connected (Zero-Quota Shield)` : 'Review DB Offline • Local Mode',
     projectId: cfg.projectId || '',
     topApps: live.topApps,
     recentReviews: live.recentReviews,
@@ -1453,7 +1540,7 @@ export async function fetchAdminReviewsList(params: {
 
   const scopeAvg = allAppReviews.length > 0
     ? Math.round((scopeRatingSum / allAppReviews.length) * 10) / 10
-    : 4.7;
+    : 0;
 
   // Apply UI filters
   let filtered = [...allAppReviews];

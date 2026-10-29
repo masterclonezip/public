@@ -427,9 +427,10 @@ jobs:
               rm -f strip-admin-from-dex.js
             fi
 
-            # Guarantee Cloudflare Pages SPA Routing in both public and admin repos
-            mkdir -p public
-            echo "/*    /index.html   200" > public/_redirects
+            # Ensure public/_redirects has no invalid /* /index.html 200 loop rule on Cloudflare Pages
+            if [ "$TYPE" = "admin" ]; then
+              rm -f public/_redirects
+            fi
 
             # Write sync metadata to guarantee git changes on every sync run
             mkdir -p src

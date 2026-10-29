@@ -14,9 +14,24 @@ import {
   normalizeClientModelId,
   isValidClientApiKey,
   maskClientApiKey,
+  parseClientApiKeys,
   loadStudioConfig
 } from './storage';
 import siteBrainSnapshot from '../../../lib/aiStudioBrain.json';
+
+export function buildFailoverModelChain(primaryModel?: string): string[] {
+  const norm = normalizeClientModelId(primaryModel);
+  const chain = [
+    norm,
+    'gemini-2.5-flash',
+    'gemini-3-flash-preview',
+    'gemini-2.5-flash-lite',
+    'gemini-3.1-flash-lite-preview',
+    'gemini-flash-latest',
+    'gemini-2.5-pro'
+  ];
+  return chain.filter((m, idx, arr) => Boolean(m) && arr.indexOf(m) === idx);
+}
 
 export const SUPPORTED_GEMINI_MODELS = [
   {
@@ -402,7 +417,8 @@ export async function verifyStudioConnection(
   const startTime = Date.now();
 
   // Path A: Direct Ultra-Fast Verification when a valid client API key is present
-  if (isValidClientApiKey(effectiveKey)) {
+  const clientKeys = parseClientApiKeys(effectiveKey);
+  if (clientKeys.length > 0) {
     // Sync key & model to backend brain asynchronously so server is always in sync
     fetchWithTimeout(
       '/api/v1/admin/community/aistudio-gemini',
@@ -419,94 +435,136 @@ export async function verifyStudioConnection(
       5000
     ).catch(() => {});
 
-    try {
-      const metaUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
-        normalizedModel
-      )}?key=${encodeURIComponent(effectiveKey)}`;
+    const candidateModels = buildFailoverModelChain(normalizedModel);
+    let sawInvalidKey = false;
+    let lastDirectErr = '';
 
-      const metaRes = await fetchWithTimeout(metaUrl, { method: 'GET' }, 4500);
-      const metaJson: any = await metaRes.json().catch(() => ({}));
+    for (const candidateKey of clientKeys) {
+      let keyInvalid = false;
 
-      if (metaRes.ok && metaJson?.name) {
-        if (deepPing) {
-          // Optional 1-word generation ping
-          const genUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
-            normalizedModel
-          )}:generateContent?key=${encodeURIComponent(effectiveKey)}`;
-          const thinkingConfig = buildClientThinkingConfig(normalizedModel);
-          const pingRes = await fetchWithTimeout(
-            genUrl,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ role: 'user', parts: [{ text: 'Reply with OK' }] }],
-                generationConfig: {
-                  temperature: 0.1,
-                  ...(thinkingConfig ? { thinkingConfig } : {})
-                }
-              })
-            },
-            6500
-          );
-          if (pingRes.ok) {
-            return {
-              state: 'connected',
-              model: normalizedModel,
-              requestedModel: normalizedModel,
-              latencyMs: Math.max(1, Date.now() - startTime),
-              keySource: 'custom',
-              keyMask: maskClientApiKey(effectiveKey),
-              lastCheckedAt: Date.now()
-            };
+      for (const candidateModel of candidateModels) {
+        try {
+          const metaUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+            candidateModel
+          )}?key=${encodeURIComponent(candidateKey)}`;
+
+          const metaRes = await fetchWithTimeout(metaUrl, { method: 'GET' }, 4500);
+          const metaJson: any = await metaRes.json().catch(() => ({}));
+
+          if (!metaRes.ok) {
+            const errMsg = metaJson?.error?.message || `HTTP ${metaRes.status}`;
+            lastDirectErr = errMsg;
+            if (isKeyErrorString(errMsg) || metaRes.status === 400 || metaRes.status === 403) {
+              if (isKeyErrorString(errMsg)) {
+                sawInvalidKey = true;
+                keyInvalid = true;
+                break; // Try next key if multiple keys were pasted
+              }
+            }
+            // Try next model on 404 / 503 / 429
+            continue;
           }
-        }
 
-        return {
-          state: 'connected',
-          model: normalizedModel,
-          requestedModel: normalizedModel,
-          latencyMs: Math.max(1, Date.now() - startTime),
-          keySource: 'custom',
-          keyMask: maskClientApiKey(effectiveKey),
-          lastCheckedAt: Date.now()
-        };
-      }
+          if (deepPing) {
+            const genUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+              candidateModel
+            )}:generateContent?key=${encodeURIComponent(candidateKey)}`;
+            const thinkingConfig = buildClientThinkingConfig(candidateModel);
+            const pingRes = await fetchWithTimeout(
+              genUrl,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ role: 'user', parts: [{ text: 'Reply with OK' }] }],
+                  generationConfig: {
+                    temperature: 0.1,
+                    ...(thinkingConfig ? { thinkingConfig } : {})
+                  }
+                })
+              },
+              6500
+            );
+            const pingJson: any = await pingRes.json().catch(() => ({}));
 
-      const errMsg = metaJson?.error?.message || `HTTP ${metaRes.status}`;
-      if (isKeyErrorString(errMsg) || metaRes.status === 400 || metaRes.status === 403) {
-        return {
-          state: 'invalid_key',
-          model: normalizedModel,
-          requestedModel: normalizedModel,
-          keySource: 'custom',
-          keyMask: maskClientApiKey(effectiveKey),
-          errorMessage: 'Invalid Gemini API Key. Please check that you copied the full key from Google AI Studio.',
-          lastCheckedAt: Date.now()
-        };
-      }
+            if (pingRes.ok) {
+              return {
+                state: 'connected',
+                model: candidateModel,
+                requestedModel: normalizedModel,
+                latencyMs: Math.max(1, Date.now() - startTime),
+                keySource: 'custom',
+                keyMask: maskClientApiKey(effectiveKey),
+                warningMessage:
+                  candidateModel !== normalizedModel
+                    ? `Model "${normalizedModel}" had temporary high demand; auto-routed to ${candidateModel}.`
+                    : undefined,
+                lastCheckedAt: Date.now()
+              };
+            }
 
-      // If requested model returned 404, immediately check gemini-2.5-flash
-      if (metaRes.status === 404 && normalizedModel !== 'gemini-2.5-flash') {
-        const fbUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash?key=${encodeURIComponent(
-          effectiveKey
-        )}`;
-        const fbRes = await fetchWithTimeout(fbUrl, { method: 'GET' }, 4000);
-        if (fbRes.ok) {
+            const pingErr = pingJson?.error?.message || `HTTP ${pingRes.status}`;
+            lastDirectErr = pingErr;
+            if (isKeyErrorString(pingErr)) {
+              sawInvalidKey = true;
+              keyInvalid = true;
+              break;
+            }
+            // If 503 (high demand) or 429 (quota) or 404 on deepPing, immediately test next model in candidateModels!
+            continue;
+          }
+
           return {
             state: 'connected',
-            model: 'gemini-2.5-flash',
+            model: candidateModel,
             requestedModel: normalizedModel,
             latencyMs: Math.max(1, Date.now() - startTime),
             keySource: 'custom',
             keyMask: maskClientApiKey(effectiveKey),
-            warningMessage: `Model "${normalizedModel}" unavailable on this tier; auto-routed to gemini-2.5-flash.`,
+            warningMessage:
+              candidateModel !== normalizedModel
+                ? `Model "${normalizedModel}" unavailable; auto-routed to ${candidateModel}.`
+                : undefined,
             lastCheckedAt: Date.now()
           };
+        } catch (err: any) {
+          lastDirectErr = err?.message || 'Network timeout';
         }
       }
-    } catch (_) {
-      // Fall through to server endpoint check if direct check was blocked by browser extension
+
+      if (!keyInvalid && lastDirectErr && !sawInvalidKey) {
+        // Metadata succeeded on key earlier or all models had transient spike; if metadata of primaryModel worked, still mark connected with warning
+        try {
+          const quickUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash?key=${encodeURIComponent(
+            candidateKey
+          )}`;
+          const quickRes = await fetchWithTimeout(quickUrl, { method: 'GET' }, 3500);
+          if (quickRes.ok) {
+            return {
+              state: 'connected',
+              model: 'gemini-2.5-flash',
+              requestedModel: normalizedModel,
+              latencyMs: Math.max(1, Date.now() - startTime),
+              keySource: 'custom',
+              keyMask: maskClientApiKey(effectiveKey),
+              warningMessage: `API Key verified. Google reported temporary high demand on ${normalizedModel}; auto-failover to Gemini 2.5 Flash / Lite is active.`,
+              lastCheckedAt: Date.now()
+            };
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (sawInvalidKey) {
+      return {
+        state: 'invalid_key',
+        model: normalizedModel,
+        requestedModel: normalizedModel,
+        keySource: 'custom',
+        keyMask: maskClientApiKey(effectiveKey),
+        errorMessage: 'Invalid Gemini API Key. Please check that you copied the full key from Google AI Studio.',
+        lastCheckedAt: Date.now()
+      };
     }
   }
 
@@ -606,98 +664,115 @@ async function callGeminiDirectEdge(params: {
   isInvalidKey?: boolean;
   error?: string;
 }> {
-  const cleanKey = params.apiKey.trim();
+  const keys = parseClientApiKeys(params.apiKey);
   const primaryModel = normalizeClientModelId(params.model);
-  const candidates = [primaryModel, 'gemini-2.5-flash', 'gemini-2.5-flash-lite']
-    .filter((m, idx, arr) => m && arr.indexOf(m) === idx)
-    .slice(0, 2);
+  const candidates = buildFailoverModelChain(primaryModel);
+
+  if (keys.length === 0) {
+    return {
+      ok: false,
+      text: '',
+      modelUsed: primaryModel,
+      isInvalidKey: true,
+      error: 'No valid Gemini API Key configured.'
+    };
+  }
 
   let lastError = '';
+  let allKeysInvalid = true;
 
-  for (const currentModel of candidates) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
-        currentModel
-      )}:generateContent?key=${encodeURIComponent(cleanKey)}`;
+  for (const currentKey of keys) {
+    let thisKeyInvalid = false;
 
-      const thinkingConfig = buildClientThinkingConfig(currentModel);
-      const generationConfig: Record<string, any> = {
-        temperature: params.temperature ?? 0.88
-      };
-      if (params.responseMimeType) {
-        generationConfig.responseMimeType = params.responseMimeType;
-      }
-      if (thinkingConfig) {
-        generationConfig.thinkingConfig = thinkingConfig;
-      }
+    for (const currentModel of candidates) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+          currentModel
+        )}:generateContent?key=${encodeURIComponent(currentKey)}`;
 
-      const bodyPayload: Record<string, any> = {
-        contents: params.contents,
-        generationConfig
-      };
-
-      if (params.systemInstruction) {
-        bodyPayload.systemInstruction = {
-          parts: [{ text: params.systemInstruction }]
+        const thinkingConfig = buildClientThinkingConfig(currentModel);
+        const generationConfig: Record<string, any> = {
+          temperature: params.temperature ?? 0.88
         };
-      }
-
-      const res = await fetchWithTimeout(
-        url,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(bodyPayload)
-        },
-        20000
-      );
-
-      const json: any = await res.json().catch(() => ({}));
-
-      if (res.ok) {
-        const parts = json?.candidates?.[0]?.content?.parts;
-        if (Array.isArray(parts)) {
-          const extractedText = parts
-            .filter((p: any) => typeof p?.text === 'string' && !p?.thought)
-            .map((p: any) => p.text)
-            .join('')
-            .trim();
-          const fallbackText =
-            extractedText ||
-            parts
-              .map((p: any) => p?.text || '')
-              .join('')
-              .trim();
-
-          if (fallbackText) {
-            return {
-              ok: true,
-              text: fallbackText,
-              modelUsed: currentModel
-            };
-          }
+        if (params.responseMimeType) {
+          generationConfig.responseMimeType = params.responseMimeType;
         }
-      }
+        if (thinkingConfig) {
+          generationConfig.thinkingConfig = thinkingConfig;
+        }
 
-      const errMsg = json?.error?.message || `HTTP ${res.status}`;
-      lastError = errMsg;
+        const bodyPayload: Record<string, any> = {
+          contents: params.contents,
+          generationConfig
+        };
 
-      if (isKeyErrorString(errMsg) || res.status === 400 || res.status === 403) {
-        if (isKeyErrorString(errMsg)) {
-          return {
-            ok: false,
-            text: '',
-            modelUsed: currentModel,
-            isInvalidKey: true,
-            error: 'Invalid Gemini API Key. Please check your key in API Key & Model settings.'
+        if (params.systemInstruction) {
+          bodyPayload.systemInstruction = {
+            parts: [{ text: params.systemInstruction }]
           };
         }
+
+        const res = await fetchWithTimeout(
+          url,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(bodyPayload)
+          },
+          18000
+        );
+
+        const json: any = await res.json().catch(() => ({}));
+
+        if (res.ok) {
+          allKeysInvalid = false;
+          const parts = json?.candidates?.[0]?.content?.parts;
+          if (Array.isArray(parts)) {
+            const extractedText = parts
+              .filter((p: any) => typeof p?.text === 'string' && !p?.thought)
+              .map((p: any) => p.text)
+              .join('')
+              .trim();
+            const fallbackText =
+              extractedText ||
+              parts
+                .map((p: any) => p?.text || '')
+                .join('')
+                .trim();
+
+            if (fallbackText) {
+              return {
+                ok: true,
+                text: fallbackText,
+                modelUsed: currentModel
+              };
+            }
+          }
+        }
+
+        const errMsg = json?.error?.message || `HTTP ${res.status}`;
+        lastError = errMsg;
+
+        if (isKeyErrorString(errMsg)) {
+          thisKeyInvalid = true;
+          break; // Move to next API key if available
+        }
+
+        allKeysInvalid = false;
+
+        // If 503 (high demand), 429 (quota/rate-limit), 404 (not found), or 5xx, immediately try next model in candidates!
+        continue;
+      } catch (err: any) {
+        allKeysInvalid = false;
+        lastError =
+          err?.name === 'AbortError'
+            ? `Model ${currentModel} timed out`
+            : err?.message || 'Direct Gemini connection error';
       }
-    } catch (err: any) {
-      lastError =
-        err?.name === 'AbortError'
-          ? `Model ${currentModel} timed out`
-          : err?.message || 'Direct Gemini connection error';
+    }
+
+    if (!thisKeyInvalid) {
+      allKeysInvalid = false;
     }
   }
 
@@ -705,7 +780,10 @@ async function callGeminiDirectEdge(params: {
     ok: false,
     text: '',
     modelUsed: primaryModel,
-    error: lastError || 'Direct Gemini call failed'
+    isInvalidKey: allKeysInvalid,
+    error: allKeysInvalid
+      ? 'Invalid Gemini API Key. Please check your key in API Key & Model settings.'
+      : lastError || 'Direct Gemini call failed'
   };
 }
 

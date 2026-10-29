@@ -5,7 +5,3 @@
 /blog/*           /             301
 /blogs            /             301
 /blog             /             301
-
-# Catch-all SPA Fallback (Cloudflare Pages serves matching pre-rendered static HTML files first)
-/*                /index.html   200
-

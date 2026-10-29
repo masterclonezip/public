@@ -29,27 +29,39 @@ export function normalizeClientModelId(rawModel?: string): string {
   return cleaned;
 }
 
+export function parseClientApiKeys(rawKey?: string): string[] {
+  const raw = (rawKey || '').trim();
+  if (!raw) return [];
+  const parts = raw
+    .split(/[\n,;]+/)
+    .map(k => k.trim())
+    .filter(k => {
+      if (!k || k.length < 20) return false;
+      const lower = k.toLowerCase();
+      if (
+        lower === 'my_gemini_api_key' ||
+        lower.includes('your_api_key') ||
+        lower.includes('your-api-key') ||
+        lower.includes('paste_your') ||
+        lower.includes('placeholder')
+      ) {
+        return false;
+      }
+      return true;
+    });
+  return Array.from(new Set(parts));
+}
+
 export function isValidClientApiKey(rawKey?: string): boolean {
-  const clean = (rawKey || '').trim();
-  if (!clean || clean.length < 20) return false;
-  const lower = clean.toLowerCase();
-  if (
-    lower === 'my_gemini_api_key' ||
-    lower.includes('your_api_key') ||
-    lower.includes('your-api-key') ||
-    lower.includes('paste_your') ||
-    lower.includes('placeholder')
-  ) {
-    return false;
-  }
-  return true;
+  return parseClientApiKeys(rawKey).length > 0;
 }
 
 export function maskClientApiKey(rawKey?: string): string {
-  const clean = (rawKey || '').trim();
-  if (!isValidClientApiKey(clean)) return '';
-  if (clean.length <= 10) return '••••••';
-  return `${clean.slice(0, 6)}••••${clean.slice(-4)}`;
+  const keys = parseClientApiKeys(rawKey);
+  if (keys.length === 0) return '';
+  const first = keys[0];
+  const baseMask = first.length <= 10 ? '••••••' : `${first.slice(0, 6)}••••${first.slice(-4)}`;
+  return keys.length > 1 ? `${baseMask} (+${keys.length - 1} more)` : baseMask;
 }
 
 const DEFAULT_BRAIN_DIRECTIVES: BrainDirective[] = [

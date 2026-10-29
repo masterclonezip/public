@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "prebuild": "test -f scripts/check-secrets.ts && tsx scripts/check-secrets.ts || echo \"Skipping secret check\"",
-    "build": "NODE_ENV=production vite build && (test -f scripts/prerender.ts && NODE_ENV=production tsx scripts/prerender.ts || echo \"Skipping prerender\") && (test -f scripts/compress-dist.ts && NODE_ENV=production tsx scripts/compress-dist.ts || echo \"Skipping compression\") && (test -f server.ts && esbuild server.ts --bundle --platform=node --format=cjs --define:import.meta.env=process.env --packages=external --sourcemap --outfile=dist/server.cjs || echo \"Skipping server build\") && (test -f scripts/build-api.js && node scripts/build-api.js || echo \"Skipping api build\")",
+    "build": "NODE_ENV=production vite build && (test -f scripts/prerender.ts && NODE_ENV=production tsx scripts/prerender.ts || echo \"Skipping prerender\") && (test -f scripts/compress-dist.ts && NODE_ENV=production tsx scripts/compress-dist.ts || echo \"Skipping compression\") && (test -f server.ts && esbuild server.ts --bundle --platform=node --format=cjs --define:import.meta.env=process.env --log-override:empty-import-meta=silent --packages=external --sourcemap --outfile=dist/server.cjs || echo \"Skipping server build\") && (test -f scripts/build-api.js && node scripts/build-api.js || echo \"Skipping api build\")",
     "precommit": "test -f scripts/check-secrets.ts && tsx scripts/check-secrets.ts || echo \"Skipping secret check\"",
     "start": "vite preview",
     "clean": "rm -rf dist",

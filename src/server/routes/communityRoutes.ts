@@ -140,11 +140,12 @@ function persistServerLedgerAndStaticBundles() {
     }
   }
 
+  const validAllReviews: AdminReviewItem[] = [];
   for (const rev of allReviews) {
     const meta = resolveCanonicalAppMeta(rev.appId, rev.appSlug, rev.appName, catalogApps);
     const cKey = meta.canonicalKey || String(rev.appSlug || rev.appId || '').toLowerCase().trim();
-    if (!cKey) continue;
-    if (!metaByCanonical.has(cKey)) metaByCanonical.set(cKey, meta);
+    if (!cKey || !metaByCanonical.has(cKey)) continue;
+    validAllReviews.push(rev);
     const arr = reviewsByCanonical.get(cKey) || [];
     arr.push(rev);
     reviewsByCanonical.set(cKey, arr);
@@ -245,7 +246,7 @@ function persistServerLedgerAndStaticBundles() {
     }
   }
 
-  const globalAvg = totalGlobal > 0 ? Math.round((globalRatingSum / totalGlobal) * 10) / 10 : 4.7;
+  const globalAvg = totalGlobal > 0 ? Math.round((globalRatingSum / totalGlobal) * 10) / 10 : 0;
 
   const catalogStatsPayload = {
     generatedAt: new Date().toISOString(),
@@ -268,7 +269,7 @@ function persistServerLedgerAndStaticBundles() {
     fs.writeFileSync(CATALOG_STATS_FILE, JSON.stringify(catalogStatsPayload, null, 2), 'utf8');
   } catch (_) {}
 
-  return { allReviews, staticBundle, catalogStatsPayload };
+  return { allReviews: validAllReviews, staticBundle, catalogStatsPayload };
 }
 
 // ============================================================================

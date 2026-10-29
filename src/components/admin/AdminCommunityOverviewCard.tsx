@@ -46,9 +46,9 @@ export const AdminCommunityOverviewCard: React.FC<AdminCommunityOverviewCardProp
         flaggedReviews: live.globalStats.flagged || 0,
         totalReports: 0,
         pendingReports: 0,
-        averageRating: live.globalStats.averageRating || 4.5,
-        liveStatus: 'live',
-        statusMessage: 'Live (Atomic Shield)',
+        averageRating: live.globalStats.averageRating ?? 0,
+        liveStatus: (import.meta as any).env?.VITE_COMMUNITY_FIREBASE_PROJECT_ID ? 'live' : 'offline',
+        statusMessage: (import.meta as any).env?.VITE_COMMUNITY_FIREBASE_PROJECT_ID ? 'Live (Atomic Shield)' : 'Review DB Offline • Local Mode',
         projectId: (import.meta as any).env?.VITE_COMMUNITY_FIREBASE_PROJECT_ID || '',
         topApps: [],
         recentReviews: [],
@@ -162,7 +162,7 @@ export const AdminCommunityOverviewCard: React.FC<AdminCommunityOverviewCardProp
           publishedReviews: e.detail.globalStats.published,
           pendingReviews: e.detail.globalStats.pending,
           rejectedReviews: e.detail.globalStats.rejected || 0,
-          averageRating: e.detail.globalStats.averageRating || 4.5,
+          averageRating: e.detail.globalStats.averageRating ?? 0,
           appCounts: e.detail.appCounts || prev?.appCounts || {}
         }));
       }
@@ -174,7 +174,7 @@ export const AdminCommunityOverviewCard: React.FC<AdminCommunityOverviewCardProp
 
   const publishedPercent = stats && stats.totalReviews > 0 
     ? Math.round((stats.publishedReviews / stats.totalReviews) * 100) 
-    : 100;
+    : 0;
   const pendingPercent = stats && stats.totalReviews > 0 
     ? Math.round((stats.pendingReviews / stats.totalReviews) * 100) 
     : 0;
@@ -203,10 +203,17 @@ export const AdminCommunityOverviewCard: React.FC<AdminCommunityOverviewCardProp
               <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">
                 Community Firebase Engine & Reviews Platform
               </h3>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300/50 dark:border-emerald-800/50">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Live Cloud Sync
-              </span>
+              {stats?.projectId ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300/50 dark:border-emerald-800/50">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Live Cloud Sync
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300/50 dark:border-amber-800/50">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  Review DB Offline • Local Mode
+                </span>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500 dark:text-slate-400">
               <span>Dedicated Project:</span>
@@ -326,7 +333,7 @@ export const AdminCommunityOverviewCard: React.FC<AdminCommunityOverviewCardProp
           </div>
           <div className="text-2xl sm:text-3xl font-black text-amber-500 flex items-center gap-1.5">
             <Star className="w-6 h-6 fill-amber-400 text-amber-400" />
-            {loading ? '...' : (stats?.averageRating || 4.8)}
+            {loading ? '...' : Number(stats?.averageRating || 0).toFixed(1)}
             <span className="text-xs font-bold text-slate-400">/ 5.0</span>
           </div>
           <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 font-medium">

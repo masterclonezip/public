@@ -18,11 +18,16 @@ export function getEnvSecretKeys(explicitKey?: string): string[] {
     add(process.env.AES_SECRET);
     add(process.env.VITE_AES_SECRET);
   }
-  if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
-    add((import.meta as any).env.VITE_VAULT_SECRET_KEY);
-    add((import.meta as any).env.VAULT_SECRET_KEY);
-    add((import.meta as any).env.VITE_AES_SECRET);
-    add((import.meta as any).env.AES_SECRET);
+  try {
+    const metaEnv = import.meta.env as Record<string, any> | undefined;
+    if (metaEnv) {
+      add(metaEnv.VITE_VAULT_SECRET_KEY);
+      add(metaEnv.VAULT_SECRET_KEY);
+      add(metaEnv.VITE_AES_SECRET);
+      add(metaEnv.AES_SECRET);
+    }
+  } catch {
+    // ignore
   }
   add(INTERNAL_VAULT_FALLBACK_KEY);
   return keys;

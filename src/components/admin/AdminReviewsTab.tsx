@@ -40,6 +40,7 @@ import {
   getLiveAtomicReviewStatsSync,
   registerCatalogAppsForReviews,
   buildPublicCommunitySyncBundle,
+  getResolvedCommunityFirebaseConfig,
   AdminReviewItem,
   AppReviewCountsData,
   formatReviewDate
@@ -64,17 +65,8 @@ export const AdminReviewsTab: React.FC<AdminReviewsTabProps> = ({
   gitConfig
 }) => {
   // Register live catalog apps immediately so canonical ID/Slug resolution has 100% coverage
-  useEffect(() => {
-    if (Array.isArray(appsList) && appsList.length > 0) {
-      registerCatalogAppsForReviews(appsList);
-    }
-  }, [appsList]);
-
-  // 1. Atomic Stats State (Initialized synchronously from Unified Review Ledger)
   const initialAtomic = useMemo(() => {
-    if (Array.isArray(appsList) && appsList.length > 0) {
-      registerCatalogAppsForReviews(appsList);
-    }
+    registerCatalogAppsForReviews(Array.isArray(appsList) ? appsList : []);
     return getLiveAtomicReviewStatsSync();
   }, [appsList]);
 
@@ -96,10 +88,26 @@ export const AdminReviewsTab: React.FC<AdminReviewsTabProps> = ({
     pending: initialAtomic?.globalStats?.pending ?? 0,
     rejected: initialAtomic?.globalStats?.rejected ?? 0,
     flagged: initialAtomic?.globalStats?.flagged ?? 0,
-    averageRating: initialAtomic?.globalStats?.averageRating || 4.7,
+    averageRating: initialAtomic?.globalStats?.averageRating ?? 0,
     ratingDistribution: initialAtomic?.globalStats?.ratingDistribution || { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 },
     appCoverageCount: initialAtomic?.globalStats?.appCoverageCount ?? 0
   }));
+
+  useEffect(() => {
+    registerCatalogAppsForReviews(Array.isArray(appsList) ? appsList : []);
+    const live = getLiveAtomicReviewStatsSync();
+    setAppCountsMap(live.appCounts || {});
+    setGlobalAtomicStats({
+      total: live.globalStats.total ?? 0,
+      published: live.globalStats.published ?? 0,
+      pending: live.globalStats.pending ?? 0,
+      rejected: live.globalStats.rejected ?? 0,
+      flagged: live.globalStats.flagged ?? 0,
+      averageRating: live.globalStats.averageRating ?? 0,
+      ratingDistribution: live.globalStats.ratingDistribution || { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 },
+      appCoverageCount: live.globalStats.appCoverageCount ?? 0
+    });
+  }, [appsList]);
 
   // 2. Navigation & Filter States
   const [selectedAppId, setSelectedAppId] = useState<string>('all');
@@ -270,20 +278,21 @@ export const AdminReviewsTab: React.FC<AdminReviewsTabProps> = ({
   // Resolve per-app stats with 100% canonical parity
   const getAppStat = useCallback((app: any): AppReviewCountsData => {
     if (!app) {
-      return { total: 0, published: 0, pending: 0, rejected: 0, flagged: 0, avgRating: 4.6, starCounts: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 } };
+      return { total: 0, published: 0, pending: 0, rejected: 0, flagged: 0, avgRating: 0, starCounts: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 } };
     }
     const slugKey = String(app.slug || '').toLowerCase().trim();
     const idKey = String(app.id || '').toLowerCase().trim();
     const hit = (slugKey && appCountsMap[slugKey]) || (idKey && appCountsMap[idKey]);
 
     if (hit) {
+      const total = Number(hit.total) || 0;
       return {
-        total: Number(hit.total) || 0,
+        total,
         published: Number(hit.published) || 0,
         pending: Number(hit.pending) || 0,
         rejected: Number(hit.rejected) || 0,
         flagged: Number(hit.flagged) || 0,
-        avgRating: Number(hit.avgRating) || Number(app.rating) || 4.6,
+        avgRating: total > 0 ? (Number(hit.avgRating) || Number(app.rating) || 0) : (Number(app.rating) || 0),
         starCounts: hit.starCounts || { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 }
       };
     }
@@ -294,7 +303,7 @@ export const AdminReviewsTab: React.FC<AdminReviewsTabProps> = ({
       pending: 0,
       rejected: 0,
       flagged: 0,
-      avgRating: Number(app.rating) || 4.6,
+      avgRating: Number(app.rating) || 0,
       starCounts: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 }
     };
   }, [appCountsMap]);
@@ -669,7 +678,9 @@ export const AdminReviewsTab: React.FC<AdminReviewsTabProps> = ({
   const globalDist = globalAtomicStats.ratingDistribution || { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 };
   const publishedPct = globalAtomicStats.total > 0
     ? Math.round((globalAtomicStats.published / globalAtomicStats.total) * 100)
-    : 100;
+    : 0;
+  const communityCfg = getResolvedCommunityFirebaseConfig();
+  const isReviewCloudConnected = Boolean(communityCfg.projectId && communityCfg.apiKey);
 
   return (
     <div className="space-y-5 sm:space-y-6 animate-fade-in pb-12">
@@ -687,10 +698,17 @@ export const AdminReviewsTab: React.FC<AdminReviewsTabProps> = ({
                 <h2 className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
                   Reviews & Atomic Ratings Console
                 </h2>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800/60">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Zero-Quota Unified Ledger
-                </span>
+                {isReviewCloudConnected ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800/60">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Live Cloud Connected ({communityCfg.projectId})
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300/60 dark:border-amber-800/60">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                    Review DB Offline • Local Mode
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 100% synchronized atomic counts across Outside Cards, Inside App Workspaces, and Public Website.
@@ -827,7 +845,7 @@ export const AdminReviewsTab: React.FC<AdminReviewsTabProps> = ({
               <div className="flex items-center gap-0.5 text-amber-500">
                 <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                 <span className="text-xs font-black text-slate-900 dark:text-white">
-                  {Number(globalAtomicStats.averageRating || 4.7).toFixed(1)}
+                  {globalAtomicStats.total > 0 ? Number(globalAtomicStats.averageRating || 0).toFixed(1) : '0.0'}
                 </span>
               </div>
             </div>
@@ -974,7 +992,7 @@ export const AdminReviewsTab: React.FC<AdminReviewsTabProps> = ({
                               <span>•</span>
                               <span className="inline-flex items-center gap-0.5 text-amber-600 dark:text-amber-400 font-bold">
                                 <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
-                                {Number(st.avgRating || 4.6).toFixed(1)}
+                                {Number(st.avgRating || 0).toFixed(1)}
                               </span>
                             </div>
                           </div>
@@ -1133,13 +1151,13 @@ export const AdminReviewsTab: React.FC<AdminReviewsTabProps> = ({
               <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-800">
                 <div className="text-center shrink-0 pr-4 border-r border-slate-200 dark:border-slate-700">
                   <div className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white leading-none">
-                    {Number(selectedAppStats.avgRating || 4.6).toFixed(1)}
+                    {Number(selectedAppStats.avgRating || 0).toFixed(1)}
                   </div>
                   <div className="flex items-center justify-center gap-0.5 my-1 text-amber-400">
                     {[1, 2, 3, 4, 5].map(s => (
                       <Star
                         key={s}
-                        className={`w-3 h-3 ${s <= Math.round(Number(selectedAppStats.avgRating || 5)) ? 'fill-amber-400 text-amber-400' : 'text-slate-300 dark:text-slate-600'}`}
+                        className={`w-3 h-3 ${s <= Math.round(Number(selectedAppStats.avgRating || 0)) ? 'fill-amber-400 text-amber-400' : 'text-slate-300 dark:text-slate-600'}`}
                       />
                     ))}
                   </div>

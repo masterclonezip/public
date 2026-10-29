@@ -109,14 +109,29 @@ export function cleanSettingsMetaTitles<T extends Record<string, any>>(settings:
   return copy as T;
 }
 
+declare const __APP_BUILD_ENV__: Record<string, string> | undefined;
+
 function getConfiguredPrimaryDomain(): string {
+  try {
+    if (typeof __APP_BUILD_ENV__ !== 'undefined' && __APP_BUILD_ENV__) {
+      const d = (__APP_BUILD_ENV__.PUBLIC_DOMAIN || __APP_BUILD_ENV__.VITE_PUBLIC_DOMAIN || '').trim().replace(/\/+$/, '');
+      if (d) return d.startsWith('http') ? d : `https://${d}`;
+    }
+  } catch {
+    // ignore
+  }
   if (typeof process !== 'undefined' && process.env) {
     const d = (process.env.PUBLIC_DOMAIN || process.env.VITE_PUBLIC_DOMAIN || '').trim().replace(/\/+$/, '');
     if (d) return d.startsWith('http') ? d : `https://${d}`;
   }
-  if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
-    const d = String((import.meta as any).env.VITE_PUBLIC_DOMAIN || '').trim().replace(/\/+$/, '');
-    if (d) return d.startsWith('http') ? d : `https://${d}`;
+  try {
+    const metaEnv = import.meta.env as Record<string, any> | undefined;
+    if (metaEnv) {
+      const d = String(metaEnv.VITE_PUBLIC_DOMAIN || metaEnv.PUBLIC_DOMAIN || '').trim().replace(/\/+$/, '');
+      if (d) return d.startsWith('http') ? d : `https://${d}`;
+    }
+  } catch {
+    // ignore
   }
   if (typeof window !== 'undefined' && window.location?.origin) {
     return window.location.origin;

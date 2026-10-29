@@ -1,11 +1,13 @@
 const fs = require('fs');
 const { execSync } = require('child_process');
 
-try {
-    console.log("Syncing staticData.json & sitemaps from live Firestore before Vite build...");
-    execSync('npx tsx scripts/prerender.ts --sync-only', { stdio: 'inherit' });
-} catch (syncErr) {
-    console.warn("Pre-build Firestore sync notice:", syncErr.message || syncErr);
+if (fs.existsSync('scripts/prerender.ts')) {
+    try {
+        console.log("Syncing staticData.json & sitemaps from live Firestore before API build...");
+        execSync('npx tsx scripts/prerender.ts --sync-only', { stdio: 'inherit' });
+    } catch (syncErr) {
+        console.warn("Pre-build Firestore sync notice:", syncErr.message || syncErr);
+    }
 }
 
 // Generate api/index.js for Vercel serverless functions
@@ -58,7 +60,7 @@ if (vIdx !== -1 && eIdx !== -1) {
 fs.writeFileSync('api_temp.ts', content);
 fs.mkdirSync('api', { recursive: true });
 console.log("Compiling api_temp.ts to api/index.js...");
-execSync('npx esbuild api_temp.ts --bundle --platform=node --format=cjs --define:import.meta.env=process.env --packages=external --minify --outfile=api/index.js', { stdio: 'inherit' });
+execSync('npx esbuild api_temp.ts --bundle --platform=node --format=cjs --define:import.meta.env=process.env --log-override:empty-import-meta=silent --packages=external --minify --outfile=api/index.js', { stdio: 'inherit' });
 console.log("api/index.js generated successfully.");
 if (fs.existsSync('api_temp.ts')) {
     fs.unlinkSync('api_temp.ts');

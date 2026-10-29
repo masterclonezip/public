@@ -3,7 +3,7 @@ import { FileText, Newspaper, ShieldAlert, MessageSquare, TrendingUp, Sparkles, 
 import { AreaChart, Area, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import FirebaseStatusPanel from '../FirebaseStatusPanel';
 import { AdminCommunityOverviewCard } from './AdminCommunityOverviewCard';
-import { fetchAdminCommunityOverviewStats, getLiveAtomicReviewStatsSync, AdminCommunityStats } from '../../lib/adminCommunityFirebase';
+import { fetchAdminCommunityOverviewStats, getLiveAtomicReviewStatsSync, registerCatalogAppsForReviews, AdminCommunityStats } from '../../lib/adminCommunityFirebase';
 
 interface DashboardOverviewProps {
   apps: any[];
@@ -14,6 +14,7 @@ interface DashboardOverviewProps {
 
 export const AdminDashboardOverview = React.memo(({ apps, news, onTabChange }: DashboardOverviewProps) => {
   const [commStats, setCommStats] = useState<AdminCommunityStats | null>(() => {
+    registerCatalogAppsForReviews(Array.isArray(apps) ? apps : []);
     const live = getLiveAtomicReviewStatsSync();
     if (live && live.globalStats && live.globalStats.total > 0) {
       return {
@@ -24,9 +25,9 @@ export const AdminDashboardOverview = React.memo(({ apps, news, onTabChange }: D
         flaggedReviews: live.globalStats.flagged || 0,
         totalReports: 0,
         pendingReports: 0,
-        averageRating: live.globalStats.averageRating || 4.5,
-        liveStatus: 'live',
-        statusMessage: 'Live (Atomic Shield)',
+        averageRating: live.globalStats.averageRating ?? 0,
+        liveStatus: (import.meta as any).env?.VITE_COMMUNITY_FIREBASE_PROJECT_ID ? 'live' : 'offline',
+        statusMessage: (import.meta as any).env?.VITE_COMMUNITY_FIREBASE_PROJECT_ID ? 'Live (Atomic Shield)' : 'Review DB Offline • Local Mode',
         projectId: (import.meta as any).env?.VITE_COMMUNITY_FIREBASE_PROJECT_ID || '',
         topApps: [],
         recentReviews: [],
@@ -38,6 +39,7 @@ export const AdminDashboardOverview = React.memo(({ apps, news, onTabChange }: D
   const [loadingStats, setLoadingStats] = useState(() => !commStats);
 
   useEffect(() => {
+    registerCatalogAppsForReviews(Array.isArray(apps) ? apps : []);
     let isMounted = true;
     fetchAdminCommunityOverviewStats()
       .then(stats => {
@@ -58,8 +60,8 @@ export const AdminDashboardOverview = React.memo(({ apps, news, onTabChange }: D
             flaggedReviews: 0,
             totalReports: 0,
             pendingReports: 0,
-            liveStatus: 'live',
-            statusMessage: 'Live (Atomic Shield)',
+            liveStatus: (import.meta as any).env?.VITE_COMMUNITY_FIREBASE_PROJECT_ID ? 'live' : 'offline',
+            statusMessage: (import.meta as any).env?.VITE_COMMUNITY_FIREBASE_PROJECT_ID ? 'Live (Atomic Shield)' : 'Review DB Offline • Local Mode',
             projectId: (import.meta as any).env?.VITE_COMMUNITY_FIREBASE_PROJECT_ID || '',
             topApps: [],
             recentReviews: [],
@@ -69,7 +71,7 @@ export const AdminDashboardOverview = React.memo(({ apps, news, onTabChange }: D
           publishedReviews: e.detail.globalStats.published,
           pendingReviews: e.detail.globalStats.pending,
           rejectedReviews: e.detail.globalStats.rejected || 0,
-          averageRating: e.detail.globalStats.averageRating || 4.5,
+          averageRating: e.detail.globalStats.averageRating ?? 0,
           appCounts: e.detail.appCounts || prev?.appCounts || {}
         }));
         setLoadingStats(false);
@@ -82,7 +84,7 @@ export const AdminDashboardOverview = React.memo(({ apps, news, onTabChange }: D
       isMounted = false;
       window.removeEventListener('atomic_review_counts_updated', handleAtomicUpdate);
     };
-  }, []);
+  }, [apps]);
 
   const chartData = [
     { name: 'Mon', apps: Math.max(0, apps.length - 5), traffic: 4000 },

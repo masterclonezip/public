@@ -31,10 +31,20 @@ export interface FirestoreErrorInfo {
   };
 }
 
+declare const __APP_BUILD_ENV__: Record<string, string> | undefined;
+
 const getEnv = (key: string): string => {
   try {
-    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
-      return String(import.meta.env[key]).trim();
+    if (typeof __APP_BUILD_ENV__ !== 'undefined' && __APP_BUILD_ENV__ && __APP_BUILD_ENV__[key]) {
+      return String(__APP_BUILD_ENV__[key]).trim();
+    }
+  } catch {
+    // ignore
+  }
+  try {
+    const metaEnv = import.meta.env as Record<string, any> | undefined;
+    if (metaEnv && metaEnv[key]) {
+      return String(metaEnv[key]).trim();
     }
   } catch {
     // ignore
@@ -45,15 +55,51 @@ const getEnv = (key: string): string => {
   return '';
 };
 
+const resolvedProjectId =
+  getEnv('VITE_FIREBASE_PROJECT_ID') ||
+  getEnv('FIREBASE_PROJECT_ID') ||
+  getEnv('VITE_COMMUNITY_FIREBASE_PROJECT_ID') ||
+  getEnv('COMMUNITY_FIREBASE_PROJECT_ID') ||
+  '';
+
 const firebaseConfig = {
-  projectId: getEnv('VITE_FIREBASE_PROJECT_ID') || getEnv('FIREBASE_PROJECT_ID') || '',
-  appId: getEnv('VITE_FIREBASE_APP_ID') || getEnv('FIREBASE_APP_ID') || '',
-  apiKey: getEnv('VITE_FIREBASE_API_KEY') || getEnv('FIREBASE_API_KEY') || '',
-  authDomain: getEnv('VITE_FIREBASE_AUTH_DOMAIN') || getEnv('FIREBASE_AUTH_DOMAIN') || '',
-  firestoreDatabaseId: getEnv('VITE_FIREBASE_DATABASE_ID') || getEnv('FIREBASE_DATABASE_ID') || '(default)',
-  storageBucket: getEnv('VITE_FIREBASE_STORAGE_BUCKET') || getEnv('FIREBASE_STORAGE_BUCKET') || '',
-  messagingSenderId: getEnv('VITE_FIREBASE_MESSAGING_SENDER_ID') || getEnv('FIREBASE_MESSAGING_SENDER_ID') || '',
-  measurementId: getEnv('VITE_FIREBASE_MEASUREMENT_ID') || getEnv('FIREBASE_MEASUREMENT_ID') || ''
+  projectId: resolvedProjectId,
+  appId:
+    getEnv('VITE_FIREBASE_APP_ID') ||
+    getEnv('FIREBASE_APP_ID') ||
+    getEnv('VITE_COMMUNITY_FIREBASE_APP_ID') ||
+    getEnv('COMMUNITY_FIREBASE_APP_ID') ||
+    '',
+  apiKey:
+    getEnv('VITE_FIREBASE_API_KEY') ||
+    getEnv('FIREBASE_API_KEY') ||
+    getEnv('VITE_COMMUNITY_FIREBASE_API_KEY') ||
+    getEnv('COMMUNITY_FIREBASE_API_KEY') ||
+    '',
+  authDomain:
+    getEnv('VITE_FIREBASE_AUTH_DOMAIN') ||
+    getEnv('FIREBASE_AUTH_DOMAIN') ||
+    getEnv('VITE_COMMUNITY_FIREBASE_AUTH_DOMAIN') ||
+    (resolvedProjectId ? `${resolvedProjectId}.firebaseapp.com` : ''),
+  firestoreDatabaseId:
+    getEnv('VITE_FIREBASE_DATABASE_ID') ||
+    getEnv('FIREBASE_DATABASE_ID') ||
+    getEnv('VITE_COMMUNITY_FIREBASE_DATABASE_ID') ||
+    '(default)',
+  storageBucket:
+    getEnv('VITE_FIREBASE_STORAGE_BUCKET') ||
+    getEnv('FIREBASE_STORAGE_BUCKET') ||
+    getEnv('VITE_COMMUNITY_FIREBASE_STORAGE_BUCKET') ||
+    (resolvedProjectId ? `${resolvedProjectId}.appspot.com` : ''),
+  messagingSenderId:
+    getEnv('VITE_FIREBASE_MESSAGING_SENDER_ID') ||
+    getEnv('FIREBASE_MESSAGING_SENDER_ID') ||
+    getEnv('VITE_COMMUNITY_FIREBASE_MESSAGING_SENDER_ID') ||
+    '',
+  measurementId:
+    getEnv('VITE_FIREBASE_MEASUREMENT_ID') ||
+    getEnv('FIREBASE_MEASUREMENT_ID') ||
+    ''
 };
 
 export const isFirebaseConfigured = Boolean(
