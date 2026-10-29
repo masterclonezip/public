@@ -16,12 +16,16 @@ export function getRawFirebaseConfig() {
   const projectId = (
     getEnv('VITE_FIREBASE_PROJECT_ID') ||
     getEnv('FIREBASE_PROJECT_ID') ||
+    getEnv('VITE_COMMUNITY_FIREBASE_PROJECT_ID') ||
+    getEnv('COMMUNITY_FIREBASE_PROJECT_ID') ||
     ''
   ).replace(/^["']|["']$/g, '').trim();
 
   const apiKey = (
     getEnv('VITE_FIREBASE_API_KEY') ||
     getEnv('FIREBASE_API_KEY') ||
+    getEnv('VITE_COMMUNITY_FIREBASE_API_KEY') ||
+    getEnv('COMMUNITY_FIREBASE_API_KEY') ||
     ''
   ).replace(/^["']|["']$/g, '').trim();
 

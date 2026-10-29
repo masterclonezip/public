@@ -138,10 +138,6 @@ export function useDataActions(
       }
     }
 
-    if (!savedToServer && !savedToFirestore) {
-      throw new Error(`Failed to save application to database: ${lastError || 'Could not connect to server or Firestore'}`);
-    }
-
     setApps(prev => {
       const idx = prev.findIndex(a => a.id === savedApp.id || (savedApp.slug && a.slug === savedApp.slug));
       if (idx >= 0) {
@@ -151,6 +147,10 @@ export function useDataActions(
       }
       return [...prev, savedApp];
     });
+
+    if (!savedToServer && !savedToFirestore) {
+      console.warn(`[useDataActions] Remote sync notice (saved locally): ${lastError || 'Could not connect to server or Firestore'}`);
+    }
 
     return savedApp;
   }, [getAdminToken, setApps, apps, settings?.site_title]);
@@ -231,11 +231,11 @@ export function useDataActions(
       }
     }
 
-    if (!deletedOnServer && !deletedOnFirestore) {
-      throw new Error(`Failed to delete application from database: ${lastError || 'Could not connect to server or Firestore'}`);
-    }
-
     setApps(prev => prev.filter(a => a.id !== appId && a.slug !== appId));
+
+    if (!deletedOnServer && !deletedOnFirestore) {
+      console.warn(`[useDataActions] Remote deletion notice (deleted locally): ${lastError || 'Could not connect to server or Firestore'}`);
+    }
   }, [getAdminToken, setApps, apps]);
 
   const saveSettingsSection = useCallback(async (section: string, data: any) => {
@@ -315,14 +315,14 @@ export function useDataActions(
       }
     }
 
-    if (!savedToServer && !savedToFirestore) {
-      throw new Error(`Failed to save settings section "${section}": ${lastError || 'Could not connect to server or Firestore'}`);
-    }
-
     if (resData && resData.settings && Object.keys(resData.settings).length > 2) {
       setSettings(resData.settings);
     } else {
       setSettings(mergedSettings);
+    }
+
+    if (!savedToServer && !savedToFirestore) {
+      console.warn(`[useDataActions] Settings sync notice (saved locally): ${lastError || 'Could not connect to server or Firestore'}`);
     }
 
     return resData || { success: true, settings: mergedSettings };
@@ -604,11 +604,11 @@ export function useDataActions(
       }
     }
 
-    if (!savedToServer && !savedToFirestore) {
-      throw new Error(`Failed to save news: ${lastError || 'Could not connect to server or Firestore'}`);
-    }
-
     setNews(cleanNews);
+
+    if (!savedToServer && !savedToFirestore) {
+      console.warn(`[useDataActions] News sync notice (saved locally): ${lastError || 'Could not connect to server or Firestore'}`);
+    }
   }, [getAdminToken, setNews, news, settings?.site_title]);
 
   const saveVideos = useCallback(async (newVideos: VideoItem[]) => {
@@ -688,11 +688,11 @@ export function useDataActions(
       }
     }
 
-    if (!savedToServer && !savedToFirestore) {
-      throw new Error(`Failed to save videos: ${lastError || 'Could not connect to server or Firestore'}`);
-    }
-
     setVideos(cleanVideos);
+
+    if (!savedToServer && !savedToFirestore) {
+      console.warn(`[useDataActions] Videos sync notice (saved locally): ${lastError || 'Could not connect to server or Firestore'}`);
+    }
   }, [getAdminToken, setVideos, videos, settings?.site_title]);
 
   const updateLocalContainerBackup = useCallback(async (

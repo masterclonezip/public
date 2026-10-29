@@ -113,24 +113,24 @@ export const AdminWelcomeOverlay: React.FC<AdminWelcomeOverlayProps> = ({
                 {stage >= 1 && (
                   <motion.div
                     key="stage-1"
-                    initial={{ opacity: 0, y: 20, filter: 'blur(8px)' }}
-                    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                    transition={{ duration: 0.7, ease: [0.19, 1, 0.22, 1] }}
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.45, ease: [0.19, 1, 0.22, 1] }}
                     className="flex flex-col items-center gap-1"
                   >
                     <span className="text-xl sm:text-2xl font-bold tracking-tight text-slate-300">
                       Welcome back,
                     </span>
                     <motion.div
-                      initial={{ scale: 0.85, opacity: 0 }}
+                      initial={{ scale: 0.9, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
-                      transition={{ delay: 0.3, duration: 0.6, type: 'spring', stiffness: 200 }}
+                      transition={{ delay: 0.15, duration: 0.4, type: 'spring', stiffness: 220 }}
                       className="flex items-center gap-2"
                     >
                       <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 bg-clip-text text-transparent drop-shadow-sm">
                         {adminName}
                       </h1>
-                      <Sparkles className="w-6 h-6 text-amber-300 animate-spin" style={{ animationDuration: '6s' }} />
+                      <Sparkles className="w-6 h-6 text-amber-300" />
                     </motion.div>
                   </motion.div>
                 )}
@@ -141,9 +141,9 @@ export const AdminWelcomeOverlay: React.FC<AdminWelcomeOverlayProps> = ({
                 {stage >= 2 && (
                   <motion.div
                     key="stage-2"
-                    initial={{ opacity: 0, y: 16, filter: 'blur(6px)' }}
-                    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                    transition={{ duration: 0.6, ease: [0.19, 1, 0.22, 1] }}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, ease: [0.19, 1, 0.22, 1] }}
                     className="mt-3 flex items-center justify-center gap-2 text-base sm:text-xl font-semibold text-blue-300/90"
                   >
                     <span className="text-slate-400 font-normal">to</span>

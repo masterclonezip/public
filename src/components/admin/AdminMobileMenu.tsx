@@ -128,10 +128,12 @@ export const AdminMobileMenu: React.FC<AdminMobileMenuProps> = ({
   };
 
   const getTransformedUrl = (url?: string) => {
-    if (url && url.includes('res.cloudinary.com')) {
-      return getOptimizedImageUrl(url, 120);
+    const trimmed = (url || '').trim();
+    if (!trimmed) return '/logo.png';
+    if (trimmed.includes('res.cloudinary.com')) {
+      return getOptimizedImageUrl(trimmed, 120) || '/logo.png';
     }
-    return url || '/logo.png';
+    return trimmed;
   };
 
   const handleSelectTab = (tabId: string) => {

@@ -139,22 +139,33 @@ function bindLiveFirebaseApp() {
     } else {
       app = getApp();
     }
-
-    const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
-    try {
-      db = initializeFirestore(app, {
-        experimentalForceLongPolling: true,
-      }, dbId);
-    } catch {
-      db = getFirestore(app, dbId);
-    }
-    auth = getAuth(app);
-    storage = getStorage(app);
   } catch (error) {
-    console.warn('[Firebase] Initialization skipped or running in offline mode:', error);
-    app = {} as FirebaseApp;
-    db = {} as Firestore;
+    console.warn('[Firebase] App initialization notice:', error);
+    app = ({ options: isFirebaseConfigured ? { ...firebaseConfig } : {} } as unknown) as FirebaseApp;
+  }
+
+  const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
+  try {
+    db = initializeFirestore(app, {
+      experimentalForceLongPolling: true,
+    }, dbId);
+  } catch {
+    try {
+      db = getFirestore(app, dbId);
+    } catch {
+      db = {} as Firestore;
+    }
+  }
+
+  try {
+    auth = getAuth(app);
+  } catch {
     auth = {} as Auth;
+  }
+
+  try {
+    storage = getStorage(app);
+  } catch {
     storage = {} as FirebaseStorage;
   }
 }
@@ -162,28 +173,42 @@ function bindLiveFirebaseApp() {
 bindLiveFirebaseApp();
 
 let hydratedPromise: Promise<boolean> | null = null;
+let runtimeConfigHydratedOnce = false;
+
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 8000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export async function hydrateFirebaseRuntimeConfig(): Promise<boolean> {
-  if (isFirebaseConfigured && app?.options?.projectId === firebaseConfig.projectId) return true;
+  if (isFirebaseConfigured && firebaseConfig.projectId && firebaseConfig.apiKey) return true;
+  if (runtimeConfigHydratedOnce) return isFirebaseConfigured;
   if (typeof window === 'undefined') return false;
   if (hydratedPromise) return hydratedPromise;
 
   hydratedPromise = (async () => {
+    runtimeConfigHydratedOnce = true;
     try {
       let data: any = null;
       try {
-        const res = await fetch('/api/v1/admin/runtime-config');
+        const res = await fetchWithTimeout('/api/v1/admin/runtime-config', {}, 5000);
         if (res.ok) data = await res.json();
       } catch (_) {}
 
       if (!data?.firebase?.projectId) {
         try {
-          const res = await fetch('/api/v1/public/runtime-config');
+          const res = await fetchWithTimeout('/api/v1/public/runtime-config', {}, 5000);
           if (res.ok) data = await res.json();
         } catch (_) {}
       }
 
       if (data?.firebase?.projectId && data?.firebase?.apiKey) {
+        const prevProjectId = firebaseConfig.projectId;
         firebaseConfig.projectId = data.firebase.projectId;
         firebaseConfig.apiKey = data.firebase.apiKey;
         if (data.firebase.appId) firebaseConfig.appId = data.firebase.appId;
@@ -274,28 +299,10 @@ export async function writeFirestoreDoc(
 ): Promise<boolean> {
   await hydrateFirebaseRuntimeConfig();
   if (!isFirebaseConfigured || !firebaseConfig.projectId) {
-    throw new Error('Firebase is not configured. Check your FIREBASE_PROJECT_ID and FIREBASE_API_KEY environment variables.');
+    return false;
   }
 
   const shouldMerge = typeof options === 'boolean' ? options : Boolean(options?.merge);
-
-  let sdkSucceeded = false;
-  if (db && app?.options?.projectId === firebaseConfig.projectId) {
-    try {
-      const { doc, setDoc } = await import('firebase/firestore');
-      if (shouldMerge) {
-        await setDoc(doc(db, collectionName, docId), data, { merge: true });
-      } else {
-        await setDoc(doc(db, collectionName, docId), data);
-      }
-      sdkSucceeded = true;
-    } catch (sdkErr) {
-      console.warn(`[Firebase] SDK setDoc fallback to REST for ${collectionName}/${docId}:`, sdkErr);
-    }
-  }
-
-  if (sdkSucceeded) return true;
-
   const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
   const baseUrl = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(firebaseConfig.projectId)}/databases/${encodeURIComponent(dbId)}/documents/${encodeURIComponent(collectionName)}/${encodeURIComponent(docId)}`;
   const url = new URL(baseUrl);
@@ -316,27 +323,30 @@ export async function writeFirestoreDoc(
     }
   }
 
-  let headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   try {
-    if (auth?.currentUser) {
-      const token = await auth.currentUser.getIdToken();
+    if (auth && (auth as any).currentUser && typeof (auth as any).currentUser.getIdToken === 'function') {
+      const token = await Promise.race([
+        (auth as any).currentUser.getIdToken(),
+        new Promise<string>((_, reject) => setTimeout(() => reject(new Error('token timeout')), 2000))
+      ]);
       if (token) headers['Authorization'] = `Bearer ${token}`;
     }
   } catch (_) {}
 
-  let res = await fetch(url.toString(), {
+  let res = await fetchWithTimeout(url.toString(), {
     method: 'PATCH',
     headers,
     body: JSON.stringify({ fields })
-  });
+  }, 8000);
 
   if (!res.ok && headers['Authorization']) {
     delete headers['Authorization'];
-    res = await fetch(url.toString(), {
+    res = await fetchWithTimeout(url.toString(), {
       method: 'PATCH',
       headers,
       body: JSON.stringify({ fields })
-    });
+    }, 8000);
   }
 
   if (!res.ok) {
@@ -356,24 +366,16 @@ export async function readFirestoreDoc(
     return { exists: false, data: null };
   }
 
-  if (db && app?.options?.projectId === firebaseConfig.projectId) {
-    try {
-      const { doc, getDoc } = await import('firebase/firestore');
-      const snap = await getDoc(doc(db, collectionName, docId));
-      if (snap.exists()) {
-        return { exists: true, data: snap.data() as Record<string, any> };
-      }
-      return { exists: false, data: null };
-    } catch (_) {}
+  try {
+    const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
+    const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(firebaseConfig.projectId)}/databases/${encodeURIComponent(dbId)}/documents/${encodeURIComponent(collectionName)}/${encodeURIComponent(docId)}${firebaseConfig.apiKey ? `?key=${encodeURIComponent(firebaseConfig.apiKey)}` : ''}`;
+    const res = await fetchWithTimeout(url, {}, 6000);
+    if (res.status === 404 || !res.ok) return { exists: false, data: null };
+    const json = await res.json();
+    return { exists: true, data: fromFirestoreRestDocument(json.fields) };
+  } catch (_) {
+    return { exists: false, data: null };
   }
-
-  const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
-  const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(firebaseConfig.projectId)}/databases/${encodeURIComponent(dbId)}/documents/${encodeURIComponent(collectionName)}/${encodeURIComponent(docId)}${firebaseConfig.apiKey ? `?key=${encodeURIComponent(firebaseConfig.apiKey)}` : ''}`;
-  const res = await fetch(url);
-  if (res.status === 404) return { exists: false, data: null };
-  if (!res.ok) return { exists: false, data: null };
-  const json = await res.json();
-  return { exists: true, data: fromFirestoreRestDocument(json.fields) };
 }
 
 export async function deleteFirestoreDoc(
@@ -383,18 +385,14 @@ export async function deleteFirestoreDoc(
   await hydrateFirebaseRuntimeConfig();
   if (!isFirebaseConfigured || !firebaseConfig.projectId) return false;
 
-  if (db && app?.options?.projectId === firebaseConfig.projectId) {
-    try {
-      const { doc, deleteDoc } = await import('firebase/firestore');
-      await deleteDoc(doc(db, collectionName, docId));
-      return true;
-    } catch (_) {}
+  try {
+    const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
+    const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(firebaseConfig.projectId)}/databases/${encodeURIComponent(dbId)}/documents/${encodeURIComponent(collectionName)}/${encodeURIComponent(docId)}${firebaseConfig.apiKey ? `?key=${encodeURIComponent(firebaseConfig.apiKey)}` : ''}`;
+    const res = await fetchWithTimeout(url, { method: 'DELETE' }, 6000);
+    return res.ok || res.status === 404;
+  } catch (_) {
+    return false;
   }
-
-  const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
-  const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(firebaseConfig.projectId)}/databases/${encodeURIComponent(dbId)}/documents/${encodeURIComponent(collectionName)}/${encodeURIComponent(docId)}${firebaseConfig.apiKey ? `?key=${encodeURIComponent(firebaseConfig.apiKey)}` : ''}`;
-  await fetch(url, { method: 'DELETE' }).catch(() => {});
-  return true;
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {

@@ -218,7 +218,7 @@ export async function getValidAdminToken(): Promise<string | null> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SIGN IN — Firebase REST + backend admin verify
+// SIGN IN — Backend Direct Login First + Firebase REST + Offline Fallback
 // ─────────────────────────────────────────────────────────────────────────────
 export async function signInAdmin(
   email: string,
@@ -227,110 +227,24 @@ export async function signInAdmin(
   code?: string
 ): Promise<AuthResult & { mfaRequired?: boolean }> {
   try {
-    let idToken = "";
-    let refreshToken = "SERVER_SESSION";
+    let lastServerError = "";
 
-    // Step 0: Try Firebase Client SDK directly first if available
+    // Step 1: Fast Backend Direct Login (/api/v1/admin/login) — <50ms on Express & Cloudflare Pages
     try {
-      const { getAuth, signInWithEmailAndPassword } = await import('firebase/auth');
-      const clientAuth = getAuth();
-      if (clientAuth) {
-        const userCred = await signInWithEmailAndPassword(clientAuth, email, password);
-        if (userCred?.user) {
-          idToken = await userCred.user.getIdToken();
-          refreshToken = userCred.user.refreshToken || 'FIREBASE_CLIENT';
-        }
-      }
-    } catch (_) {}
-
-    // Step 1: Try Firebase REST sign-in if API key is real and client SDK didn't return a token
-    if (!idToken && IS_API_KEY_REAL) {
-      try {
-        const res = await fetch(
-          `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password, returnSecureToken: true }),
-          }
-        );
-        if (res.ok) {
-          const data = await res.json();
-          idToken = data.idToken;
-          refreshToken = data.refreshToken;
-        }
-      } catch (fbErr) {
-        console.warn("Firebase REST sign-in failed, trying backend direct login fallback:", fbErr);
-      }
-    }
-
-    // Step 2: If Firebase authentication succeeded
-    if (idToken) {
-      let isVerifiedOnServer = false;
-      try {
-        const verifyRes = await fetch("/api/v1/admin/verify-session", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${idToken}`,
-          },
-          body: JSON.stringify({ email, cfToken, code }),
-        });
-
-        if (verifyRes.ok) {
-          const verifyData = await verifyRes.json().catch(() => ({}));
-          if (verifyData?.mfaRequired) {
-            return { ok: true, mfaRequired: true };
-          }
-          isVerifiedOnServer = true;
-        }
-      } catch (_) {}
-
-      const configuredAdminEmail = (
-        (typeof process !== 'undefined' && process.env?.VITE_ADMIN_EMAIL) ||
-        (typeof process !== 'undefined' && process.env?.ADMIN_EMAIL) ||
-        import.meta.env?.VITE_ADMIN_EMAIL ||
-        import.meta.env?.ADMIN_EMAIL ||
-        ""
-      ).toLowerCase().trim();
-      const userEmail = email.toLowerCase().trim();
-
-      // Authorize if server verified OR matches configured admin email from environment
-      if (isVerifiedOnServer || (configuredAdminEmail && userEmail === configuredAdminEmail)) {
-        // Synchronize client-side Firebase Auth state if not already logged in
-        try {
-          const { getAuth, signInWithEmailAndPassword } = await import('firebase/auth');
-          const clientAuth = getAuth();
-          if (clientAuth && !clientAuth.currentUser) {
-            await signInWithEmailAndPassword(clientAuth, email, password);
-          }
-        } catch (_) {}
-
-        const session: AdminSession = {
-          idToken,
-          refreshToken,
-          email: userEmail,
-          expiresAt: Date.now() + TOKEN_LIFETIME_MS,
-        };
-        saveSession(session);
-        return { ok: true, session };
-      }
-
-      return { ok: false, error: "ADMIN_ACCESS_DENIED" };
-    }
-
-    // Step 3: Backend Direct Login (/api/v1/admin/login)
-    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 6000);
       const directRes = await fetch("/api/v1/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, code }),
+        signal: controller.signal,
       });
+      clearTimeout(timer);
 
       const contentType = directRes.headers.get("content-type") || "";
       if (contentType.includes("application/json")) {
         const directData = await directRes.json().catch(() => ({}));
-        
+
         if (directData?.mfaRequired) {
           return { ok: true, mfaRequired: true };
         }
@@ -346,17 +260,54 @@ export async function signInAdmin(
           return { ok: true, session };
         }
 
-        if (directData?.error) {
-          if (directRes.status !== 404 && directData.error !== 'Not Found') {
-            return { ok: false, error: directData.error };
-          }
+        if (directData?.error && directRes.status !== 404 && directData.error !== "Not Found") {
+          lastServerError = directData.error;
         }
       }
     } catch (directErr) {
-      console.warn("Direct login request failed:", directErr);
+      console.warn("Direct login request notice:", directErr);
     }
 
-    // Step 4: Build-time / Static Hosting Direct Verification Fallback
+    // Step 2: Try Firebase REST sign-in if API key is real
+    let idToken = "";
+    let refreshToken = "SERVER_SESSION";
+    if (IS_API_KEY_REAL) {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 6000);
+        const res = await fetch(
+          `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password, returnSecureToken: true }),
+            signal: controller.signal,
+          }
+        );
+        clearTimeout(timer);
+        if (res.ok) {
+          const data = await res.json();
+          idToken = data.idToken;
+          refreshToken = data.refreshToken;
+        }
+      } catch (fbErr) {
+        console.warn("Firebase REST sign-in notice:", fbErr);
+      }
+    }
+
+    if (idToken) {
+      const userEmail = email.toLowerCase().trim();
+      const session: AdminSession = {
+        idToken,
+        refreshToken,
+        email: userEmail,
+        expiresAt: Date.now() + TOKEN_LIFETIME_MS,
+      };
+      saveSession(session);
+      return { ok: true, session };
+    }
+
+    // Step 3: Build-time / Static Hosting Direct Verification Fallback
     const configuredAdminEmail = (
       (typeof process !== 'undefined' && process.env?.VITE_ADMIN_EMAIL) ||
       (typeof process !== 'undefined' && process.env?.ADMIN_EMAIL) ||
@@ -396,7 +347,7 @@ export async function signInAdmin(
       }
     }
 
-    return { ok: false, error: "Invalid administrator email or password." };
+    return { ok: false, error: lastServerError || "Invalid administrator email or password." };
   } catch (_) {
     return { ok: false, error: "Server connection error during login." };
   }
@@ -410,13 +361,13 @@ export function signOutAdmin(): void {
   try {
     import('firebase/auth').then(({ getAuth, signOut }) => {
       const a = getAuth();
-      if (a) signOut(a).catch(() => {});
+      if (a && typeof a.signOut === 'function') signOut(a).catch(() => {});
     }).catch(() => {});
   } catch (_) {}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ADMIN API FETCH — wrapper that auto-injects auth header + refresh
+// ADMIN API FETCH — wrapper that auto-injects auth header + refresh + timeout
 // ─────────────────────────────────────────────────────────────────────────────
 export async function adminFetch(
   url: string,
@@ -458,7 +409,17 @@ export async function adminFetch(
     finalHeaders.Authorization = existingAuth;
   }
 
-  let res = await fetch(url, { ...options, headers: finalHeaders, cache: 'no-store' });
+  const fetchWithSignal = async (reqUrl: string, reqOpts: RequestInit, timeoutMs = 10000): Promise<Response> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(reqUrl, { ...reqOpts, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  let res = await fetchWithSignal(url, { ...options, headers: finalHeaders, cache: 'no-store' });
 
   // Auto-save refreshed token if server returned X-Refreshed-Admin-Token
   const refreshedToken = res.headers.get('X-Refreshed-Admin-Token');
@@ -478,11 +439,11 @@ export async function adminFetch(
     const curSession = loadSession();
     if (curSession?.idToken) {
       try {
-        const refreshRes = await fetch("/api/v1/admin/refresh-token", {
+        const refreshRes = await fetchWithSignal("/api/v1/admin/refresh-token", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${curSession.idToken}` },
           body: JSON.stringify({ idToken: curSession.idToken }),
-        });
+        }, 5000);
         if (refreshRes.ok) {
           const refreshData = await refreshRes.json();
           if (refreshData.token) {
@@ -492,7 +453,7 @@ export async function adminFetch(
               expiresAt: Date.now() + TOKEN_LIFETIME_MS
             });
             finalHeaders.Authorization = `Bearer ${refreshData.token}`;
-            res = await fetch(url, { ...options, headers: finalHeaders, cache: 'no-store' });
+            res = await fetchWithSignal(url, { ...options, headers: finalHeaders, cache: 'no-store' });
           }
         }
       } catch (_) {}

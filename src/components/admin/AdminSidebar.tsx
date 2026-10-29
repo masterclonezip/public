@@ -113,17 +113,50 @@ export const AdminSidebar = ({
     };
   }, []);
 
+  const [localSessionTimeLeft, setLocalSessionTimeLeft] = useState(sessionTimeLeft || 15 * 60);
+
+  useEffect(() => {
+    let lastReset = Date.now();
+    const timerId = setInterval(() => {
+      setLocalSessionTimeLeft((prev) => {
+        if (prev <= 1) {
+          handleLogout();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    const resetTimer = () => {
+      const now = Date.now();
+      if (now - lastReset > 5000) {
+        lastReset = now;
+        setLocalSessionTimeLeft(15 * 60);
+      }
+    };
+
+    window.addEventListener('keydown', resetTimer, { passive: true });
+    window.addEventListener('click', resetTimer, { passive: true });
+    return () => {
+      clearInterval(timerId);
+      window.removeEventListener('keydown', resetTimer);
+      window.removeEventListener('click', resetTimer);
+    };
+  }, [handleLogout]);
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const getTransformedUrl = (url: string) => {
-    if (url && url.includes('res.cloudinary.com')) {
-      return getOptimizedImageUrl(url, 120);
+  const getTransformedUrl = (url?: string) => {
+    const trimmed = (url || '').trim();
+    if (!trimmed) return '/logo.png';
+    if (trimmed.includes('res.cloudinary.com')) {
+      return getOptimizedImageUrl(trimmed, 120) || '/logo.png';
     }
-    return url;
+    return trimmed;
   };
 
   return (
@@ -135,7 +168,7 @@ export const AdminSidebar = ({
         activeTab={activeTab}
         onTabChange={onTabChange}
         handleLogout={handleLogout}
-        sessionTimeLeft={sessionTimeLeft}
+        sessionTimeLeft={localSessionTimeLeft}
         onRefresh={onRefresh}
         isRefreshing={isRefreshing}
         siteTitle={settings?.site_title || ''}
@@ -149,7 +182,7 @@ export const AdminSidebar = ({
         <div className="flex flex-col h-full">
           <div className="p-4 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-3">
-              <img src={getTransformedUrl(settings?.logo_url || '')} 
+              <img src={getTransformedUrl(settings?.logo_url)} 
                 alt="Admin Logo" 
                 className="w-10 h-10 object-contain drop-shadow-sm" 
                 loading="lazy" 
@@ -164,14 +197,14 @@ export const AdminSidebar = ({
             <div className="mt-4 px-3 py-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Session Time</span>
-                <span className={`text-[10px] font-mono font-bold ${sessionTimeLeft < 60 ? 'text-rose-500 animate-pulse' : 'text-slate-600 dark:text-slate-400'}`}>
-                  {formatTime(sessionTimeLeft)}
+                <span className={`text-[10px] font-mono font-bold ${localSessionTimeLeft < 60 ? 'text-rose-500 animate-pulse' : 'text-slate-600 dark:text-slate-400'}`}>
+                  {formatTime(localSessionTimeLeft)}
                 </span>
               </div>
               <div className="mt-1 h-1 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                 <div 
-                  className={`h-full transition-all duration-1000 ${sessionTimeLeft < 60 ? 'bg-rose-500' : 'bg-blue-600'}`}
-                  style={{ width: `${(sessionTimeLeft / (15 * 60)) * 100}%` }}
+                  className={`h-full transition-all duration-1000 ${localSessionTimeLeft < 60 ? 'bg-rose-500' : 'bg-blue-600'}`}
+                  style={{ width: `${(localSessionTimeLeft / (15 * 60)) * 100}%` }}
                 />
               </div>
             </div>

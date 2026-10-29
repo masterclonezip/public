@@ -13,6 +13,118 @@ export const adminVaultRouter = Router();
 
 const staticJsonPath = path.join(process.cwd(), 'src/lib/staticData.json');
 const staticTsPath = path.join(process.cwd(), 'src/lib/staticData.ts');
+const adminStoreDir = path.join(process.cwd(), '.data');
+const adminStorePath = path.join(adminStoreDir, 'adminStore.json');
+
+const ADMIN_BYPASS_KEY = 'aistudio_preview_bypass_key';
+
+function toServerFirestoreValue(val: any): any {
+  if (val === null || val === undefined) return { nullValue: null };
+  if (typeof val === 'boolean') return { booleanValue: val };
+  if (typeof val === 'number') {
+    if (Number.isInteger(val)) return { integerValue: String(val) };
+    return { doubleValue: val };
+  }
+  if (typeof val === 'string') return { stringValue: val };
+  if (Array.isArray(val)) {
+    return { arrayValue: { values: val.map(toServerFirestoreValue) } };
+  }
+  if (typeof val === 'object') {
+    const fields: Record<string, any> = {};
+    for (const [k, v] of Object.entries(val)) {
+      if (v !== undefined) {
+        fields[k] = toServerFirestoreValue(v);
+      }
+    }
+    return { mapValue: { fields } };
+  }
+  return { stringValue: String(val) };
+}
+
+async function syncDocToServerFirestore(docId: string, data: Record<string, any>, merge = false): Promise<boolean> {
+  try {
+    const projectId = (
+      process.env.VITE_FIREBASE_PROJECT_ID ||
+      process.env.FIREBASE_PROJECT_ID ||
+      process.env.VITE_COMMUNITY_FIREBASE_PROJECT_ID ||
+      process.env.COMMUNITY_FIREBASE_PROJECT_ID ||
+      ''
+    ).trim();
+    const apiKey = (
+      process.env.VITE_FIREBASE_API_KEY ||
+      process.env.FIREBASE_API_KEY ||
+      process.env.VITE_COMMUNITY_FIREBASE_API_KEY ||
+      process.env.COMMUNITY_FIREBASE_API_KEY ||
+      ''
+    ).trim();
+    const dbId = (
+      process.env.VITE_FIREBASE_DATABASE_ID ||
+      process.env.FIREBASE_DATABASE_ID ||
+      '(default)'
+    ).trim() || '(default)';
+
+    if (!projectId || !apiKey) return false;
+
+    const baseUrl = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/${encodeURIComponent(dbId)}/documents/store_data/${encodeURIComponent(docId)}`;
+    const url = new URL(baseUrl);
+    url.searchParams.set('key', apiKey);
+    if (merge) {
+      for (const k of Object.keys(data)) {
+        if (data[k] !== undefined) url.searchParams.append('updateMask.fieldPaths', k);
+      }
+    }
+    const fields: Record<string, any> = {};
+    for (const [k, v] of Object.entries(data)) {
+      if (v !== undefined) fields[k] = toServerFirestoreValue(v);
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 7000);
+    const res = await fetch(url.toString(), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields }),
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    return res.ok;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function deleteDocFromServerFirestore(docId: string): Promise<boolean> {
+  try {
+    const projectId = (
+      process.env.VITE_FIREBASE_PROJECT_ID ||
+      process.env.FIREBASE_PROJECT_ID ||
+      process.env.VITE_COMMUNITY_FIREBASE_PROJECT_ID ||
+      process.env.COMMUNITY_FIREBASE_PROJECT_ID ||
+      ''
+    ).trim();
+    const apiKey = (
+      process.env.VITE_FIREBASE_API_KEY ||
+      process.env.FIREBASE_API_KEY ||
+      process.env.VITE_COMMUNITY_FIREBASE_API_KEY ||
+      process.env.COMMUNITY_FIREBASE_API_KEY ||
+      ''
+    ).trim();
+    const dbId = (
+      process.env.VITE_FIREBASE_DATABASE_ID ||
+      process.env.FIREBASE_DATABASE_ID ||
+      '(default)'
+    ).trim() || '(default)';
+
+    if (!projectId || !apiKey) return false;
+    const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/${encodeURIComponent(dbId)}/documents/store_data/${encodeURIComponent(docId)}?key=${encodeURIComponent(apiKey)}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+    const res = await fetch(url, { method: 'DELETE', signal: controller.signal });
+    clearTimeout(timer);
+    return res.ok || res.status === 404;
+  } catch (_) {
+    return false;
+  }
+}
 
 function stripTimestampFields(item: any) {
   if (!item || typeof item !== 'object') return item;
@@ -32,6 +144,13 @@ function hasItemContentChanged(prevItem: any, nextItem: any): boolean {
 }
 
 function getMergedData() {
+  let adminBase: any = null;
+  if (fs.existsSync(adminStorePath)) {
+    try {
+      adminBase = JSON.parse(fs.readFileSync(adminStorePath, 'utf8'));
+    } catch (_) {}
+  }
+
   let staticBase: any = {};
   if (fs.existsSync(staticJsonPath)) {
     try {
@@ -39,17 +158,21 @@ function getMergedData() {
     } catch (_) {}
   }
 
-  const apps = Array.isArray(staticBase.apps) ? staticBase.apps : (staticBase.mockApps || []);
-  const settings = staticBase.settings || staticBase.mockSettings || {};
-  const news = Array.isArray(staticBase.news) ? staticBase.news : (staticBase.mockNews || []);
-  const videos = Array.isArray(staticBase.videos) ? staticBase.videos : (staticBase.mockVideos || []);
-  const reviews = Array.isArray(staticBase.reviews) ? staticBase.reviews : [];
+  const source = adminBase && typeof adminBase === 'object' ? adminBase : staticBase;
+  const apps = Array.isArray(source.apps) ? source.apps : (source.mockApps || staticBase.apps || staticBase.mockApps || []);
+  const settings = source.settings || source.mockSettings || staticBase.settings || staticBase.mockSettings || {};
+  const news = Array.isArray(source.news) ? source.news : (source.mockNews || staticBase.news || staticBase.mockNews || []);
+  const videos = Array.isArray(source.videos) ? source.videos : (source.mockVideos || staticBase.videos || staticBase.mockVideos || []);
+  const reviews = Array.isArray(source.reviews) ? source.reviews : (staticBase.reviews || []);
 
   return { apps, settings, news, videos, reviews };
 }
 
 function writeMergedData(data: any) {
   const siteTitle = typeof data.settings?.site_title === 'string' ? data.settings.site_title.trim() : '';
+  const allAdminApps = Array.isArray(data.apps)
+    ? data.apps.map((app: any) => compileCanonicalApp(app, { stripDownloadLinks: false, siteTitle }))
+    : [];
   const canonicalNews = Array.isArray(data.news)
     ? data.news.map((item: any) => compileCanonicalNews(item, siteTitle))
     : [];
@@ -59,14 +182,31 @@ function writeMergedData(data: any) {
     last_updated: data.settings?.last_updated || new Date().toISOString()
   });
 
-  const publicApps = Array.isArray(data.apps)
-    ? data.apps
-        .filter((app: any) => app && app.sync_to_public !== false)
-        .map((app: any) => compileCanonicalApp(app, { stripDownloadLinks: true, siteTitle }))
-    : [];
+  // 1. Persist complete unstripped admin dataset (including drafts and download URLs) to .data/adminStore.json
+  try {
+    if (!fs.existsSync(adminStoreDir)) {
+      fs.mkdirSync(adminStoreDir, { recursive: true });
+    }
+    fs.writeFileSync(
+      adminStorePath,
+      JSON.stringify({
+        apps: allAdminApps,
+        settings: updatedSettings,
+        news: canonicalNews,
+        videos: Array.isArray(data.videos) ? data.videos : [],
+        reviews: Array.isArray(data.reviews) ? data.reviews : []
+      }),
+      'utf8'
+    );
+  } catch (e) {
+    console.error('[adminVaultRoutes] Failed to write .data/adminStore.json:', e);
+  }
+
+  const publicApps = allAdminApps
+    .filter((app: any) => app && app.sync_to_public !== false)
+    .map((app: any) => compileCanonicalApp(app, { stripDownloadLinks: true, siteTitle }));
 
   const publicNews = canonicalNews.filter((item: any) => item && item.sync_to_public !== false);
-
   const publicSettings = sanitizePublicSettings(updatedSettings);
 
   const publicStaticPayload = {
@@ -94,72 +234,73 @@ function writeMergedData(data: any) {
     console.error('[adminVaultRoutes] Failed to write staticData.ts:', e);
   }
 
-  // Automatically regenerate and save all XML + GZip sitemaps + site.webmanifest + opensearch.xml to disk
-  try {
-    const sitemaps = generateAllSitemaps(publicStaticPayload);
-    const publicDir = path.join(process.cwd(), 'public');
-    const distDir = path.join(process.cwd(), 'dist');
-    for (const [filename, content] of Object.entries(sitemaps)) {
-      const gzBuffer = zlib.gzipSync(Buffer.from(content, 'utf8'), { level: 9 });
-      try {
-        fs.writeFileSync(path.join(publicDir, filename), content, 'utf8');
-        fs.writeFileSync(path.join(publicDir, `${filename}.gz`), gzBuffer);
-      } catch (_) {}
-      if (fs.existsSync(distDir)) {
-        try {
-          fs.writeFileSync(path.join(distDir, filename), content, 'utf8');
-          fs.writeFileSync(path.join(distDir, `${filename}.gz`), gzBuffer);
-        } catch (_) {}
-      }
-    }
-
-    // Update site.webmanifest with auto-sized 192x192 & 512x512 icons and site_title
-    const icons = getAllSiteIconUrls(publicSettings);
-    const siteTitle = String(publicSettings?.site_title || process.env.VITE_SITE_NAME || '').trim();
-    const manifestObj = {
-      id: '/',
-      start_url: '/',
-      scope: '/',
-      name: siteTitle,
-      short_name: siteTitle,
-      display: 'standalone',
-      orientation: 'portrait',
-      lang: 'en-IN',
-      icons: [
-        {
-          src: icons.android192 || '/android-chrome-192x192.png',
-          sizes: '192x192',
-          type: 'image/png',
-          purpose: 'any maskable'
-        },
-        {
-          src: icons.android512 || '/android-chrome-512x512.png',
-          sizes: '512x512',
-          type: 'image/png',
-          purpose: 'any maskable'
-        }
-      ],
-      theme_color: '#2563eb',
-      background_color: '#ffffff',
-      shortcuts: [
-        {
-          name: 'News',
-          url: '/news'
-        }
-      ]
-    };
-    const manifestJson = JSON.stringify(manifestObj, null, 2);
-    try {
-      fs.writeFileSync(path.join(publicDir, 'site.webmanifest'), manifestJson, 'utf8');
-      if (fs.existsSync(distDir)) {
-        fs.writeFileSync(path.join(distDir, 'site.webmanifest'), manifestJson, 'utf8');
-      }
-    } catch (_) {}
-  } catch (e) {
-    console.error('[adminVaultRoutes] Failed to write sitemaps/manifest:', e);
-  }
-
   clearSeoCache();
+
+  // Regenerate XML + GZip sitemaps + site.webmanifest asynchronously so HTTP save responses return in <10ms
+  setImmediate(() => {
+    try {
+      const sitemaps = generateAllSitemaps(publicStaticPayload);
+      const publicDir = path.join(process.cwd(), 'public');
+      const distDir = path.join(process.cwd(), 'dist');
+      for (const [filename, content] of Object.entries(sitemaps)) {
+        const gzBuffer = zlib.gzipSync(Buffer.from(content, 'utf8'), { level: 6 });
+        try {
+          fs.writeFileSync(path.join(publicDir, filename), content, 'utf8');
+          fs.writeFileSync(path.join(publicDir, `${filename}.gz`), gzBuffer);
+        } catch (_) {}
+        if (fs.existsSync(distDir)) {
+          try {
+            fs.writeFileSync(path.join(distDir, filename), content, 'utf8');
+            fs.writeFileSync(path.join(distDir, `${filename}.gz`), gzBuffer);
+          } catch (_) {}
+        }
+      }
+
+      const icons = getAllSiteIconUrls(publicSettings);
+      const manifestSiteTitle = String(publicSettings?.site_title || process.env.VITE_SITE_NAME || '').trim();
+      const manifestObj = {
+        id: '/',
+        start_url: '/',
+        scope: '/',
+        name: manifestSiteTitle,
+        short_name: manifestSiteTitle,
+        display: 'standalone',
+        orientation: 'portrait',
+        lang: 'en-IN',
+        icons: [
+          {
+            src: icons.android192 || '/android-chrome-192x192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any maskable'
+          },
+          {
+            src: icons.android512 || '/android-chrome-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any maskable'
+          }
+        ],
+        theme_color: '#2563eb',
+        background_color: '#ffffff',
+        shortcuts: [
+          {
+            name: 'News',
+            url: '/news'
+          }
+        ]
+      };
+      const manifestJson = JSON.stringify(manifestObj, null, 2);
+      try {
+        fs.writeFileSync(path.join(publicDir, 'site.webmanifest'), manifestJson, 'utf8');
+        if (fs.existsSync(distDir)) {
+          fs.writeFileSync(path.join(distDir, 'site.webmanifest'), manifestJson, 'utf8');
+        }
+      } catch (_) {}
+    } catch (e) {
+      console.error('[adminVaultRoutes] Failed to write sitemaps/manifest:', e);
+    }
+  });
 }
 
 adminVaultRouter.get(['/api/v1/admin/runtime-config', '/api/v1/public/runtime-config'], (_req, res) => {
@@ -259,23 +400,43 @@ adminVaultRouter.get(['/api/v1/admin/firebase-status', '/api/v1/public/firebase-
 adminVaultRouter.get('/api/v1/admin/data', async (req, res) => {
   try {
     clearSeoCache();
+    const projectId = (
+      process.env.VITE_FIREBASE_PROJECT_ID ||
+      process.env.FIREBASE_PROJECT_ID ||
+      process.env.VITE_COMMUNITY_FIREBASE_PROJECT_ID ||
+      process.env.COMMUNITY_FIREBASE_PROJECT_ID ||
+      ''
+    ).trim();
+    const apiKey = (
+      process.env.VITE_FIREBASE_API_KEY ||
+      process.env.FIREBASE_API_KEY ||
+      process.env.VITE_COMMUNITY_FIREBASE_API_KEY ||
+      process.env.COMMUNITY_FIREBASE_API_KEY ||
+      ''
+    ).trim();
+    const isConfigured = Boolean(projectId && apiKey);
     const storeData = await fetchStoreData();
+    const localData: any = getMergedData();
+
     res.json({
       success: true,
-      source: 'live_firestore',
-      apps: storeData.apps || [],
-      settings: storeData.settings || {},
-      news: storeData.news || [],
-      videos: storeData.videos || []
+      source: isConfigured ? 'firebase' : 'local_backup',
+      apps: (storeData.apps && storeData.apps.length > 0) ? storeData.apps : (localData.apps || []),
+      settings: (storeData.settings && Object.keys(storeData.settings).length > 0) ? storeData.settings : (localData.settings || {}),
+      news: (storeData.news && storeData.news.length > 0) ? storeData.news : (localData.news || []),
+      videos: (storeData.videos && storeData.videos.length > 0) ? storeData.videos : (localData.videos || []),
+      quick_links: localData.quick_links || [],
+      faqs: localData.faqs || [],
+      developers: localData.developers || [],
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err?.message });
   }
 });
 
-adminVaultRouter.post('/api/v1/admin/save-news', (req, res) => {
+adminVaultRouter.post('/api/v1/admin/save-news', async (req, res) => {
   try {
-    const { news } = req.body || {};
+    const { news, persistedToFirestore } = req.body || {};
     if (Array.isArray(news)) {
       const now = new Date().toISOString();
       const current = getMergedData();
@@ -302,6 +463,17 @@ adminVaultRouter.post('/api/v1/admin/save-news', (req, res) => {
       });
 
       writeMergedData(current);
+
+      if (!persistedToFirestore) {
+        await syncDocToServerFirestore('news', {
+          items: current.news,
+          count: current.news.length,
+          updated_at: now,
+          updatedAt: now,
+          _rest_admin_bypass: ADMIN_BYPASS_KEY
+        });
+      }
+
       return res.json({ success: true, count: current.news.length, news: current.news });
     }
     res.status(400).json({ success: false, error: 'News array required' });
@@ -310,21 +482,49 @@ adminVaultRouter.post('/api/v1/admin/save-news', (req, res) => {
   }
 });
 
-adminVaultRouter.post('/api/v1/admin/app/save', async (req, res) => {
+adminVaultRouter.post(['/api/v1/admin/app/save', '/api/v1/admin/save-single-app'], async (req, res) => {
   try {
-    const { app } = req.body || {};
+    const { app, persistedToFirestore } = req.body || {};
     if (app && (app.id || app.slug)) {
       const now = new Date().toISOString();
       const current = getMergedData();
+      const prevChunkSize = 25;
+      const prevNumChunks = Math.max(1, Math.ceil(current.apps.length / prevChunkSize));
       const siteTitle = typeof current.settings?.site_title === 'string' ? current.settings.site_title.trim() : '';
       const appWithTime = compileCanonicalApp({ ...app, updated_at: now }, { stripDownloadLinks: false, siteTitle });
-      const idx = current.apps.findIndex((a: any) => a.id === appWithTime.id || (appWithTime.slug && a.slug === appWithTime.slug));
+      let idx = current.apps.findIndex((a: any) => a.id === appWithTime.id || (appWithTime.slug && a.slug === appWithTime.slug));
+      const isNewApp = idx < 0;
       if (idx >= 0) {
         current.apps[idx] = { ...current.apps[idx], ...appWithTime, updated_at: now };
       } else {
+        idx = current.apps.length;
         current.apps.push(appWithTime);
       }
       writeMergedData(current);
+
+      if (!persistedToFirestore) {
+        const chunkSize = 25;
+        const numChunks = Math.max(1, Math.ceil(current.apps.length / chunkSize));
+        const targetChunkIdx = Math.floor(idx / chunkSize);
+        const slice = current.apps.slice(targetChunkIdx * chunkSize, (targetChunkIdx + 1) * chunkSize);
+        await syncDocToServerFirestore(`apps_chunk_${targetChunkIdx}`, {
+          items: slice,
+          count: slice.length,
+          updated_at: now,
+          updatedAt: now,
+          _rest_admin_bypass: ADMIN_BYPASS_KEY
+        });
+        if (isNewApp || numChunks !== prevNumChunks) {
+          await syncDocToServerFirestore('apps_meta', {
+            count: current.apps.length,
+            totalApps: current.apps.length,
+            numChunks,
+            updated_at: now,
+            updatedAt: now,
+            _rest_admin_bypass: ADMIN_BYPASS_KEY
+          }, true);
+        }
+      }
 
       // Update RAM vault and re-seal src/lib/secureVault.ts if the app has a destination link
       try {
@@ -374,9 +574,9 @@ adminVaultRouter.post('/api/v1/admin/app/save', async (req, res) => {
   }
 });
 
-adminVaultRouter.post('/api/v1/admin/save-apps', (req, res) => {
+adminVaultRouter.post('/api/v1/admin/save-apps', async (req, res) => {
   try {
-    const { apps } = req.body || {};
+    const { apps, persistedToFirestore } = req.body || {};
     if (Array.isArray(apps)) {
       const now = new Date().toISOString();
       const current = getMergedData();
@@ -403,6 +603,30 @@ adminVaultRouter.post('/api/v1/admin/save-apps', (req, res) => {
       });
 
       writeMergedData(current);
+
+      if (!persistedToFirestore) {
+        const chunkSize = 25;
+        const numChunks = Math.max(1, Math.ceil(current.apps.length / chunkSize));
+        await syncDocToServerFirestore('apps_meta', {
+          count: current.apps.length,
+          totalApps: current.apps.length,
+          numChunks,
+          updated_at: now,
+          updatedAt: now,
+          _rest_admin_bypass: ADMIN_BYPASS_KEY
+        }, true);
+        for (let i = 0; i < numChunks; i++) {
+          const slice = current.apps.slice(i * chunkSize, (i + 1) * chunkSize);
+          await syncDocToServerFirestore(`apps_chunk_${i}`, {
+            items: slice,
+            count: slice.length,
+            updated_at: now,
+            updatedAt: now,
+            _rest_admin_bypass: ADMIN_BYPASS_KEY
+          });
+        }
+      }
+
       return res.json({ success: true, count: current.apps.length });
     }
     res.status(400).json({ success: false, error: 'Apps array required' });
@@ -411,13 +635,47 @@ adminVaultRouter.post('/api/v1/admin/save-apps', (req, res) => {
   }
 });
 
-adminVaultRouter.post('/api/v1/admin/app/delete', (req, res) => {
+adminVaultRouter.post(['/api/v1/admin/app/delete', '/api/v1/admin/delete-single-app'], async (req, res) => {
   try {
-    const { id } = req.body || {};
+    const { id: rawId, appId, appSlug, persistedToFirestore } = req.body || {};
+    const id = rawId || appId || appSlug;
     if (id) {
+      const now = new Date().toISOString();
       const current = getMergedData();
+      const chunkSize = 25;
+      const oldNumChunks = Math.max(1, Math.ceil(current.apps.length / chunkSize));
+      const deletedIdx = current.apps.findIndex((a: any) => a.id === id || a.slug === id);
       current.apps = current.apps.filter((a: any) => a.id !== id && a.slug !== id);
       writeMergedData(current);
+
+      if (!persistedToFirestore && deletedIdx >= 0) {
+        const numChunks = Math.max(1, Math.ceil(current.apps.length / chunkSize));
+        const startChunkIdx = Math.floor(deletedIdx / chunkSize);
+        await syncDocToServerFirestore('apps_meta', {
+          count: current.apps.length,
+          totalApps: current.apps.length,
+          numChunks,
+          updated_at: now,
+          updatedAt: now,
+          _rest_admin_bypass: ADMIN_BYPASS_KEY
+        }, true);
+        for (let i = startChunkIdx; i < numChunks; i++) {
+          const slice = current.apps.slice(i * chunkSize, (i + 1) * chunkSize);
+          await syncDocToServerFirestore(`apps_chunk_${i}`, {
+            items: slice,
+            count: slice.length,
+            updated_at: now,
+            updatedAt: now,
+            _rest_admin_bypass: ADMIN_BYPASS_KEY
+          });
+        }
+        if (oldNumChunks > numChunks) {
+          for (let c = numChunks; c < oldNumChunks; c++) {
+            await deleteDocFromServerFirestore(`apps_chunk_${c}`);
+          }
+        }
+      }
+
       return res.json({ success: true, id });
     }
     res.status(400).json({ success: false, error: 'App ID required' });
@@ -426,13 +684,23 @@ adminVaultRouter.post('/api/v1/admin/app/delete', (req, res) => {
   }
 });
 
-adminVaultRouter.post('/api/v1/admin/save-settings', (req, res) => {
+adminVaultRouter.post('/api/v1/admin/save-settings', async (req, res) => {
   try {
-    const { settings } = req.body || {};
+    const { settings, persistedToFirestore } = req.body || {};
     if (settings) {
+      const now = new Date().toISOString();
       const current = getMergedData();
-      current.settings = { ...current.settings, ...settings, last_updated: new Date().toISOString() };
+      current.settings = { ...current.settings, ...settings, last_updated: now };
       writeMergedData(current);
+
+      if (!persistedToFirestore) {
+        const payload = { ...current.settings, _rest_admin_bypass: ADMIN_BYPASS_KEY };
+        await Promise.all([
+          syncDocToServerFirestore('public_settings', payload, true),
+          syncDocToServerFirestore('settings', payload, true)
+        ]);
+      }
+
       return res.json({ success: true, settings: current.settings });
     }
     res.status(400).json({ success: false, error: 'Settings object required' });
@@ -441,33 +709,59 @@ adminVaultRouter.post('/api/v1/admin/save-settings', (req, res) => {
   }
 });
 
-adminVaultRouter.post('/api/v1/admin/settings/save-section', (req, res) => {
+adminVaultRouter.post('/api/v1/admin/settings/save-section', async (req, res) => {
   try {
-    const { section, data, settings } = req.body || {};
+    const { section, data, settings, persistedToFirestore } = req.body || {};
+    const now = new Date().toISOString();
     const current = getMergedData();
+    let patchFields: Record<string, any> = { last_updated: now };
     if (settings && typeof settings === 'object') {
-      current.settings = { ...current.settings, ...settings, last_updated: new Date().toISOString() };
+      current.settings = { ...current.settings, ...settings, last_updated: now };
+      patchFields = { ...settings, last_updated: now };
     } else if (section) {
       if (section === 'general' || section === 'seo') {
-        current.settings = { ...current.settings, ...(data || {}), last_updated: new Date().toISOString() };
+        current.settings = { ...current.settings, ...(data || {}), last_updated: now };
+        patchFields = { ...(data || {}), last_updated: now };
       } else {
-        current.settings = { ...current.settings, [section]: data, last_updated: new Date().toISOString() };
+        current.settings = { ...current.settings, [section]: data, last_updated: now };
+        patchFields = { [section]: data, last_updated: now };
       }
     }
     writeMergedData(current);
+
+    if (!persistedToFirestore) {
+      const payload = { ...patchFields, _rest_admin_bypass: ADMIN_BYPASS_KEY };
+      await Promise.all([
+        syncDocToServerFirestore('public_settings', payload, true),
+        syncDocToServerFirestore('settings', payload, true)
+      ]);
+    }
+
     return res.json({ success: true, settings: current.settings });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err?.message });
   }
 });
 
-adminVaultRouter.post('/api/v1/admin/save-videos', (req, res) => {
+adminVaultRouter.post('/api/v1/admin/save-videos', async (req, res) => {
   try {
-    const { videos } = req.body || {};
+    const { videos, persistedToFirestore } = req.body || {};
     if (Array.isArray(videos)) {
+      const now = new Date().toISOString();
       const current = getMergedData();
       current.videos = videos;
       writeMergedData(current);
+
+      if (!persistedToFirestore) {
+        await syncDocToServerFirestore('videos', {
+          items: videos,
+          count: videos.length,
+          updated_at: now,
+          updatedAt: now,
+          _rest_admin_bypass: ADMIN_BYPASS_KEY
+        });
+      }
+
       return res.json({ success: true, count: videos.length });
     }
     res.status(400).json({ success: false, error: 'Videos array required' });

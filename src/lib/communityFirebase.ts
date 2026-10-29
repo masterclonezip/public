@@ -1254,6 +1254,19 @@ function saveLiveAtomicReviewStats(
   },
   notify = true
 ) {
+  const prev = memoryAtomicStats?.globalStats;
+  const next = stats.globalStats;
+  const hasChanged =
+    !prev ||
+    prev.total !== next.total ||
+    prev.published !== next.published ||
+    prev.pending !== next.pending ||
+    prev.rejected !== next.rejected ||
+    prev.flagged !== next.flagged ||
+    prev.averageRating !== next.averageRating ||
+    prev.appCoverageCount !== (next.appCoverageCount ?? 0) ||
+    Object.keys(memoryAtomicStats?.appCounts || {}).length !== Object.keys(stats.appCounts || {}).length;
+
   memoryAtomicStats = {
     globalStats: {
       ...stats.globalStats,
@@ -1266,7 +1279,7 @@ function saveLiveAtomicReviewStats(
     lastSynced: Date.now()
   };
 
-  if (typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && hasChanged) {
     try {
       localStorage.setItem(ADMIN_ATOMIC_STATS_KEY, JSON.stringify({
         globalStats: memoryAtomicStats.globalStats,

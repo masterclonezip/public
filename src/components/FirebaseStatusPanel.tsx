@@ -69,8 +69,15 @@ export default function FirebaseStatusPanel() {
       } catch (_) {}
 
       // Zero-Quota client-side verification (only probes Firestore REST when forceLiveProbe === true)
-      const pId = firebaseConfig.projectId || db?.app?.options?.projectId || '';
-      const aKey = firebaseConfig.apiKey || (db?.app?.options as any)?.apiKey || '';
+      const isValidVal = (val: any): boolean => {
+        if (!val || typeof val !== 'string') return false;
+        const t = val.trim();
+        return t.length > 0 && t !== 'unconfigured-project' && t !== 'unconfigured-api-key' && t !== 'undefined' && t !== 'null';
+      };
+      const rawPid = firebaseConfig.projectId || db?.app?.options?.projectId || '';
+      const rawAkey = firebaseConfig.apiKey || (db?.app?.options as any)?.apiKey || '';
+      const pId = isValidVal(rawPid) ? rawPid : '';
+      const aKey = isValidVal(rawAkey) ? rawAkey : '';
       if (!hasValidBackendData && (isFirebaseReal || (pId && aKey))) {
         let lat = 18;
         const dbId = firebaseConfig.firestoreDatabaseId || (import.meta as any).env?.VITE_FIREBASE_DATABASE_ID || '(default)';
@@ -130,6 +137,16 @@ export default function FirebaseStatusPanel() {
       }
 
       if (!hasValidBackendData) {
+        setStatusDetails({
+          projectId: '',
+          firestoreRead: false,
+          firestoreWrite: false,
+          adminSdk: false,
+          aesConfigured: false,
+          diagnosticSummary: 'Firestore environment variables not configured.',
+          details: { databaseId: '(default)', projectId: '' }
+        });
+        setLastCheckTime(new Date().toLocaleTimeString());
         setFirestoreStatus('disconnected');
         setWriteStatus('failing');
         setAdminSdkStatus('inactive');
@@ -151,7 +168,7 @@ export default function FirebaseStatusPanel() {
 
     let unsubAuth: (() => void) | null = null;
     try {
-      if (auth && typeof (auth as any).onAuthStateChanged === 'function') {
+      if (isFirebaseReal && auth && typeof (auth as any).onAuthStateChanged === 'function') {
         unsubAuth = onAuthStateChanged(auth as any, () => {
           if (mounted) setAuthStatus('connected');
         });
@@ -165,7 +182,7 @@ export default function FirebaseStatusPanel() {
     runDiagnostics(false);
     const handleHydrated = () => {
       if (mounted) {
-        setAuthStatus('connected');
+        setAuthStatus(Boolean(firebaseConfig.projectId && firebaseConfig.apiKey) ? 'connected' : 'disconnected');
         runDiagnostics(false);
       }
     };

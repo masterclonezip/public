@@ -348,7 +348,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [apps.length]);
 
+  const initialFetchDoneRef = React.useRef(false);
+
   useEffect(() => {
+    if (initialFetchDoneRef.current) return;
+    initialFetchDoneRef.current = true;
+
     // Pre-warm the offline static dataset in background idle time so client navigation has 0ms instant content
     const timer = setTimeout(() => {
       loadFullStaticDataset().then(full => {
@@ -361,7 +366,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }).catch(() => {});
     }, 200);
 
-    // Only fetch backup data if initial SSR cache was completely empty or has a trimmed route slice (< 50 apps on catalog route)
+    // Fetch backup data once on initial load if SSR cache was empty or trimmed
     const p = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
     const isCatalog = p === '/' || p === '/new-apps' || p.startsWith('/categories') || p.startsWith('/category');
     if (apps.length === 0 || (isCatalog && apps.length < 50)) {
@@ -371,17 +376,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [apps.length, fetchBackupData]);
 
   // Ensure full catalog is loaded if user navigates to catalog listing routes or opens search
+  const routeFetchDoneRef = React.useRef(false);
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const checkCatalogRoute = () => {
+      if (routeFetchDoneRef.current) return;
       const p = window.location.pathname.toLowerCase();
       const isCatalog = p === '/' || p === '/new-apps' || p.startsWith('/categories') || p.startsWith('/category');
       if (isCatalog && apps.length > 0 && apps.length < 50) {
+        routeFetchDoneRef.current = true;
         fetchBackupData(true);
       }
     };
     const handleSearchOpen = () => {
+      if (routeFetchDoneRef.current) return;
       if (apps.length > 0 && apps.length < 50) {
+        routeFetchDoneRef.current = true;
         fetchBackupData(true);
       }
     };

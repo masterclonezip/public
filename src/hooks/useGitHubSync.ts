@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db, isFirebaseReal, handleFirestoreError, OperationType } from '../lib/firebase';
+import { auth, db, isFirebaseReal, readFirestoreDoc, writeFirestoreDoc, handleFirestoreError, OperationType } from '../lib/firebase';
 import { adminFetch, getValidAdminToken, loadSession } from '../services/adminAuthService';
 import { GitConfig, generateStaticDataFileCode, generateCommunityReviewsFileCode, commitFileToGitHub, commitMultiFilesToGitHub, encryptUrlIfNeeded, compileCanonicalApp, compileCanonicalNews, generateSecureVaultFile, sanitizePublicSettings } from '../lib/githubSync';
 import { getAesSecret, safeDecrypt, safeEncrypt } from '../lib/cryptoUtils';
@@ -24,8 +23,11 @@ export function useGitHubSync(
 
   const getAdminToken = async (): Promise<string> => {
     try {
-      if (auth?.currentUser) {
-        const tok = await auth.currentUser.getIdToken();
+      if (auth && (auth as any).currentUser && typeof (auth as any).currentUser.getIdToken === 'function') {
+        const tok = await Promise.race([
+          (auth as any).currentUser.getIdToken(),
+          new Promise<string>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
+        ]);
         if (tok) return tok;
       }
     } catch (e) {}
@@ -60,32 +62,29 @@ export function useGitHubSync(
         console.warn("[GitHub Sync] Failed to fetch config from server:", e);
       }
 
-      // 2. Direct Firestore read from doc(db, 'sec_git', 'cfg') for static hosts (Cloudflare Pages)
-      if (isFirebaseReal && db) {
-        try {
-          const { doc, getDoc } = await import('firebase/firestore');
-          const snap = await getDoc(doc(db, 'sec_git', 'cfg'));
-          if (snap.exists() && isMounted) {
-            const data = snap.data() as any;
-            if (data && (data.token || data.owner || data.repo)) {
-              const loadedConfig: GitConfig = {
-                owner: data.owner || (import.meta as any).env?.VITE_GITHUB_OWNER || "",
-                repo: data.repo || (import.meta as any).env?.VITE_GITHUB_PUBLIC_REPO || "",
-                branch: data.branch || "main",
-                token: data.token || "",
-                autoSync: Boolean(data.autoSync)
-              };
-              setGitConfig(loadedConfig);
-              try {
-                localStorage.setItem('cached_git_config', JSON.stringify(loadedConfig));
-              } catch (e) {}
-              setGitConfigLoading(false);
-              return;
-            }
+      // 2. Direct Firestore REST read from sec_git/cfg for static hosts (Cloudflare Pages)
+      try {
+        const snap = await readFirestoreDoc('sec_git', 'cfg');
+        if (snap.exists && snap.data && isMounted) {
+          const data = snap.data as any;
+          if (data && (data.token || data.owner || data.repo)) {
+            const loadedConfig: GitConfig = {
+              owner: data.owner || (import.meta as any).env?.VITE_GITHUB_OWNER || "",
+              repo: data.repo || (import.meta as any).env?.VITE_GITHUB_PUBLIC_REPO || "",
+              branch: data.branch || "main",
+              token: data.token || "",
+              autoSync: Boolean(data.autoSync)
+            };
+            setGitConfig(loadedConfig);
+            try {
+              localStorage.setItem('cached_git_config', JSON.stringify(loadedConfig));
+            } catch (e) {}
+            setGitConfigLoading(false);
+            return;
           }
-        } catch (dbErr) {
-          console.warn("[GitHub Sync] Firestore direct config load warning:", dbErr);
         }
+      } catch (dbErr) {
+        console.warn("[GitHub Sync] Firestore direct config load warning:", dbErr);
       }
 
       // 3. Fallback to localStorage
@@ -143,16 +142,15 @@ export function useGitHubSync(
         lastError = serverErr?.message || 'Server endpoint unreachable';
       }
 
-      // 2. Direct Firestore write fallback for static hosts (Cloudflare Pages)
-      if (!savedSuccessfully && isFirebaseReal && db) {
+      // 2. Direct Firestore REST write fallback for static hosts (Cloudflare Pages)
+      if (!savedSuccessfully) {
         try {
-          const { doc, setDoc } = await import('firebase/firestore');
           const payload = {
             ...newConfig,
             updatedAt: new Date().toISOString()
           };
-          await setDoc(doc(db, 'sec_git', 'cfg'), payload, { merge: true });
-          savedSuccessfully = true;
+          const ok = await writeFirestoreDoc('sec_git', 'cfg', payload, { merge: true });
+          if (ok) savedSuccessfully = true;
         } catch (dbErr: any) {
           console.error("[GitHub Sync] Direct Firestore config save error:", dbErr);
           lastError = `Firestore write failed: ${dbErr?.message || 'Unknown Firestore error'}`;

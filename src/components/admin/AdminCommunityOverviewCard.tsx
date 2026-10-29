@@ -63,12 +63,15 @@ export const AdminCommunityOverviewCard: React.FC<AdminCommunityOverviewCardProp
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [approvingId, setApprovingId] = useState<string | null>(null);
 
+  const hasLoadedRef = React.useRef(Boolean(stats));
+
   const loadStats = useCallback(async (isForce = false) => {
     if (isForce) setRefreshing(true);
-    else if (!stats) setLoading(true);
+    else if (!hasLoadedRef.current) setLoading(true);
 
     try {
       const data = await fetchAdminCommunityOverviewStats(isForce);
+      hasLoadedRef.current = true;
       setStats(data);
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       if (isForce) {
@@ -81,7 +84,7 @@ export const AdminCommunityOverviewCard: React.FC<AdminCommunityOverviewCardProp
       setLoading(false);
       setRefreshing(false);
     }
-  }, [stats]);
+  }, []);
 
   const handleReloadBackup = async () => {
     try {
@@ -446,7 +449,7 @@ export const AdminCommunityOverviewCard: React.FC<AdminCommunityOverviewCardProp
               >
                 <div className="flex items-center gap-2.5">
                   <img
-                    src={getOptimizedImageUrl(app.icon_url || '', 80)}
+                    src={getOptimizedImageUrl(app.icon_url || '/logo.png', 80) || '/logo.png'}
                     alt={app.name}
                     className="w-10 h-10 rounded-xl object-cover bg-slate-200 dark:bg-slate-700 shadow-sm flex-shrink-0"
                     onError={(e) => {

@@ -20,11 +20,20 @@ const getStaticData = () => {
   let staticJsonData: any = null;
 
   try {
-    const staticJsonPath = path.join(process.cwd(), 'src/lib/staticData.json');
-    if (fs.existsSync(staticJsonPath)) {
-      staticJsonData = JSON.parse(fs.readFileSync(staticJsonPath, 'utf8'));
+    const adminStorePath = path.join(process.cwd(), '.data/adminStore.json');
+    if (fs.existsSync(adminStorePath)) {
+      staticJsonData = JSON.parse(fs.readFileSync(adminStorePath, 'utf8'));
     }
   } catch (_) {}
+
+  if (!staticJsonData) {
+    try {
+      const staticJsonPath = path.join(process.cwd(), 'src/lib/staticData.json');
+      if (fs.existsSync(staticJsonPath)) {
+        staticJsonData = JSON.parse(fs.readFileSync(staticJsonPath, 'utf8'));
+      }
+    } catch (_) {}
+  }
 
   if (staticJsonData && typeof staticJsonData === 'object') {
     const staticApps = staticJsonData.mockApps || staticJsonData.apps || [];

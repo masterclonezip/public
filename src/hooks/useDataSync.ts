@@ -147,7 +147,7 @@ export function useDataSync() {
               }
             });
 
-            if (metaExists || anyChunkExists || loadedApps.length > 0) {
+            if (loadedApps.length > 0) {
               setApps(loadedApps);
               loadedFromDirectFirestore = true;
             }
@@ -162,15 +162,15 @@ export function useDataSync() {
               loadedFromDirectFirestore = true;
             }
             if (faqsSnap.exists && faqsSnap.data) {
-              if (Array.isArray(faqsSnap.data.items)) loadedSettings.website_faqs = faqsSnap.data.items;
+              if (Array.isArray(faqsSnap.data.items) && faqsSnap.data.items.length > 0) loadedSettings.website_faqs = faqsSnap.data.items;
               loadedFromDirectFirestore = true;
             }
             if (devsSnap.exists && devsSnap.data) {
-              if (Array.isArray(devsSnap.data.items)) loadedSettings.developers = devsSnap.data.items;
+              if (Array.isArray(devsSnap.data.items) && devsSnap.data.items.length > 0) loadedSettings.developers = devsSnap.data.items;
               loadedFromDirectFirestore = true;
             }
             if (linksSnap.exists && linksSnap.data) {
-              if (Array.isArray(linksSnap.data.items)) loadedSettings.quick_links = linksSnap.data.items;
+              if (Array.isArray(linksSnap.data.items) && linksSnap.data.items.length > 0) loadedSettings.quick_links = linksSnap.data.items;
               loadedFromDirectFirestore = true;
             }
 
@@ -181,7 +181,7 @@ export function useDataSync() {
 
             if (newsSnap.exists && newsSnap.data) {
               const items = newsSnap.data.items || newsSnap.data.news || [];
-              if (Array.isArray(items)) {
+              if (Array.isArray(items) && items.length > 0) {
                 setNews(items);
                 loadedFromDirectFirestore = true;
               }
@@ -189,7 +189,7 @@ export function useDataSync() {
 
             if (videosSnap.exists && videosSnap.data) {
               const items = videosSnap.data.items || videosSnap.data.videos || [];
-              if (Array.isArray(items)) {
+              if (Array.isArray(items) && items.length > 0) {
                 setVideos(items);
                 loadedFromDirectFirestore = true;
               }
@@ -204,6 +204,20 @@ export function useDataSync() {
             console.warn("[useDataSync] Direct Firestore load notice:", directErr);
           }
         }
+
+        // If direct Firestore had 0 apps, load backup catalog data
+        setApps(prev => {
+          if (Array.isArray(prev) && prev.length > 0) return prev;
+          return (mockApps as any) || [];
+        });
+        setNews(prev => {
+          if (Array.isArray(prev) && prev.length > 0) return prev;
+          return (mockNews as any) || [];
+        });
+        setVideos(prev => {
+          if (Array.isArray(prev) && prev.length > 0) return prev;
+          return (mockVideos as any) || [];
+        });
 
         if (!loadedFromDirectFirestore) {
           // Fallback: try public backup-data endpoint
@@ -227,10 +241,10 @@ export function useDataSync() {
             }
           } catch (_) {}
 
-          setApps(prev => (Array.isArray(prev) ? prev : (mockApps as any || [])));
+          setApps(prev => (Array.isArray(prev) && prev.length > 0 ? prev : (mockApps as any || [])));
           setSettings(prev => (prev && Object.keys(prev).length > 0 ? prev : (mockSettings as any || {} as GlobalSettings)));
-          setNews(prev => (Array.isArray(prev) ? prev : (mockNews as any || [])));
-          setVideos(prev => (Array.isArray(prev) ? prev : (mockVideos as any || [])));
+          setNews(prev => (Array.isArray(prev) && prev.length > 0 ? prev : (mockNews as any || [])));
+          setVideos(prev => (Array.isArray(prev) && prev.length > 0 ? prev : (mockVideos as any || [])));
           setDataSource(isFirebaseReal ? 'firebase' : 'local_backup');
         }
       }

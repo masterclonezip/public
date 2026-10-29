@@ -374,28 +374,28 @@ export const AdminSettingsTab = React.memo(({ settings: rawSettings, handleSaveS
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px]">
                 <div className="bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 flex items-center gap-2.5">
-                  <img src={previewIcons.headerLogo || previewIcons.masterLogo} alt="Header Logo" className="w-9 h-9 object-contain rounded bg-slate-100 dark:bg-slate-800 p-1 shrink-0" />
+                  <img src={previewIcons.headerLogo || previewIcons.masterLogo || '/logo.png'} alt="Header Logo" className="w-9 h-9 object-contain rounded bg-slate-100 dark:bg-slate-800 p-1 shrink-0" />
                   <div className="min-w-0">
                     <div className="font-bold text-slate-800 dark:text-slate-200 truncate">Header & Footer</div>
                     <div className="text-[10px] text-slate-500">Auto-Fit 120px</div>
                   </div>
                 </div>
                 <div className="bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 flex items-center gap-2.5">
-                  <img src={previewIcons.favicon48} alt="Google Search 48x48" className="w-9 h-9 object-contain rounded bg-slate-100 dark:bg-slate-800 p-1 shrink-0" />
+                  <img src={previewIcons.favicon48 || '/favicon.ico'} alt="Google Search 48x48" className="w-9 h-9 object-contain rounded bg-slate-100 dark:bg-slate-800 p-1 shrink-0" />
                   <div className="min-w-0">
                     <div className="font-bold text-slate-800 dark:text-slate-200 truncate">Google SERP Icon</div>
                     <div className="text-[10px] text-slate-500">48×48 & 96×96 PNG</div>
                   </div>
                 </div>
                 <div className="bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 flex items-center gap-2.5">
-                  <img src={previewIcons.appleTouch180} alt="Apple Touch 180x180" className="w-9 h-9 object-contain rounded bg-slate-100 dark:bg-slate-800 p-1 shrink-0" />
+                  <img src={previewIcons.appleTouch180 || '/apple-touch-icon.png'} alt="Apple Touch 180x180" className="w-9 h-9 object-contain rounded bg-slate-100 dark:bg-slate-800 p-1 shrink-0" />
                   <div className="min-w-0">
                     <div className="font-bold text-slate-800 dark:text-slate-200 truncate">Apple & Android</div>
                     <div className="text-[10px] text-slate-500">180×180 & 192×192</div>
                   </div>
                 </div>
                 <div className="bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 flex items-center gap-2.5">
-                  <img src={previewIcons.searchLogo512} alt="Schema 512x512" className="w-9 h-9 object-contain rounded bg-slate-100 dark:bg-slate-800 p-1 shrink-0" />
+                  <img src={previewIcons.searchLogo512 || '/logo.png'} alt="Schema 512x512" className="w-9 h-9 object-contain rounded bg-slate-100 dark:bg-slate-800 p-1 shrink-0" />
                   <div className="min-w-0">
                     <div className="font-bold text-slate-800 dark:text-slate-200 truncate">Schema Organization</div>
                     <div className="text-[10px] text-slate-500">512×512 PNG</div>

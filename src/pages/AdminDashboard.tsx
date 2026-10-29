@@ -110,11 +110,13 @@ export default function AdminDashboard() {
     appsList, setAppsList, fetchFailed, cachedSecureMapRef, syncSecureVault, recordAppDeletion
   } = useAdminApps(apps, loading, isAdminUser);
 
+  const hasHydratedReviewsRef = React.useRef(false);
   useEffect(() => {
     const safeList = Array.isArray(appsList) ? appsList : [];
     registerCatalogAppsForReviews(safeList);
     recalculateAndBroadcastAtomicStats(safeList, false);
-    if (isAdminUser === true && safeList.length > 0) {
+    if (isAdminUser === true && safeList.length > 0 && !hasHydratedReviewsRef.current) {
+      hasHydratedReviewsRef.current = true;
       fetchAdminAppReviewCounts().catch(() => {});
     }
   }, [appsList, isAdminUser]);
