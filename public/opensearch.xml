@@ -3,6 +3,6 @@
   <ShortName>YonoappDex</ShortName>
   <Description>Search applications</Description>
   <InputEncoding>UTF-8</InputEncoding>
-  <Image width="16" height="16" type="image/png">https://res.cloudinary.com/potup3yi/image/upload/f_png,q_auto,w_16,h_16,c_fill/v1793471348/ptagmwyr07rmxmjlxcqr.png</Image>
+  <Image width="16" height="16" type="image/png">https://res.cloudinary.com/potup3yi/image/upload/f_png,q_auto,w_16,h_16,c_fill/v1793471952/vaiplcxp6xsnyzvzoux8.png</Image>
   <Url type="text/html" template="https://admin.yonoappdex.com/?s={searchTerms}"/>
 </OpenSearchDescription>
