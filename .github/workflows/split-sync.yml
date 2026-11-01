@@ -336,14 +336,14 @@ jobs:
               
               # Reset static data files in Admin to fixed empty shells so Public content updates NEVER trigger Admin commits or builds
               echo '{"apps":[],"settings":{},"news":[],"videos":[],"reviews":[]}' > src/lib/staticData.json
-              cat << 'EOF' > src/lib/staticData.ts
-import { AppConfig, GlobalSettings, NewsItem, VideoItem } from '../types';
-export const mockApps: AppConfig[] = [];
-export const mockSettings: GlobalSettings = {} as GlobalSettings;
-export const mockNews: NewsItem[] = [];
-export const mockVideos: VideoItem[] = [];
-export const mockReviews: any[] = [];
-EOF
+              printf "%s\n" \
+                "import { AppConfig, GlobalSettings, NewsItem, VideoItem } from '../types';" \
+                "export const mockApps: AppConfig[] = [];" \
+                "export const mockSettings: GlobalSettings = {} as GlobalSettings;" \
+                "export const mockNews: NewsItem[] = [];" \
+                "export const mockVideos: VideoItem[] = [];" \
+                "export const mockReviews: any[] = [];" \
+                > src/lib/staticData.ts
               echo '{"appCounts":{},"totalReviews":0}' > src/lib/communityCatalogStats.json
               echo '{}' > src/lib/communityStaticReviews.json
               
