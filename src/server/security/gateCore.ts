@@ -38,6 +38,7 @@ import {
 import {
   resolveDestinationUrl,
   getCandidateTurnstileSecrets,
+  getPublicTurnstileSiteKey,
 } from '../services/linkService.js';
 
 export interface GateRequestContext {
@@ -957,10 +958,11 @@ export async function handleSessionInit(ctx: GateRequestContext): Promise<GateRe
   }
 
   emitGateCounter(ctx.env, 'G2', 'init', 'pass', family);
+  const siteKey = getPublicTurnstileSiteKey(ctx.env);
   return {
     status: 200,
     headers: baseSecurityHeaders(setCookieHeader),
-    body: JSON.stringify({ nonce }),
+    body: JSON.stringify(siteKey ? { nonce, siteKey } : { nonce }),
   };
 }
 
@@ -1483,21 +1485,32 @@ export async function handleSessionClearance(ctx: GateRequestContext): Promise<G
       // ignore
     }
   }
+  const isPreviewOrCloneHost =
+    ctx.env.STRICT_HOST_CHECK !== '1' &&
+    (rawHost.endsWith('.pages.dev') ||
+      rawHost.endsWith('.vercel.app') ||
+      rawHost.endsWith('.run.app') ||
+      rawHost === 'localhost' ||
+      rawHost === '127.0.0.1');
   const isProdDomain =
-    (Boolean(configuredBareHost) &&
+    ctx.env.STRICT_HOST_CHECK === '1' ||
+    (!isPreviewOrCloneHost &&
+      Boolean(configuredBareHost) &&
       (rawHost === configuredBareHost ||
         rawHost === `www.${configuredBareHost}` ||
-        rawHost.endsWith(`.${configuredBareHost}`))) ||
-    rawHost.endsWith('.pages.dev');
+        rawHost.endsWith(`.${configuredBareHost}`)));
 
   const rawSecrets = await getCandidateTurnstileSecrets(ctx.env);
   const isNonProdDummyToken =
     !isProdDomain &&
+    ctx.env.STRICT_HOST_CHECK !== '1' &&
     !ctx.env.TURNSTILE_SITEVERIFY_URL &&
     cfToken.includes('DUMMY.TOKEN');
 
   if (isNonProdDummyToken) {
     rawSecrets.unshift('1x0000000000000000000000000000000AA');
+  } else if (!isProdDomain && ctx.env.STRICT_HOST_CHECK !== '1' && rawSecrets.length === 0 && !ctx.env.TURNSTILE_SITEVERIFY_URL) {
+    rawSecrets.push('1x0000000000000000000000000000000AA');
   }
 
   // Filter out dummy test keys on production domains
@@ -1588,7 +1601,8 @@ export async function handleSessionClearance(ctx: GateRequestContext): Promise<G
   const hostAllowed =
     allowedHosts.has(svHostname) ||
     (ctx.env.STRICT_HOST_CHECK !== '1' &&
-      (svHostname.endsWith('.run.app') ||
+      (svHostname === rawHost ||
+        svHostname.endsWith('.run.app') ||
         svHostname.endsWith('.pages.dev') ||
         svHostname.endsWith('.vercel.app'))) ||
     (isNonProdDummyToken && svHostname === 'example.com');

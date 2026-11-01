@@ -78,6 +78,7 @@ export function useTurnstileVerification({
 
   const adminSiteKeyRef = useRef<string | undefined>(adminTurnstileSiteKey);
   adminSiteKeyRef.current = adminTurnstileSiteKey;
+  const serverSiteKeyRef = useRef<string>('');
 
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -122,6 +123,7 @@ export function useTurnstileVerification({
     const hostname =
       typeof window !== 'undefined' ? window.location.hostname.toLowerCase() : '';
     const rawConfiguredDomain = String((import.meta as any).env?.VITE_PUBLIC_DOMAIN || '').trim().toLowerCase();
+    const strictHostCheck = String((import.meta as any).env?.VITE_STRICT_HOST_CHECK || '').trim() === '1';
     let configuredHost = '';
     try {
       if (rawConfiguredDomain) {
@@ -130,23 +132,42 @@ export function useTurnstileVerification({
     } catch {
       configuredHost = rawConfiguredDomain.replace(/^https?:\/\//, '').split('/')[0];
     }
+    const isPreviewOrCloneHost =
+      !strictHostCheck &&
+      (hostname.endsWith('.pages.dev') ||
+        hostname.endsWith('.vercel.app') ||
+        hostname.endsWith('.run.app') ||
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1');
     const isProdDomain =
-      Boolean(configuredHost && (hostname === configuredHost || hostname === `www.${configuredHost}` || hostname.endsWith(`.${configuredHost}`))) ||
-      hostname.endsWith('.pages.dev');
+      strictHostCheck ||
+      (!isPreviewOrCloneHost &&
+        Boolean(
+          configuredHost &&
+            (hostname === configuredHost ||
+              hostname === `www.${configuredHost}` ||
+              hostname.endsWith(`.${configuredHost}`))
+        ));
 
-    const envKey = String((import.meta as any).env?.VITE_TURNSTILE_SITE_KEY || '').trim();
+    const envKey = String(
+      (import.meta as any).env?.VITE_TURNSTILE_SITE_KEY ||
+        (import.meta as any).env?.TURNSTILE_SITE_KEY ||
+        ''
+    ).trim();
     const adminKey = String(adminSiteKeyRef.current || '').trim();
+    const serverKey = String(serverSiteKeyRef.current || '').trim();
 
     const candidates: string[] = [];
     const addKey = (k: string) => {
       if (!isRealTurnstileKey(k)) return;
-      // §5.5 & §8 Test 15: Test keys (1x000...) are forbidden on production domains
+      // §5.5 & §8 Test 15: Test keys (1x000...) are forbidden on strict production domains
       if (isProdDomain && k.startsWith('1x00000000000000000000')) return;
       if (!candidates.includes(k)) candidates.push(k);
     };
 
-    // §7 Site key cascade: Admin setting -> VITE_TURNSTILE_SITE_KEY -> test key (non-production hosts only)
+    // §7 Site key cascade: Admin setting -> Server runtime key -> VITE_TURNSTILE_SITE_KEY -> non-strict fallback
     addKey(adminKey);
+    addKey(serverKey);
     addKey(envKey);
     if (!isProdDomain) {
       addKey('1x00000000000000000000AA');
@@ -213,16 +234,9 @@ export function useTurnstileVerification({
           return;
         }
 
-        const candidateKeys = resolveCandidateSiteKeys();
-        if (candidateKeys.length === 0) {
-          clearTimers();
-          setUiTimeoutExceeded(true);
-          return;
-        }
-
         const safeAppId = appId.replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 64);
 
-        // 2. Request server-issued signed nonce + device cookie (§5.4)
+        // 2. Request server-issued signed nonce + device cookie + runtime siteKey (§5.4)
         const res = await fetch('/api/v1/app/session-init', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -264,6 +278,10 @@ export function useTurnstileVerification({
             setUiTimeoutExceeded(true);
           }
           return;
+        }
+
+        if (typeof data.siteKey === 'string' && data.siteKey.trim()) {
+          serverSiteKeyRef.current = data.siteKey.trim();
         }
 
         const nonce = data.nonce.trim();

@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   split-and-sync:
-    if: "!endsWith(github.repository, '/admin') && (github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]'))"
+    if: "!endsWith(github.repository, '/admin') && !endsWith(github.repository, '-admin') && (github.event_name != 'push' || !contains(github.event.head_commit.message, 'Production Sync ('))"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Source
@@ -71,6 +71,7 @@ jobs:
             "src/services/adminAuthService.ts"
             "src/services/firestoreSyncService.ts"
             "src/services/dataService.ts"
+            "src/services/localCacheService.ts"
             "src/server/routes/adminAuthRoutes.ts"
             "src/server/routes/adminVaultRoutes.ts"
             "src/server/routes/githubSyncRoutes.ts"
@@ -84,7 +85,10 @@ jobs:
             "src/lib/sessionStore.ts"
             "src/lib/firebase.ts"
             "src/lib/adminCommunityFirebase.ts"
+            "src/lib/aiStudioBrain.json"
+            "src/lib/dummyAdmin.ts"
             ".aistudio/"
+            "public/assets/"
             "src/lib/secure_links_backup.json"
             "src/lib/autopilot_checkpoint.json"
             "src/server/secure_vault.json"
@@ -108,110 +112,22 @@ jobs:
             "AI_PITFALLS.md"
             "DUAL_DATABASE_RATING_SYSTEM.md"
             "MORE_INFO_SECURITY_ARCHITECTURE.md"
+            "ENV_VARS_GUIDE.md"
+            "MASTER_WHITE_LABEL_BLUEPRINT.md"
+            "SEO_ARCHITECTURE.md"
             "SEO_MAP.md"
             "AI_SEO_CHEAT_SHEET.md"
-            "add-admin-rest.ts"
-            "add-admin.ts"
-            "add_save_button.js"
-            "check-env.ts"
-            "debug-db.js"
-            "dom.html"
-            "extract.js"
-            "fetch_git_cfg.js"
-            "fetch_real_git_cfg.js"
-            "fetch_rest.js"
-            "find_app_cache.js"
-            "fix-admin.ts"
-            "fix-aes.ts"
-            "fix-api.ts"
-            "fix-dashboard.ts"
-            "fix-download.ts"
-            "fix-missing-urls.cjs"
-            "fix-seo.js"
-            "fix-seo.ts"
-            "fix_admin_dashboard.js"
-            "fix_app_layout.js"
-            "fix_appstab.js"
-            "fix_css.js"
-            "fix_css_performance.js"
-            "fix_h2.js"
-            "fix_header.js"
-            "fix_home.js"
-            "fix_home_layout.js"
-            "fix_lazy.js"
-            "fix_lenis.js"
-            "fix_lenis_easing.js"
-            "fix_lenis_settings.js"
-            "fix_lenis_ultra.js"
-            "fix_lenis_ultra2.js"
-            "fix_loading.js"
-            "fix_loading_all.js"
-            "fix_loading_home.js"
-            "fix_menu.js"
-            "fix_news_published_at.js"
-            "fix_news_seo.js"
-            "fix_news_tab.js"
-            "fix_newsdetail_date.js"
-            "fix_newspage_date.js"
-            "fix_routes.js"
-            "fix_scroll.js"
-            "fix_secrets.sh"
-            "fix_server.js"
-            "fix_server2.js"
-            "fix_server3.js"
-            "format.js"
-            "get_git_config.ts"
-            "insert_screenshots.js"
-            "live_app.html"
             "metadata.json"
-            "output.html"
-            "patch.js"
-            "patch2.js"
-            "patch3.js"
-            "patch4.js"
-            "patch5.js"
-            "patch6.js"
-            "patch7.js"
-            "patch8.js"
-            "patch_menu.js"
-            "print-env.ts"
-            "remove_chatbot.js"
-            "replace-color.mjs"
-            "restore_app.js"
-            "restore_header_footer.js"
-            "temp_news_tab.txt"
-            "test-admin-encrypt.js"
-            "test-admin.js"
-            "test-chat.ts"
-            "test-chunk-item.cjs"
-            "test-curl.ts"
-            "test-fetch.ts"
-            "test-firestore.ts"
-            "test-gemini.ts"
-            "test-models-all.ts"
-            "test-payload.mjs"
-            "test-pow.mjs"
-            "test-secure-links.ts"
-            "test.js"
-            "test_pull.js"
-            "update_app.js"
-            "update_app_home.js"
-            "update_appdetails.js"
-            "update_dashboard.patch"
-            "update_gateway.js"
-            "update_home.js"
-            "update_html.js"
-            "update_loading.js"
-            "update_vite.js"
-            "verify-db.js"
-            "verify-rules.js"
-            "write_files.js"
             "src/lib/public_backup.json"
           )
 
           # List of files that should ONLY exist in Dex (Public)
           PUBLIC_ONLY_FILES=(
             "public-api/"
+            "public/assets/"
+            "public/data/"
+            "public/ai-catalog.json"
+            "public/llms.txt"
             "src/components/public/"
             "src/pages/About.tsx"
             "src/pages/AppDetails.tsx"
@@ -219,6 +135,7 @@ jobs:
             "src/pages/Developers.tsx"
             "src/pages/Disclaimer.tsx"
             "src/pages/Ethics.tsx"
+            "src/pages/FaqPage.tsx"
             "scripts/prerender.ts"
             "src/pages/GatewayPage.tsx"
             "src/pages/Home.tsx"
@@ -235,6 +152,7 @@ jobs:
             "src/components/AccordionItem.tsx"
             "src/components/FallbackRouteMatcher.tsx"
             "src/components/LanguageSelector.tsx"
+            "src/components/MobileMenuModal.tsx"
             "src/components/PlayStoreRatingSection.tsx"
             "src/components/PlayStoreUI.tsx"
             "src/components/playstore/"
@@ -267,16 +185,13 @@ jobs:
           echo "Source Repository: $GITHUB_REPOSITORY"
           echo "Target Public:     $PUBLIC_TARGET"
           echo "Target Admin:      $ADMIN_TARGET"
+          echo "Commit Message:    $COMMIT_MSG"
           echo "=========================================================="
 
           CLEAN_PAT=$(echo -n "$PAT" | tr -d '[:space:]')
           if [ -z "$CLEAN_PAT" ]; then
             echo "⚠️ WARNING: 'PAT' (Personal Access Token) secret not found in repository secrets."
             echo "GitHub Actions built-in token cannot push cross-repository to '$ADMIN_TARGET'."
-            echo "To enable automated code transfer to '$ADMIN_TARGET':"
-            echo "1. Create a GitHub Personal Access Token at https://github.com/settings/tokens with 'repo' scope."
-            echo "2. In '$GITHUB_REPOSITORY', go to Settings -> Secrets and variables -> Actions."
-            echo "3. Add a New repository secret named 'PAT' and paste the token."
             echo "Skipping cross-repo push until PAT is added."
             exit 0
           fi
@@ -291,8 +206,8 @@ jobs:
             cd "$PARENT_DIR"
             rm -rf "${REPO_NAME}_repo"
             
-            # Common excludes - strictly prevent secrets/backups from leaking anywhere unvetted
-            RSYNC_EXCLUDES="--exclude=.git --exclude=.github --exclude=node_modules --exclude=dist --exclude=*.tmp --exclude=*.log --exclude=api_temp.ts --exclude=mock-2fa-state.json --exclude=autopilot_checkpoint.json* --exclude=community_local_backup.json* --exclude=src/lib/public_backup.json* --exclude=src/lib/secure_links_backup.json* --exclude=.env* --exclude=bun.lock* --exclude=bun.lockb --exclude=yarn.lock --exclude=pnpm-lock.yaml"
+            # Common excludes - strictly prevent secrets, backups, and debug screenshots from leaking anywhere
+            RSYNC_EXCLUDES="--exclude=.git --exclude=.github --exclude=node_modules --exclude=dist --exclude=public/assets --exclude=public/assets/aistudio --exclude=*.tmp --exclude=*.log --exclude=api_temp.ts --exclude=mock-2fa-state.json --exclude=autopilot_checkpoint.json* --exclude=community_local_backup.json* --exclude=src/lib/public_backup.json* --exclude=src/lib/secure_links_backup.json* --exclude=.env* --exclude=bun.lock* --exclude=bun.lockb --exclude=yarn.lock --exclude=pnpm-lock.yaml"
 
             if [ -z "$REPO_URL" ]; then
               echo "Skipping $REPO_NAME sync: repository target not configured."
@@ -334,15 +249,16 @@ jobs:
               rsync -rv $RSYNC_EXCLUDES "$SOURCE_DIR/" .
             fi
             
-            # Explicitly purge any rogue lockfiles that trigger non-npm build runners on Cloudflare/Vercel
+            # Explicitly purge any rogue lockfiles and screenshot directories
             rm -f bun.lock bun.lockb yarn.lock pnpm-lock.yaml
+            rm -rf public/assets
             
             # Ensure .npmrc is always present
             if [ -f "$SOURCE_DIR/.npmrc" ]; then
               cp "$SOURCE_DIR/.npmrc" .npmrc
             fi
             
-            # Explicitly remove .github to prevent workflow nesting/looping
+            # Explicitly remove .github to prevent workflow nesting/looping in target repositories
             rm -rf .github
             git rm -rf --ignore-unmatch .github 2>/dev/null || true
 
@@ -368,7 +284,7 @@ jobs:
               rm -f api/index.ts
               rm -f api/index.js
 
-              # Restore prerender and compress scripts for Vercel
+              # Restore prerender and compress scripts for Vercel / Cloudflare Pages
               mkdir -p scripts
               if [ -f "$SOURCE_DIR/scripts/prerender.ts" ]; then
                 cp "$SOURCE_DIR/scripts/prerender.ts" scripts/prerender.ts
@@ -403,19 +319,35 @@ jobs:
               fi
               rm -f strip-admin-from-dex.js
               rm -f strip-public-from-masterworld.js
+              rm -f src/sync-meta.json
             fi
 
             if [ "$TYPE" = "admin" ]; then
-              echo "Enforcing Admin-Only Masterworld Isolation..."
+              echo "Enforcing Admin-Only Masterworld Isolation (100% Firebase-Driven, Zero Public Static Data)..."
               # 1. Strip all explicit public-only files
               for file in "${PUBLIC_ONLY_FILES[@]}"; do
                 rm -rf "$file"
               done
               
-              # Force remove api/index.ts to prevent Vercel conflicts
+              # Force remove api/index.ts and public sitemaps (Admin does not serve public sitemaps or static catalog)
               rm -f api/index.ts
+              rm -f public/sitemap*.xml public/sitemap*.xml.gz
+              rm -f src/sync-meta.json
               
-              # 2. Strict Allowlist enforcement for pages and components
+              # Reset static data files in Admin to fixed empty shells so Public content updates NEVER trigger Admin commits or builds
+              echo '{"apps":[],"settings":{},"news":[],"videos":[],"reviews":[]}' > src/lib/staticData.json
+              cat << 'EOF' > src/lib/staticData.ts
+import { AppConfig, GlobalSettings, NewsItem, VideoItem } from '../types';
+export const mockApps: AppConfig[] = [];
+export const mockSettings: GlobalSettings = {} as GlobalSettings;
+export const mockNews: NewsItem[] = [];
+export const mockVideos: VideoItem[] = [];
+export const mockReviews: any[] = [];
+EOF
+              echo '{"appCounts":{},"totalReviews":0}' > src/lib/communityCatalogStats.json
+              echo '{}' > src/lib/communityStaticReviews.json
+              
+              # 2. Strict Allowlist enforcement for pages
               echo "Purging non-admin pages..."
               find src/pages -type f ! -name "AdminDashboard.tsx" ! -name "AdminLogin.tsx" -delete
               # 3. Swap App to Admin
@@ -432,13 +364,10 @@ jobs:
               rm -f public/_redirects
             fi
 
-            # Write sync metadata to guarantee git changes on every sync run
-            mkdir -p src
-            echo "{\"last_sync\": \"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\", \"target\": \"$REPO_NAME\", \"branch\": \"$TARGET_BRANCH\"}" > src/sync-meta.json
-
             git add -A
             if [ -n "$(git status --porcelain)" ]; then
-              git commit -m "Auto-sync ($TYPE) [$(date -u +'%Y-%m-%d %H:%M:%S UTC')] [skip ci]"
+              # IMPORTANT: Do NOT include [skip ci] in the commit message because Cloudflare Pages skips builds when [skip ci] is present!
+              git commit -m "Production Sync ($TYPE) [$(date -u +'%Y-%m-%d %H:%M:%S UTC')]"
 
               # Re-ensure origin URL with token and clear any conflicting local extraheader
               git remote set-url origin "$AUTH_REPO_URL" 2>/dev/null || true
@@ -471,36 +400,19 @@ jobs:
                 echo "✅ Successfully synced to $REPO_URL ($TARGET_BRANCH)!"
               else
                 echo "::error title=Sync Failed for $REPO_NAME::Failed to push to $REPO_URL ($TARGET_BRANCH)."
-                if [ -n "$GITHUB_STEP_SUMMARY" ]; then
-                  echo "### 🚨 GitHub Push Notice: Authorization Required for \`$REPO_URL\`" >> "$GITHUB_STEP_SUMMARY"
-                  echo "" >> "$GITHUB_STEP_SUMMARY"
-                  echo "The automatic split-sync engine prepared the admin codebase, but GitHub returned **HTTP 403 Forbidden** when pushing to \`$REPO_URL\`." >> "$GITHUB_STEP_SUMMARY"
-                  echo "" >> "$GITHUB_STEP_SUMMARY"
-                  echo "#### Why this happens:" >> "$GITHUB_STEP_SUMMARY"
-                  echo "Your Personal Access Token (\`PAT\`) secret in \`$GITHUB_REPOSITORY\` does not have write access to repository \`$REPO_URL\`." >> "$GITHUB_STEP_SUMMARY"
-                  echo "" >> "$GITHUB_STEP_SUMMARY"
-                  echo "#### 🔑 30-Second Fix on GitHub:" >> "$GITHUB_STEP_SUMMARY"
-                  echo "1. **Fine-Grained Token (Beta)**:" >> "$GITHUB_STEP_SUMMARY"
-                  echo "   - Go to: https://github.com/settings/tokens?type=beta" >> "$GITHUB_STEP_SUMMARY"
-                  echo "   - Tap your active token" >> "$GITHUB_STEP_SUMMARY"
-                  echo "   - Under **Repository access**, choose **All repositories** (or add \`$REPO_URL\` to the list)" >> "$GITHUB_STEP_SUMMARY"
-                  echo "   - Under **Repository permissions** -> **Contents**, select **Read and write**" >> "$GITHUB_STEP_SUMMARY"
-                  echo "   - Tap **Update token**" >> "$GITHUB_STEP_SUMMARY"
-                  echo "" >> "$GITHUB_STEP_SUMMARY"
-                  echo "2. **Classic Token**:" >> "$GITHUB_STEP_SUMMARY"
-                  echo "   - Go to: https://github.com/settings/tokens" >> "$GITHUB_STEP_SUMMARY"
-                  echo "   - Ensure the **repo** checkbox is checked (Full control of repositories)" >> "$GITHUB_STEP_SUMMARY"
-                  echo "   - Update the secret \`PAT\` in https://github.com/$GITHUB_REPOSITORY/settings/secrets/actions" >> "$GITHUB_STEP_SUMMARY"
-                fi
                 return 1
               fi
             else
-              echo "No changes detected for $REPO_NAME ($TARGET_BRANCH)."
+              echo "No changes detected for $REPO_NAME ($TARGET_BRANCH). Skipping unnecessary commit & deployment."
             fi
           }
 
-          # 1. Transfer Admin codebase to target Admin repository
-          sync_repo "admin" "$ADMIN_TARGET" "admin" || ADMIN_SYNC_FAILED=1
+          # 1. Transfer Admin codebase to target Admin repository ONLY when actual Admin code changes (NEVER on Public/Admin Content Releases)
+          if [[ "$COMMIT_MSG" == *"Public Release"* ]] || [[ "$COMMIT_MSG" == *"Admin Release"* ]]; then
+            echo "Notice: Content release commit detected ('$COMMIT_MSG'). Skipping Admin repository sync (Admin runs 100% on Firebase)."
+          else
+            sync_repo "admin" "$ADMIN_TARGET" "admin" || ADMIN_SYNC_FAILED=1
+          fi
 
           # 2. Sync clean Public release (if separate public repo configured or to production branch)
           sync_repo "public" "$PUBLIC_TARGET" "public" || PUBLIC_SYNC_FAILED=1
@@ -509,3 +421,4 @@ jobs:
             echo "::error::One or more sync targets failed. Check diagnostics above."
             exit 1
           fi
+

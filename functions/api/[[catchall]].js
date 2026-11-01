@@ -1,6 +1,9 @@
 import { handleSessionInit, handleSessionClearance } from '../../src/server/security/gateCore';
 import { HARD_RESPONSE_STATUS, HARD_RESPONSE_BODY } from '../../src/lib/gateConfig';
 import { resolveAppSlug } from '../../src/lib/slugResolver';
+import { encryptAesGcmV2, decryptVaultValue } from '../../src/server/crypto';
+import { safeEncrypt, safeDecrypt, getAesSecret } from '../../src/lib/cryptoUtils';
+import { setRamVaultLink, isValidDestinationUrl } from '../../src/server/services/linkService';
 import staticData from '../../src/lib/staticData.json';
 
 async function sha256Hex(str) {
@@ -347,12 +350,6 @@ export async function onRequest(context) {
     });
   }
 
-  if (url.pathname === '/api/v1/public/news') {
-    return new Response(JSON.stringify({ status: 'OK', news: staticData?.news || [] }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    });
-  }
 
   if (url.pathname === '/api/v1/public/videos') {
     return new Response(JSON.stringify({ status: 'OK', videos: staticData?.videos || [] }), {
@@ -801,6 +798,61 @@ export async function onRequest(context) {
     return true;
   };
 
+  if (url.pathname === '/api/v1/public/news') {
+    let newsList = Array.isArray(staticData?.news) ? staticData.news : [];
+    const cfg = getEdgeFirestoreConfig();
+    if (cfg.configured) {
+      try {
+        const newsSnap = await edgeReadDoc('store_data', 'news');
+        if (newsSnap.exists && Array.isArray(newsSnap.data?.items) && newsSnap.data.items.length > 0) {
+          newsList = newsSnap.data.items;
+        }
+      } catch (_) {}
+    }
+    const publicNews = newsList.filter((n) => n && n.sync_to_public !== false);
+    return new Response(JSON.stringify({ status: 'OK', news: publicNews }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'public, max-age=120, s-maxage=300, stale-while-revalidate=3600',
+      },
+    });
+  }
+
+  if (url.pathname.startsWith('/api/v1/public/news/')) {
+    const rawSlug = url.pathname.replace(/^\/api\/v1\/public\/news\//, '').trim();
+    const clean = decodeURIComponent(rawSlug).toLowerCase().trim();
+    let newsList = Array.isArray(staticData?.news) ? staticData.news : [];
+    const cfg = getEdgeFirestoreConfig();
+    if (cfg.configured) {
+      try {
+        const newsSnap = await edgeReadDoc('store_data', 'news');
+        if (newsSnap.exists && Array.isArray(newsSnap.data?.items) && newsSnap.data.items.length > 0) {
+          newsList = newsSnap.data.items;
+        }
+      } catch (_) {}
+    }
+    const item = newsList.find((n) => {
+      if (!n || n.sync_to_public === false) return false;
+      const s = String(n.slug || n.id || '').toLowerCase().trim();
+      const id = String(n.id || '').toLowerCase().trim();
+      return s === clean || id === clean;
+    });
+    if (item) {
+      return new Response(JSON.stringify({ status: 'OK', news: item }), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'public, max-age=300, s-maxage=900, stale-while-revalidate=86400',
+        },
+      });
+    }
+    return new Response(JSON.stringify({ status: 'NOT_FOUND', error: 'News item not found' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    });
+  }
+
   // 7a. Admin & Public Firebase Status Telemetry (/api/v1/admin/firebase-status)
   if (url.pathname === '/api/v1/admin/firebase-status' || url.pathname === '/api/v1/public/firebase-status') {
     const cfg = getEdgeFirestoreConfig();
@@ -1240,7 +1292,115 @@ export async function onRequest(context) {
     }
   }
 
-  if ((url.pathname === '/api/v1/admin/encrypt' || url.pathname === '/api/v1/admin/encrypt-links' || url.pathname === '/api/v1/admin/seal-vault' || url.pathname === '/api/v1/admin/sync-local' || url.pathname === '/api/v1/admin/backup-links' || url.pathname === '/api/v1/admin/clear-cache') && request.method === 'POST') {
+  if (url.pathname === '/api/v1/admin/encrypt' && request.method === 'POST') {
+    let body = {};
+    try { body = JSON.parse(rawBody || '{}'); } catch (_) {}
+    const plainUrl = String(body?.url || '').trim();
+    if (!plainUrl) {
+      return new Response(JSON.stringify({ status: 'ERROR', error: 'URL required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      });
+    }
+    if (plainUrl.startsWith('v2.') || plainUrl.startsWith('U2FsdGVkX1')) {
+      return new Response(JSON.stringify({ status: 'OK', encrypted: plainUrl }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      });
+    }
+    const edgeAesSecret = String(env?.AES_SECRET || env?.VITE_AES_SECRET || env?.VAULT_SECRET_KEY || getAesSecret()).trim();
+    const hasV2Key = Boolean(env?.AES_KEY && String(env.AES_KEY).trim());
+    const encrypted = hasV2Key
+      ? (await encryptAesGcmV2(plainUrl, env)) || safeEncrypt(plainUrl, edgeAesSecret)
+      : safeEncrypt(plainUrl, edgeAesSecret);
+    return new Response(JSON.stringify({ status: 'OK', encrypted }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    });
+  }
+
+  if (url.pathname === '/api/v1/admin/encrypt-links' && request.method === 'POST') {
+    let body = {};
+    try { body = JSON.parse(rawBody || '{}'); } catch (_) {}
+    const items = Array.isArray(body?.items) ? body.items : [];
+    const edgeAesSecret = String(env?.AES_SECRET || env?.VITE_AES_SECRET || env?.VAULT_SECRET_KEY || getAesSecret()).trim();
+    const hasV2Key = Boolean(env?.AES_KEY && String(env.AES_KEY).trim());
+    const encryptedItems = [];
+    for (const item of items) {
+      const plainUrl = String(item?.url || '').trim();
+      if (plainUrl) {
+        if (item.id) setRamVaultLink(String(item.id), plainUrl);
+        if (item.slug) setRamVaultLink(String(item.slug), plainUrl);
+      }
+      let encrypted_link = '';
+      if (plainUrl) {
+        encrypted_link = hasV2Key
+          ? (await encryptAesGcmV2(plainUrl, env)) || safeEncrypt(plainUrl, edgeAesSecret)
+          : safeEncrypt(plainUrl, edgeAesSecret);
+      }
+      encryptedItems.push({
+        id: item.id,
+        slug: item.slug,
+        encrypted_link,
+      });
+    }
+    return new Response(JSON.stringify({ status: 'OK', success: true, count: encryptedItems.length, items: encryptedItems }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    });
+  }
+
+  if (url.pathname === '/api/v1/admin/seal-vault' && request.method === 'POST') {
+    let body = {};
+    try { body = JSON.parse(rawBody || '{}'); } catch (_) {}
+    const items = Array.isArray(body?.items) ? body.items : [];
+    const edgeAesSecret = String(env?.AES_SECRET || env?.VITE_AES_SECRET || env?.VAULT_SECRET_KEY || getAesSecret()).trim();
+    const hasV2Key = Boolean(env?.AES_KEY && String(env.AES_KEY).trim());
+    const vaultMap = {};
+    for (const item of items) {
+      if (!item) continue;
+      const id = String(item.id || '').trim();
+      const slug = String(item.slug || '').trim();
+      const rawUrl = item.more_information_url || item.encrypted_link || item.url || '';
+      if (!rawUrl || typeof rawUrl !== 'string') continue;
+      const trimmed = rawUrl.trim();
+      if (trimmed.toLowerCase().includes('mediafire.com') || trimmed.includes('com.example')) continue;
+      const plainUrl =
+        trimmed.startsWith('v2.') || trimmed.startsWith('U2FsdGVkX1')
+          ? (await decryptVaultValue(trimmed, env)) || safeDecrypt(trimmed, edgeAesSecret) || ''
+          : trimmed;
+      if (!isValidDestinationUrl(plainUrl)) continue;
+      if (id) {
+        vaultMap[id] = plainUrl;
+        setRamVaultLink(id, plainUrl);
+      }
+      if (slug) {
+        vaultMap[slug] = plainUrl;
+        setRamVaultLink(slug, plainUrl);
+      }
+    }
+    const jsonPayload = JSON.stringify(vaultMap);
+    const ciphertext = hasV2Key
+      ? (await encryptAesGcmV2(jsonPayload, env)) || safeEncrypt(jsonPayload, edgeAesSecret)
+      : safeEncrypt(jsonPayload, edgeAesSecret);
+    const rawTsSecret = String(
+      body?.turnstileSecretKey ||
+        env?.TURNSTILE_SECRET_KEY ||
+        env?.VITE_TURNSTILE_SECRET_KEY ||
+        ''
+    ).trim();
+    const encryptedTurnstileSecret = rawTsSecret
+      ? (hasV2Key
+          ? (await encryptAesGcmV2(rawTsSecret, env)) || safeEncrypt(rawTsSecret, edgeAesSecret)
+          : safeEncrypt(rawTsSecret, edgeAesSecret))
+      : '';
+    return new Response(JSON.stringify({ status: 'OK', success: true, ciphertext, encryptedTurnstileSecret }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    });
+  }
+
+  if ((url.pathname === '/api/v1/admin/sync-local' || url.pathname === '/api/v1/admin/backup-links' || url.pathname === '/api/v1/admin/clear-cache') && request.method === 'POST') {
     let body = {};
     try { body = JSON.parse(rawBody || '{}'); } catch (_) {}
     return new Response(JSON.stringify({ status: 'OK', success: true, encrypted: body?.encrypted || null, encryptedLinks: body?.links || {} }), {
@@ -1250,7 +1410,16 @@ export async function onRequest(context) {
   }
 
   if ((url.pathname === '/api/v1/admin/backup-links-get' || url.pathname === '/api/v1/admin/debug-links') && request.method === 'GET') {
-    return new Response(JSON.stringify({ status: 'OK', success: true, links: {} }), {
+    try {
+      const secSnap = await edgeReadDoc('store_data', 'secure_links');
+      if (secSnap.exists && Array.isArray(secSnap.data?.items)) {
+        return new Response(JSON.stringify({ status: 'OK', success: true, items: secSnap.data.items, links: {} }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        });
+      }
+    } catch (_) {}
+    return new Response(JSON.stringify({ status: 'OK', success: true, items: [], links: {} }), {
       status: 200,
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
     });

@@ -960,7 +960,7 @@ export async function commitTreeToGitHub({
         sha: entry.sha
       }));
 
-      // Prune any legacy public/data/ files from the remote git tree so only atomic files remain
+      // Prune any legacy private backups or screenshot artifacts from the remote git tree so the repository stays 100% clean
       try {
         const baseTreeDetailsRes = await fetch(
           `https://api.github.com/repos/${encodeURIComponent(cleanOwner)}/${encodeURIComponent(cleanRepo)}/git/trees/${baseTreeSha}?recursive=1`,
@@ -975,7 +975,13 @@ export async function commitTreeToGitHub({
           const baseTreeDetails = await baseTreeDetailsRes.json() as any;
           if (Array.isArray(baseTreeDetails?.tree)) {
             const dataEntries = baseTreeDetails.tree.filter((t: any) => 
-              t.path && t.type === 'blob' && (t.path === 'src/lib/public_backup.json')
+              t.path && t.type === 'blob' && (
+                t.path === 'src/lib/public_backup.json' ||
+                t.path === 'src/sync-meta.json' ||
+                t.path === 'bun.lock' ||
+                t.path.startsWith('public/assets/aistudio/') ||
+                t.path.startsWith('.aistudio/')
+              )
             );
             dataEntries.forEach((t: any) => {
               treeEntries.push({
@@ -986,7 +992,7 @@ export async function commitTreeToGitHub({
               });
             });
             if (dataEntries.length > 0) {
-              console.log(`[GitHub Sync] Pruned private backup file from remote git tree.`);
+              console.log(`[GitHub Sync] Pruned ${dataEntries.length} unnecessary/screenshot file(s) from remote git tree.`);
             }
           }
         }

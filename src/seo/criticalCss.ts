@@ -9,7 +9,7 @@ const CRITICAL_SHELL_CSS = `<style id="server-critical-css">
   *,::before,::after{box-sizing:border-box;border:0 solid}
   html{-webkit-text-size-adjust:100%;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased;background-color:#ffffff;color:#09090b;color-scheme:light}
   @media (prefers-color-scheme:dark){html:not(.light){background-color:#090d16;color:#f8fafc;color-scheme:dark}}
-  html.dark{background-color:#090d16;color:#f8fafc;color-scheme:dark}
+  html.dark,html[data-theme="dark"]{background-color:#090d16;color:#f8fafc;color-scheme:dark}
   body{margin:0;min-height:100vh;background-color:inherit;color:inherit;overflow-x:hidden}
   img,svg,video{display:block;max-width:100%;height:auto}
   a{color:inherit;text-decoration:inherit}

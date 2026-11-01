@@ -694,9 +694,20 @@ adminVaultRouter.post(['/api/v1/admin/app/save', '/api/v1/admin/save-single-app'
         const ciphertext = hasV2Key
           ? (await encryptAesGcmV2(jsonPayload, process.env as Record<string, string | undefined>)) || safeEncrypt(jsonPayload, AES_SECRET)
           : safeEncrypt(jsonPayload, AES_SECRET);
+        const rawTsSecret = String(
+          current.settings?.turnstile_secret_key ||
+            process.env.TURNSTILE_SECRET_KEY ||
+            process.env.VITE_TURNSTILE_SECRET_KEY ||
+            ''
+        ).trim();
+        const encryptedTurnstileSecret = rawTsSecret
+          ? (hasV2Key
+              ? (await encryptAesGcmV2(rawTsSecret, process.env as Record<string, string | undefined>)) || safeEncrypt(rawTsSecret, AES_SECRET)
+              : safeEncrypt(rawTsSecret, AES_SECRET))
+          : '';
         if (ciphertext) {
           const vaultFilePath = path.join(process.cwd(), 'src/lib/secureVault.ts');
-          fs.writeFileSync(vaultFilePath, generateSecureVaultFile(ciphertext), 'utf8');
+          fs.writeFileSync(vaultFilePath, generateSecureVaultFile(ciphertext, encryptedTurnstileSecret), 'utf8');
         }
       } catch (vaultErr) {
         console.warn('[adminVaultRoutes] Notice updating vault on single app save:', vaultErr);
@@ -1009,7 +1020,7 @@ adminVaultRouter.post('/api/v1/admin/encrypt-links', async (req, res) => {
 
 adminVaultRouter.post('/api/v1/admin/seal-vault', async (req, res) => {
   try {
-    const { items } = req.body || {};
+    const { items, turnstileSecretKey } = req.body || {};
     const { encryptAesGcmV2, decryptVaultValue } = await import('../crypto.js');
     const { setRamVaultLink, isValidDestinationUrl } = await import('../services/linkService.js');
     const AES_SECRET = getAesSecret();
@@ -1050,15 +1061,29 @@ adminVaultRouter.post('/api/v1/admin/seal-vault', async (req, res) => {
       ? (await encryptAesGcmV2(jsonPayload, process.env as Record<string, string | undefined>)) || safeEncrypt(jsonPayload, AES_SECRET)
       : safeEncrypt(jsonPayload, AES_SECRET);
 
+    const current = getMergedData();
+    const rawTsSecret = String(
+      turnstileSecretKey ||
+        current.settings?.turnstile_secret_key ||
+        process.env.TURNSTILE_SECRET_KEY ||
+        process.env.VITE_TURNSTILE_SECRET_KEY ||
+        ''
+    ).trim();
+    const encryptedTurnstileSecret = rawTsSecret
+      ? (hasV2Key
+          ? (await encryptAesGcmV2(rawTsSecret, process.env as Record<string, string | undefined>)) || safeEncrypt(rawTsSecret, AES_SECRET)
+          : safeEncrypt(rawTsSecret, AES_SECRET))
+      : '';
+
     if (ciphertext) {
       try {
         const vaultFilePath = path.join(process.cwd(), 'src/lib/secureVault.ts');
-        fs.writeFileSync(vaultFilePath, generateSecureVaultFile(ciphertext), 'utf8');
+        fs.writeFileSync(vaultFilePath, generateSecureVaultFile(ciphertext, encryptedTurnstileSecret), 'utf8');
       } catch (e) {
         console.warn('[adminVaultRoutes] Could not write src/lib/secureVault.ts:', e);
       }
     }
-    res.json({ success: true, ciphertext });
+    res.json({ success: true, ciphertext, encryptedTurnstileSecret });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err?.message });
   }
@@ -1066,8 +1091,8 @@ adminVaultRouter.post('/api/v1/admin/seal-vault', async (req, res) => {
 
 adminVaultRouter.post('/api/v1/admin/build-public-api', async (req, res) => {
   try {
-    const { ciphertext } = req.body || {};
-    const content = generateSecureVaultFile(String(ciphertext || ''));
+    const { ciphertext, encryptedTurnstileSecret } = req.body || {};
+    const content = generateSecureVaultFile(String(ciphertext || ''), String(encryptedTurnstileSecret || ''));
     res.json({ success: true, content });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err?.message });

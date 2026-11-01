@@ -705,6 +705,14 @@ export function useDataActions(
     targetNews?: NewsItem[],
     targetVideos?: VideoItem[]
   ) => {
+    const isLocalDevHost = typeof window !== 'undefined' && (
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname.includes('.run.app')
+    );
+    if (!isLocalDevHost) {
+      return;
+    }
     try {
       const idToken = await getAdminToken();
       const res = await adminFetch('/api/v1/admin/sync-local', {

@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, .dark, .dark *));
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, .dark, .dark *), @media (prefers-color-scheme: dark));
 @source not "../api";
 @source not "../dist";
 @source not "../public";
@@ -35,7 +35,7 @@
   }
 }
 
-.dark {
+.dark, [data-theme="dark"] {
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --bg-primary: #090d16;
   --text-primary: #f8fafc;

@@ -577,29 +577,49 @@ export function useGitHubSync(
     const catalogStatsCode = JSON.stringify(communityStatsPayload || { appCounts: {}, totalReviews: 0 });
     const staticReviewsCode = JSON.stringify(communityReviewsPayload);
 
-    try {
-      const idToken = await getAdminToken();
-      if (idToken) {
-        log("GitHub Sync: Synchronizing local static files and sitemaps...");
-        await adminFetch('/api/v1/admin/sync-local', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-          body: JSON.stringify({
-            apps: safeBackupApps,
-            settings: finalSettings,
-            news: publicNews,
-            videos: targetVideos,
-            catalogStats: communityStatsPayload || null,
-            staticReviews: communityReviewsPayload || null
-          })
-        });
+    const isLocalDevHost = typeof window !== 'undefined' && (
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname.includes('.run.app')
+    );
+
+    if (isLocalDevHost) {
+      try {
+        const idToken = await getAdminToken();
+        if (idToken) {
+          log("GitHub Sync: Synchronizing local dev static files and sitemaps...");
+          await adminFetch('/api/v1/admin/sync-local', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+            body: JSON.stringify({
+              apps: safeBackupApps,
+              settings: finalSettings,
+              news: publicNews,
+              videos: targetVideos,
+              catalogStats: communityStatsPayload || null,
+              staticReviews: communityReviewsPayload || null
+            })
+          });
+        }
+      } catch (localSyncErr: any) {
+        log(`GitHub Sync Notice: Local files backup note: ${localSyncErr?.message || 'skipped'}`);
       }
-    } catch (localSyncErr: any) {
-      log(`GitHub Sync Notice: Local files backup note: ${localSyncErr?.message || 'skipped'}`);
     }
 
     let targetRepo = (configToUse.repo || (import.meta as any).env?.VITE_GITHUB_PUBLIC_REPO || '').trim();
     if (!configToUse.owner || !targetRepo) throw new Error("Missing GitHub repository owner or repository name configuration.");
+
+    const lowerTargetRepo = targetRepo.toLowerCase();
+    if (
+      lowerTargetRepo === 'admin' ||
+      lowerTargetRepo.endsWith('/admin') ||
+      lowerTargetRepo.endsWith('-admin') ||
+      lowerTargetRepo.includes('masterworld')
+    ) {
+      throw new Error(
+        `Invalid target repository "${targetRepo}": Admin website runs 100% on Firebase and does not use static GitHub pushes. Please set your GitHub Repository to the Public Website repository.`
+      );
+    }
 
     try {
       log(`GitHub Sync: Preparing complete compressed release bundle for "${targetRepo}"...`);
@@ -611,19 +631,26 @@ export function useGitHubSync(
       try {
         log(`GitHub Sync: Building AES Encrypted Vault...`);
         let vaultCiphertext = "";
+        let encryptedTurnstileSecret = "";
 
         try {
           const idToken = await getAdminToken();
           const vaultRes = await adminFetch('/api/v1/admin/seal-vault', {
              method: 'POST',
              headers: { 'Content-Type': 'application/json', ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {}) },
-             body: JSON.stringify({ items: publicApps })
+             body: JSON.stringify({
+               items: publicApps,
+               turnstileSecretKey: finalSettings?.turnstile_secret_key || ''
+             })
           });
 
           if (vaultRes.ok) {
             const vaultData = await vaultRes.json();
             if (vaultData.ciphertext) {
               vaultCiphertext = vaultData.ciphertext;
+            }
+            if (vaultData.encryptedTurnstileSecret) {
+              encryptedTurnstileSecret = vaultData.encryptedTurnstileSecret;
             }
           }
         } catch (_) {}
@@ -647,8 +674,18 @@ export function useGitHubSync(
           vaultCiphertext = safeEncrypt(JSON.stringify(vaultMap), AES_SECRET);
         }
 
+        if (
+          !encryptedTurnstileSecret &&
+          finalSettings?.turnstile_secret_key &&
+          typeof finalSettings.turnstile_secret_key === 'string' &&
+          finalSettings.turnstile_secret_key.trim()
+        ) {
+          const AES_SECRET = getAesSecret();
+          encryptedTurnstileSecret = safeEncrypt(finalSettings.turnstile_secret_key.trim(), AES_SECRET);
+        }
+
         if (vaultCiphertext) {
-          vaultCode = generateSecureVaultFile(vaultCiphertext);
+          vaultCode = generateSecureVaultFile(vaultCiphertext, encryptedTurnstileSecret);
           log(`GitHub Sync: ✅ AES Encrypted Vault sealed.`);
         }
       } catch (vaultErr: any) {

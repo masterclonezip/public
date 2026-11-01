@@ -26,7 +26,6 @@ githubSyncRouter.get('/api/github-sync/public-core-files', (req, res) => {
       'src/lib/sitemapGenerator.ts',
       'src/lib/firebaseConfig.ts',
       'src/lib/communityFirebase.ts',
-      'src/lib/githubSync.ts',
       'src/server/crypto.ts',
       'src/server/services/linkService.ts',
       'src/server/security/gateCore.ts',

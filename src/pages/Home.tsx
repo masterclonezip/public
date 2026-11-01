@@ -374,7 +374,7 @@ export default function Home() {
           {mockApps.length === 0 && (
             <div className="p-8 text-center bg-zinc-50 dark:bg-zinc-900 rounded-2xl mx-4 mt-8 border border-zinc-200 dark:border-zinc-800">
               <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-2">No apps available</h3>
-              <p className="text-sm text-zinc-500">
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
                 The database might be temporarily unavailable. Please check back later.
               </p>
             </div>

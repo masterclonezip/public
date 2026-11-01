@@ -130,14 +130,11 @@ const mergeUniqueNews = (baseList: NewsItem[], incomingList: NewsItem[]): NewsIt
     }
   }
 
-  const incomingKeys = new Set<string>();
-
   for (const item of (incomingList || [])) {
     if (!item) continue;
     const key = (item.slug || item.id || '').toLowerCase().trim();
     const idKey = (item.id || '').toLowerCase().trim();
     if (key) {
-      incomingKeys.add(key);
       const prevKeyById = idKey ? idToKey.get(idKey) : undefined;
       const existing = map.get(key) || (prevKeyById ? map.get(prevKeyById) : undefined);
       if (prevKeyById && prevKeyById !== key) {
@@ -149,11 +146,11 @@ const mergeUniqueNews = (baseList: NewsItem[], incomingList: NewsItem[]): NewsIt
         const incomingContent = item.content || item.description_html || '';
         const existingContent = existing.content || existing.description_html || '';
 
-        const isIncomingFull = incomingContent.trim().length > 250 && incomingContent.trim() !== (item.description || '').trim();
-        const isExistingFull = existingContent.trim().length > 250 && existingContent.trim() !== (existing.description || '').trim();
+        const isIncomingFull = Boolean((item as any)._isFullArticle || (incomingContent.trim().length > 20 && incomingContent.trim() !== (item.description || '').trim()));
+        const isExistingFull = Boolean((existing as any)._isFullArticle || (existingContent.trim().length > 20 && existingContent.trim() !== (existing.description || '').trim()));
 
         let finalContent = existingContent;
-        if (isIncomingFull) {
+        if (isIncomingFull && incomingContent.trim().length >= existingContent.trim().length) {
           finalContent = incomingContent;
         } else if (!isExistingFull) {
           finalContent = incomingContent || existingContent;
@@ -164,18 +161,12 @@ const mergeUniqueNews = (baseList: NewsItem[], incomingList: NewsItem[]): NewsIt
           ...item,
           content: finalContent,
           description_html: finalContent,
-        });
+          _isFullArticle: Boolean((existing as any)._isFullArticle || (item as any)._isFullArticle || finalContent.trim().length > 20)
+        } as NewsItem);
       } else {
         map.set(key, { ...item });
       }
     }
-  }
-
-  const isFullNewsIncoming = Array.isArray(incomingList) && incomingList.length > 10 && incomingList.length >= (baseList?.length || 0) * 0.8;
-  if (isFullNewsIncoming) {
-    return Array.from(map.entries())
-      .filter(([k]) => incomingKeys.has(k))
-      .map(([, v]) => v);
   }
 
   return Array.from(map.values());
@@ -222,8 +213,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return mockVideos;
   });
 
-  const [loading, setLoading] = useState(() => apps.length === 0);
-  const [loadedFromServer, setLoadedFromServer] = useState(() => apps.length > 0);
+  const [loading, setLoading] = useState(() => apps.length === 0 && news.length === 0);
+  const [loadedFromServer, setLoadedFromServer] = useState(() => apps.length > 0 || news.length > 0);
   const [isLive, setIsLive] = useState(true);
 
   // Dedicated lightweight fetchers for each section on-demand when URL/route changes
@@ -278,7 +269,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Fetch from server backup endpoint with fast memory caching (zero main-thread localStorage serialization stall)
   const fetchBackupData = useCallback(async (silent = false) => {
     try {
-      if (!silent && apps.length === 0) setLoading(true);
+      if (!silent && apps.length === 0 && news.length === 0) setLoading(true);
       const res = await fetch('/api/v1/public/backup-data', {
         headers: { 'Accept': 'application/json' }
       });
@@ -346,7 +337,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setLoading(false);
     }
-  }, [apps.length]);
+  }, [apps.length, news.length]);
 
   const initialFetchDoneRef = React.useRef(false);
 
@@ -369,11 +360,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Fetch backup data once on initial load if SSR cache was empty or trimmed
     const p = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
     const isCatalog = p === '/' || p === '/new-apps' || p.startsWith('/categories') || p.startsWith('/category');
-    if (apps.length === 0 || (isCatalog && apps.length < 50)) {
+    const isNewsRoute = p === '/news' || p.startsWith('/news/');
+    if (isNewsRoute) {
+      if (news.length === 0) {
+        fetchBackupData(true);
+      }
+    } else if (apps.length === 0 || (isCatalog && apps.length < 50)) {
       fetchBackupData(false);
     }
     return () => clearTimeout(timer);
-  }, [apps.length, fetchBackupData]);
+  }, [apps.length, news.length, fetchBackupData]);
 
   // Ensure full catalog is loaded if user navigates to catalog listing routes or opens search
   const routeFetchDoneRef = React.useRef(false);

@@ -71,27 +71,28 @@ Whenever code is committed to `main`, `.github/workflows/split-sync.yml` trigger
 [Push to `main` branch]
    │
    ├─► 1. Checkout Full Monorepo
-   ├─► 2. Setup Node.js 20 & Install Dependencies
+   ├─► 2. Setup Node.js 22 & Install Dependencies
    │
-   ├─► 3. SYNC TO DEX (PUBLIC SITE):
-   │     • Clone `your-github-org/Dex`
-   │     • Mirror files using rsync (excluding git/temporary artifacts)
-   │     • Build clean public API: `node scripts/build-api.js -> api/index.js`
-   │     • Delete all `ADMIN_ONLY_FILES` (Admin tabs, server routes, vault keys)
-   │     • Swap `src/AppPublic.tsx` -> `src/App.tsx`
-   │     • Set `__ADMIN_ENABLED__: false` in `vite.config.ts`
-   │     • Commit & push to `your-github-org/Dex`
+   ├─► 3. SYNC TO MASTERWORLD (ADMIN SITE):
+   │     • Check commit message for "Public Release" or "Admin Release" tag:
+   │       - IF "Public Release" or "Admin Release": SKIP masterworld completely (Admin runs 100% on Firebase and never needs static catalog pushes)!
+   │       - ELSE:
+   │         • Clone `your-github-org/admin`
+   │         • Mirror files using rsync (excluding `public/assets`, lockfiles, and temporary artifacts)
+   │         • Delete all `PUBLIC_ONLY_FILES` (Home, AppDetails, legal pages, sitemaps, `public/data/`)
+   │         • Reset `src/lib/staticData.json`, `src/lib/staticData.ts`, `src/lib/communityCatalogStats.json`, and `src/lib/communityStaticReviews.json` to fixed empty shells so Public content updates NEVER trigger Admin commits or deployments
+   │         • Purge non-admin pages (`src/pages/*` except `Admin*.tsx`)
+   │         • Swap `src/AppAdmin.tsx` -> `src/App.tsx`
+   │         • Commit (WITHOUT `[skip ci]` so Cloudflare Pages deploys real Admin code changes) & push ONLY if `git status --porcelain` has real Admin code changes
    │
-   └─► 4. SYNC TO MASTERWORLD (ADMIN SITE):
-         • Check commit message for "Admin Release" tag:
-           - IF "Admin Release": SKIP masterworld to prevent circular sync loop!
-           - ELSE:
-             • Clone `your-github-org/masterworld`
-             • Mirror files using rsync
-             • Delete all `PUBLIC_ONLY_FILES` (Home, AppDetails, legal pages)
-             • Purge non-admin pages (`src/pages/*` except `Admin*.tsx`)
-             • Swap `src/AppAdmin.tsx` -> `src/App.tsx`
-             • Commit & push to `your-github-org/masterworld`
+   └─► 4. SYNC TO DEX (PUBLIC SITE):
+         • Clone `your-github-org/Dex`
+         • Mirror files using rsync (excluding `public/assets/aistudio` and temporary artifacts)
+         • Build clean public API: `node scripts/build-api.js -> api/index.js`
+         • Delete all `ADMIN_ONLY_FILES` (Admin tabs, server routes, vault keys, internal docs)
+         • Swap `src/AppPublic.tsx` -> `src/App.tsx`
+         • Set `__ADMIN_ENABLED__: false` in `vite.config.ts`
+         • Commit (WITHOUT `[skip ci]` so Cloudflare Pages never skips a deployment) & push to `your-github-org/Dex`
 ```
 
 ---
@@ -105,13 +106,14 @@ To maintain clean repository boundaries, files are categorized into explicit all
 src/components/admin/              # All Admin Dashboard tabs, modals & editors
 src/pages/AdminDashboard.tsx       # Primary Admin Management view
 src/pages/AdminLogin.tsx           # Admin 2FA / TOTP login portal
-src/server/                        # All Express API routers, vault routes, & auth middleware
+src/server/                        # Express admin routers & auth middleware
 src/lib/totp.ts                    # Time-based One-Time Password generator
-src/lib/secureVault.ts             # AES download link encryption/decryption keys
+src/lib/githubSync.ts              # Admin-to-Public Git Tree synchronization engine
 src/lib/secureStorage.ts           # Encrypted local storage driver
 scripts/                           # Database migration and admin audit scripts
 server.ts                          # Express server entry point
 firestore.rules / firebase.json    # Master Catalog Firestore security rules
+public/assets/                     # Debug/AI Studio screenshots (strictly excluded from all repos)
 ```
 
 ### B. Public-Only Files (Stripped from Admin `masterworld` Repo)
@@ -120,47 +122,49 @@ src/pages/Home.tsx                 # Public catalog homepage
 src/pages/AppDetails.tsx           # Public app specifications & reviews view
 src/pages/NewsPage.tsx             # Public news portal
 src/pages/VideosPage.tsx           # Public media gallery
-src/pages/LegalPage.tsx            # Terms, Privacy, Disclaimer pages
+src/pages/FaqPage.tsx              # Public FAQ page
 src/components/public/             # Public navigation, header, footer, app cards
 src/components/playstore/          # Play Store design system UI components
-public/                            # Static images, icons, and webmanifest assets
+public/sitemap*.xml*               # Public XML sitemaps (Admin does not serve public sitemaps)
+public/data/                       # Pre-rendered per-app review slices
 ```
 
 ---
 
 ## 5. Data Propagation Flow: Admin Edit to Live Public Site
 
-When an administrator updates app information (e.g., adding a new app, changing download links, or modifying descriptions), data propagates through a 4-step sync pipeline:
+When an administrator updates app information (e.g., adding a new app, changing download links, or modifying descriptions), data propagates through a strict **one-way Admin $\to$ Public** sync pipeline:
 
 ```
 [1. ADMIN EDITS APP IN DASHBOARD]
    │
-   ├─► Saves changes via Admin API (`/api/v1/admin/apps`)
-   └─► Updates Cloud Firestore (`ai-studio-catalog-store-...` / `store_data`)
+   ├─► Saves changes directly to Cloud Firestore (`store_data`) in real time
+   └─► Admin Dashboard operates 100% on live Firestore (zero static cache dependency)
    │
    ▼
-[2. HIGH-AVAILABILITY SNAPSHOT GENERATION]
+[2. ONE-WAY PUBLIC SNAPSHOT GENERATION]
    │
-   ├─► Admin triggers "Publish Release" / "Sync to Public"
-   └─► Generates updated `/src/lib/staticData.json` snapshot containing all app metadata
-   │
-   ▼
-[3. GIT COMMIT WITH 'ADMIN RELEASE' TAG]
-   │
-   ├─► Commit created: `git commit -m "Admin Release: Updated catalog metadata"`
-   └─► Pushed to Monorepo `main` branch
+   ├─► Admin clicks "Sync" in Dashboard (`useGitHubSync.ts`)
+   └─► Compiles `src/lib/staticData.json`, `src/lib/staticData.ts`, `src/lib/communityCatalogStats.json`, `src/lib/communityStaticReviews.json`, `src/lib/secureVault.ts`, and `public/sitemap*.xml`
    │
    ▼
-[4. DUAL-REPO SPLIT-SYNC WORKFLOW]
+[3. ATOMIC GIT COMMIT TO PUBLIC REPO (NO `[skip ci]`)]
    │
-   ├─► Workflow detects "Admin Release" commit message
-   ├─► Automatically skips `masterworld` (preventing redundant admin rebuilds)
-   ├─► Updates `your-github-org/Dex` with new `staticData.json`
+   ├─► Commit created: `Public Release: Complete Catalog, Community Data & Secure Vault Synchronization`
+   ├─► Automatically prunes any leftover `public/assets/aistudio/*` screenshots from remote git tree
+   └─► Pushed atomically to Public Website Repository
    │
    ▼
-[5. LIVE VERCEL DEPLOYMENT (DEX)]
+[4. DUAL-REPO SPLIT-SYNC GUARD (IF PUSHED VIA MONOREPO)]
    │
-   └─► Vercel deploys `www.example.com` in under 30 seconds with 100% uptime
+   ├─► Workflow detects "Public Release" / "Admin Release" commit message
+   ├─► Automatically skips `masterworld` / `admin` (Admin never receives pushes from public content updates)
+   ├─► Updates `Dex` (Public Repo) WITHOUT `[skip ci]`
+   │
+   ▼
+[5. LIVE CLOUDFLARE PAGES / VERCEL DEPLOYMENT (PUBLIC ONLY)]
+   │
+   └─► Cloudflare Pages builds and deploys Public Website with 0 skipped pushes and 0 Admin rebuilds
 ```
 
 ---

@@ -88,7 +88,7 @@ async function syncStaticDataAndSitemaps() {
   const publicSettings = { ...(data.settings || {}) };
   delete publicSettings.turnstile_secret_key;
 
-  if (publicApps.length > 0) {
+  if (publicApps.length > 0 || publicNews.length > 0) {
     const publicPayload = {
       apps: publicApps,
       settings: publicSettings,

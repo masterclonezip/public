@@ -1,16 +1,15 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AppConfig, GlobalSettings, NewsItem, VideoItem } from '../types';
-import { mockApps, mockSettings, mockNews, mockVideos } from '../lib/staticData';
 import { adminFetch } from '../services/adminAuthService';
-import { db, isFirebaseReal, hydrateFirebaseRuntimeConfig, readFirestoreDoc } from '../lib/firebase';
+import { isFirebaseReal, hydrateFirebaseRuntimeConfig, readFirestoreDoc } from '../lib/firebase';
 
 export function useDataSync() {
   const initialData = (typeof window !== 'undefined' && (window as any).__INITIAL_DATA__) || null;
 
-  const [apps, setApps] = useState<AppConfig[]>(() => Array.isArray(initialData?.apps) ? initialData.apps : (mockApps || []));
-  const [settings, setSettings] = useState<GlobalSettings>(() => initialData?.settings || mockSettings || {} as GlobalSettings);
-  const [news, setNews] = useState<NewsItem[]>(() => Array.isArray(initialData?.news) ? initialData.news : (mockNews || []));
-  const [videos, setVideos] = useState<VideoItem[]>(() => Array.isArray(initialData?.videos) ? initialData.videos : (mockVideos || []));
+  const [apps, setApps] = useState<AppConfig[]>(() => Array.isArray(initialData?.apps) ? initialData.apps : []);
+  const [settings, setSettings] = useState<GlobalSettings>(() => initialData?.settings || ({} as GlobalSettings));
+  const [news, setNews] = useState<NewsItem[]>(() => Array.isArray(initialData?.news) ? initialData.news : []);
+  const [videos, setVideos] = useState<VideoItem[]>(() => Array.isArray(initialData?.videos) ? initialData.videos : []);
   
   const [loading, setLoading] = useState(!initialData);
   const [loadedFromServer, setLoadedFromServer] = useState(!!initialData);
@@ -68,13 +67,9 @@ export function useDataSync() {
         console.warn("adminFetch /api/v1/admin/data error:", adminErr);
       }
 
-      // If admin data fetch succeeded with real Firestore or local_backup data (not an empty static_fallback)
-      if (data && data.source !== 'static_fallback' && (Array.isArray(data.apps) || data.settings)) {
-        if (data.source === 'firebase' || data.source === 'local_backup') {
-          setDataSource(data.source);
-        } else {
-          setDataSource('firebase');
-        }
+      // If admin data fetch succeeded with real Firestore data (never static_fallback)
+      if (data && data.source === 'firebase' && (Array.isArray(data.apps) || data.settings)) {
+        setDataSource('firebase');
         if (data.quotaExceeded) {
           setQuotaExceeded(true);
         }
@@ -90,8 +85,10 @@ export function useDataSync() {
         if (Array.isArray(data.videos)) {
           setVideos(data.videos);
         }
+        setIsConnected(true);
+        setIsLive(true);
       } else {
-        // Direct Firestore load (SDK + REST fallback) for static hosts / Cloudflare Pages
+        // Direct Firestore load (SDK + REST fallback) for Admin (100% Firebase-driven)
         let loadedFromDirectFirestore = false;
         if (isFirebaseReal) {
           try {
@@ -194,58 +191,26 @@ export function useDataSync() {
               }
             }
 
-            if (loadedFromDirectFirestore) {
-              setDataSource('firebase');
-              setIsConnected(true);
-              setIsLive(true);
-            }
+            setDataSource('firebase');
+            setIsConnected(true);
+            setIsLive(true);
           } catch (directErr) {
             console.warn("[useDataSync] Direct Firestore load notice:", directErr);
+            setDataSource(isFirebaseReal ? 'firebase' : 'local_backup');
           }
-        }
-
-        if (!loadedFromDirectFirestore) {
-          // Fallback: try public backup-data endpoint
-          try {
-            const publicRes = await fetch('/api/v1/public/backup-data');
-            const cType = publicRes.headers.get('content-type') || '';
-            if (publicRes.ok && cType.includes('application/json')) {
-              const publicData = await publicRes.json();
-              if (Array.isArray(publicData.apps) && publicData.apps.length > 0) {
-                setApps(publicData.apps);
-              }
-              if (publicData.settings && Object.keys(publicData.settings).length > 0) {
-                setSettings(publicData.settings);
-              }
-              if (Array.isArray(publicData.news) && publicData.news.length > 0) {
-                setNews(publicData.news);
-              }
-              if (Array.isArray(publicData.videos) && publicData.videos.length > 0) {
-                setVideos(publicData.videos);
-              }
-            }
-          } catch (_) {}
-
-          setApps(prev => (Array.isArray(prev) && prev.length > 0 ? prev : (mockApps as any || [])));
-          setSettings(prev => (prev && Object.keys(prev).length > 0 ? prev : (mockSettings as any || {} as GlobalSettings)));
-          setNews(prev => (Array.isArray(prev) && prev.length > 0 ? prev : (mockNews as any || [])));
-          setVideos(prev => (Array.isArray(prev) && prev.length > 0 ? prev : (mockVideos as any || [])));
-          setDataSource(isFirebaseReal ? 'firebase' : 'local_backup');
+        } else {
+          setDataSource('local_backup');
+          setIsConnected(false);
+          setIsLive(false);
         }
       }
 
       setFetchedStates({ apps: true, settings: true, news: true, videos: true });
       setSyncStates({ apps: true, settings: true, news: true, videos: true });
       setLastSyncTime(new Date().toLocaleTimeString());
-      setIsConnected(true);
-      setIsLive(true);
     } catch (err: any) {
       console.error("useDataSync fetch error:", err);
-      setApps(prev => (prev && prev.length > 0 ? prev : (mockApps as any || [])));
-      setSettings(prev => (prev && Object.keys(prev).length > 0 ? prev : (mockSettings as any || {} as GlobalSettings)));
-      setNews(prev => (prev && prev.length > 0 ? prev : (mockNews as any || [])));
-      setVideos(prev => (prev && prev.length > 0 ? prev : (mockVideos as any || [])));
-      setDataSource('local_backup');
+      setDataSource(isFirebaseReal ? 'firebase' : 'local_backup');
       if (checkIsQuotaError(err)) {
         setQuotaExceeded(true);
       }

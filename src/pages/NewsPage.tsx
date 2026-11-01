@@ -21,9 +21,10 @@ export default function NewsPage() {
   const contentTopRef = useRef<HTMLDivElement>(null);
   const [copyToast, setCopyToast] = useState(false);
 
-  // Trigger dedicated news fetch only when full news list is not already in memory
+  // Trigger dedicated news fetch only when full news list is not already in memory from SSR
   useEffect(() => {
-    if (fetchNews && (!mockNews || mockNews.length <= 8)) {
+    const ssrFullLoaded = typeof window !== 'undefined' && Boolean((window as any).__INITIAL_DATA__?._newsFullListLoaded);
+    if (fetchNews && (!mockNews || mockNews.length === 0 || (!ssrFullLoaded && mockNews.length === 8))) {
       fetchNews();
     }
   }, [fetchNews, mockNews?.length]);
@@ -84,6 +85,10 @@ export default function NewsPage() {
   const currentNewsSlice = useMemo(() => {
     return filteredNews.slice(startIndex, startIndex + ITEMS_PER_PAGE);
   }, [filteredNews, startIndex]);
+
+  const remainingNews = useMemo(() => {
+    return publicNewsList.slice(ITEMS_PER_PAGE);
+  }, [publicNewsList]);
 
   const handlePageChange = (page: number) => {
     const nextParams = new URLSearchParams(searchParams);
@@ -160,17 +165,58 @@ export default function NewsPage() {
     return range;
   }, [totalPages, safeCurrentPage]);
 
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const baseTitle = mockSettings?.news_meta_title || "News & Updates";
   const seoTitle = safeCurrentPage > 1 ? `${baseTitle} - Page ${safeCurrentPage}` : baseTitle;
-  const seoDescription = mockSettings?.news_meta_description || "The latest gaming news, reports, and transparency updates.";
-  const canonicalUrl = `${window.location.origin}/news${safeCurrentPage > 1 ? `?page=${safeCurrentPage}` : ''}`;
+  const seoDescription = mockSettings?.news_meta_description || "The latest news, reports, and platform updates.";
+  const canonicalUrl = `${origin}/news${safeCurrentPage > 1 ? `?page=${safeCurrentPage}` : ''}`;
+
+  const newsCollectionSchema = useMemo(() => ({
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "@id": `${origin}/news#collection`,
+    "url": canonicalUrl,
+    "name": seoTitle,
+    "description": seoDescription,
+    "inLanguage": "en",
+    "mainEntity": {
+      "@type": "ItemList",
+      "itemListElement": publicNewsList.slice(0, 30).map((item, idx) => ({
+        "@type": "ListItem",
+        "position": idx + 1,
+        "name": item.title,
+        "url": `${origin}/news/${item.slug || item.id}`
+      }))
+    }
+  }), [origin, canonicalUrl, seoTitle, seoDescription, publicNewsList]);
+
+  const newsBreadcrumbSchema = useMemo(() => ({
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": origin || "/"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "News",
+        "item": `${origin}/news`
+      }
+    ]
+  }), [origin]);
 
   return (
-    <div className="w-full text-zinc-900 dark:text-zinc-100 pb-20 min-h-[70vh]">
+    <div className="w-full text-zinc-900 dark:text-zinc-100 pb-20 text-left min-h-[70vh]">
       <Meta 
         title={seoTitle}
         description={seoDescription}
         canonical={canonicalUrl}
+        schema={newsCollectionSchema}
+        breadcrumbSchema={newsBreadcrumbSchema}
       />
 
       {copyToast && (
@@ -187,7 +233,7 @@ export default function NewsPage() {
       <div ref={contentTopRef} className="pt-0.5 pb-0.5 px-3 sm:px-0">
         <Link 
           to="/" 
-          className="inline-flex items-center gap-2 text-sm sm:text-base font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors group shrink-0"
+          className="inline-flex items-center gap-2 text-sm sm:text-base font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors group shrink-0 no-underline"
         >
           <div className="p-1.5 sm:p-2 rounded-full bg-blue-50 dark:bg-blue-900/30 group-hover:-translate-x-1 transition-transform shadow-xs">
             <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -213,8 +259,10 @@ export default function NewsPage() {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
           {searchTerm && (
             <button 
+              type="button"
               onClick={() => handleSearchChange('')}
               className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+              aria-label="Clear search"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -224,19 +272,27 @@ export default function NewsPage() {
 
       {categories.length > 1 && (
         <div className="px-3 sm:px-0 mb-6 flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
-          {categories.map(cat => (
-            <button
-              key={cat}
-              onClick={() => handleCategoryChange(cat)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                activeCategory === cat
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                  : 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+          {categories.map(cat => {
+            const isSelected = activeCategory.toLowerCase() === cat.toLowerCase();
+            const catHref = cat === 'All' ? '/news' : `/news?category=${encodeURIComponent(cat)}`;
+            return (
+              <Link
+                key={cat}
+                to={catHref}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleCategoryChange(cat);
+                }}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer no-underline ${
+                  isSelected
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                    : 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+                }`}
+              >
+                {cat}
+              </Link>
+            );
+          })}
         </div>
       )}
 
@@ -246,6 +302,7 @@ export default function NewsPage() {
           <p className="text-xs text-zinc-400 mt-1 mb-4">Try adjusting your category or search keywords</p>
           {(activeCategory !== 'All' || searchTerm) && (
             <button
+              type="button"
               onClick={handleClearFilters}
               className="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-xl hover:bg-blue-700 transition-colors cursor-pointer"
             >
@@ -267,6 +324,29 @@ export default function NewsPage() {
         paginationRange={paginationRange}
         onPageChange={handlePageChange}
       />
+
+      {activeCategory === 'All' && !searchTerm && safeCurrentPage === 1 && remainingNews.length > 0 && (
+        <nav aria-label="Complete News Archive" data-nosnippet className="mt-10 pt-6 border-t border-zinc-200/80 dark:border-zinc-800/80 px-3 sm:px-0">
+          <h2 className="text-xs sm:text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-3 uppercase tracking-wider">
+            More News &amp; Updates ({remainingNews.length})
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {remainingNews.map((n: any) => {
+              const nTitle = n.title || 'News Article';
+              const nSlug = String(n.slug || n.id || '').trim();
+              return (
+                <Link
+                  key={n.id || nSlug}
+                  to={`/news/${encodeURIComponent(nSlug)}`}
+                  className="px-3 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 hover:bg-blue-50 dark:hover:bg-blue-950/30 border border-zinc-200/60 dark:border-zinc-800/60 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 truncate no-underline transition-colors"
+                >
+                  {nTitle}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      )}
     </div>
   );
 }

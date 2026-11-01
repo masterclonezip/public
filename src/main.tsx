@@ -35,10 +35,32 @@ if (typeof window !== 'undefined' && window.localStorage) {
     localStorage.removeItem('cached_firestore_data');
     localStorage.removeItem('platform_firestore_cache');
     localStorage.removeItem('platform_public_data_cache');
-    localStorage.setItem('platform_cache_version', CACHE_VERSION);
   }
 }
 
+// Live listener for system dark/light mode preference changes
+if (typeof window !== 'undefined' && window.matchMedia) {
+  try {
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleThemeChange = (e: MediaQueryListEvent | MediaQueryList) => {
+      const storedTheme = localStorage.getItem('theme');
+      if (!storedTheme) {
+        if (e.matches) {
+          document.documentElement.classList.add('dark');
+          document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      }
+    };
+    if (mql.addEventListener) {
+      mql.addEventListener('change', handleThemeChange);
+    } else if ((mql as any).addListener) {
+      (mql as any).addListener(handleThemeChange);
+    }
+  } catch (_) {}
+}
 
 // Global chunk loading error handler: only reload if an actual dynamic JavaScript module fails to load after a deployment
 if (typeof window !== 'undefined') {

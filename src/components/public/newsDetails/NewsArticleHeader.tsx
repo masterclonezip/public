@@ -59,17 +59,24 @@ export const NewsArticleHeader: React.FC<NewsArticleHeaderProps> = ({
 
       <header className="mb-4 text-left px-1 sm:px-4">
         <div className="flex flex-wrap items-center gap-2 mb-2 text-xs">
-          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-800/50">
+          <Link
+            to={`/news?category=${encodeURIComponent(category)}`}
+            className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors no-underline"
+          >
             {category}
-          </span>
-          <span className="text-zinc-400 dark:text-zinc-500 flex items-center gap-1 font-medium">
-            <Calendar className="w-3 h-3" />
-            {formattedDate}
-          </span>
-          <span className="text-zinc-300 dark:text-zinc-700">•</span>
+          </Link>
+          {formattedDate && (
+            <>
+              <span className="text-zinc-400 dark:text-zinc-500 flex items-center gap-1 font-medium">
+                <Calendar className="w-3 h-3" />
+                <span>{formattedDate}</span>
+              </span>
+              <span className="text-zinc-300 dark:text-zinc-700">•</span>
+            </>
+          )}
           <span className="text-zinc-400 dark:text-zinc-500 flex items-center gap-1 font-medium">
             <Clock className="w-3 h-3" />
-            {readingTime}
+            <span>{readingTime}</span>
           </span>
         </div>
 
