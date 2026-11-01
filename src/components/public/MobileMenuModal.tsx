@@ -20,7 +20,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import LanguageSelector from '../LanguageSelector';
-import { getOptimizedImageUrl } from '../../seo/utils';
+import { getSizedLogoUrl } from '../../seo/utils';
 import { safeVibrate } from '../../lib/utilsPublic';
 
 interface MobileMenuModalProps {
@@ -110,7 +110,7 @@ export function MobileMenuModal({
 
   const getTransformedUrl = (url?: string) => {
     if (url && url.includes('res.cloudinary.com')) {
-      return getOptimizedImageUrl(url, 120);
+      return getSizedLogoUrl(url, 160, 'auto', 'c_fit');
     }
     return url || '/logo.png';
   };

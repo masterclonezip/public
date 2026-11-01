@@ -23,11 +23,12 @@ import {
   Youtube 
 } from 'lucide-react';
 import { useData } from '../../contexts/DataContextPublic';
-import { getOptimizedImageUrl } from '../../seo/utils';
+import { resolveSiteLogoUrl, getSizedLogoUrl } from '../../seo/utils';
 
 export function PublicFooter() {
   const { settings } = useData();
   const siteTitle = settings?.site_title || '';
+  const resolvedLogoUrl = resolveSiteLogoUrl(settings);
 
   const directoryLinks = [
     { label: 'All Apps', to: '/', icon: LayoutGrid },
@@ -65,9 +66,9 @@ export function PublicFooter() {
               className="text-lg sm:text-xl font-black tracking-tight text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors inline-flex items-center gap-2"
               aria-label={`${siteTitle || 'Homepage'}`}
             >
-              {settings?.logo_url && (
+              {resolvedLogoUrl && (
                 <img
-                  src={getOptimizedImageUrl(settings.logo_url, 80)}
+                  src={getSizedLogoUrl(resolvedLogoUrl, 160, 'auto', 'c_fit')}
                   width={28}
                   height={28}
                   loading="lazy"

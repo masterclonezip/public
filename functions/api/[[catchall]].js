@@ -3,7 +3,7 @@ import { HARD_RESPONSE_STATUS, HARD_RESPONSE_BODY } from '../../src/lib/gateConf
 import { resolveAppSlug } from '../../src/lib/slugResolver';
 import { encryptAesGcmV2, decryptVaultValue } from '../../src/server/crypto';
 import { safeEncrypt, safeDecrypt, getAesSecret } from '../../src/lib/cryptoUtils';
-import { setRamVaultLink, isValidDestinationUrl } from '../../src/server/services/linkService';
+import { setRamVaultLink, isValidDestinationUrl, getPublicTurnstileSiteKey } from '../../src/server/services/linkService';
 import staticData from '../../src/lib/staticData.json';
 
 async function sha256Hex(str) {
@@ -334,7 +334,13 @@ export async function onRequest(context) {
   }
 
   if (url.pathname === '/api/v1/public/backup-data') {
-    return new Response(JSON.stringify(staticData), {
+    const resolvedSiteKey = getPublicTurnstileSiteKey(env);
+    const mergedSettings = { ...(staticData?.settings || {}) };
+    delete mergedSettings.turnstile_secret_key;
+    if (!mergedSettings.turnstile_site_key && resolvedSiteKey) {
+      mergedSettings.turnstile_site_key = resolvedSiteKey;
+    }
+    return new Response(JSON.stringify({ ...staticData, settings: mergedSettings }), {
       status: 200,
       headers: {
         'Content-Type': 'application/json; charset=utf-8',
@@ -344,7 +350,13 @@ export async function onRequest(context) {
   }
 
   if (url.pathname === '/api/v1/public/settings') {
-    return new Response(JSON.stringify({ status: 'OK', settings: staticData?.settings || {} }), {
+    const resolvedSiteKey = getPublicTurnstileSiteKey(env);
+    const mergedSettings = { ...(staticData?.settings || {}) };
+    delete mergedSettings.turnstile_secret_key;
+    if (!mergedSettings.turnstile_site_key && resolvedSiteKey) {
+      mergedSettings.turnstile_site_key = resolvedSiteKey;
+    }
+    return new Response(JSON.stringify({ status: 'OK', settings: mergedSettings }), {
       status: 200,
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
     });
@@ -475,6 +487,9 @@ export async function onRequest(context) {
         },
         cloudinary: {
           cloudName: env?.CLOUDINARY_CLOUD_NAME || env?.VITE_CLOUDINARY_CLOUD_NAME || '',
+        },
+        turnstile: {
+          siteKey: getPublicTurnstileSiteKey(env),
         },
       }),
       {
@@ -1069,11 +1084,30 @@ export async function onRequest(context) {
           }
         }
 
+        const edgeEnvSiteKey = getPublicTurnstileSiteKey(env);
+        const edgeEnvSecretKey = String(
+          env?.TURNSTILE_SECRET_KEY ||
+          env?.VITE_TURNSTILE_SECRET_KEY ||
+          env?.CF_TURNSTILE_SECRET_KEY ||
+          env?.CLOUDFLARE_TURNSTILE_SECRET_KEY ||
+          env?.TURNSTILE_SECRET ||
+          env?.VITE_TURNSTILE_SECRET ||
+          env?.TURNSTILE_TOKEN ||
+          env?.VITE_TURNSTILE_TOKEN ||
+          ''
+        ).trim().replace(/^["'`]+|["'`]+$/g, '').trim();
+
         let liveSettings = {
           ...(staticData?.settings || {}),
           ...(pubSettingsSnap.exists ? pubSettingsSnap.data : {}),
           ...(settingsSnap.exists ? settingsSnap.data : {}),
         };
+        if (!liveSettings.turnstile_site_key && edgeEnvSiteKey) {
+          liveSettings.turnstile_site_key = edgeEnvSiteKey;
+        }
+        if (!liveSettings.turnstile_secret_key && edgeEnvSecretKey) {
+          liveSettings.turnstile_secret_key = edgeEnvSecretKey;
+        }
         if (faqsSnap.exists && Array.isArray(faqsSnap.data?.items)) liveSettings.website_faqs = faqsSnap.data.items;
         if (devsSnap.exists && Array.isArray(devsSnap.data?.items)) liveSettings.developers = devsSnap.data.items;
         if (linksSnap.exists && Array.isArray(linksSnap.data?.items)) liveSettings.quick_links = linksSnap.data.items;
@@ -1102,12 +1136,18 @@ export async function onRequest(context) {
       } catch (_) {}
     }
 
+    const fallbackSettings = { ...(staticData?.settings || {}) };
+    const fallbackSiteKey = getPublicTurnstileSiteKey(env);
+    if (!fallbackSettings.turnstile_site_key && fallbackSiteKey) {
+      fallbackSettings.turnstile_site_key = fallbackSiteKey;
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         status: 'OK',
         apps: staticData?.apps || [],
-        settings: staticData?.settings || {},
+        settings: fallbackSettings,
         news: staticData?.news || [],
         videos: staticData?.videos || [],
         source: 'static_fallback',
@@ -1387,17 +1427,33 @@ export async function onRequest(context) {
       body?.turnstileSecretKey ||
         env?.TURNSTILE_SECRET_KEY ||
         env?.VITE_TURNSTILE_SECRET_KEY ||
+        env?.CF_TURNSTILE_SECRET_KEY ||
+        env?.CLOUDFLARE_TURNSTILE_SECRET_KEY ||
+        env?.TURNSTILE_SECRET ||
+        env?.VITE_TURNSTILE_SECRET ||
+        env?.TURNSTILE_TOKEN ||
+        env?.VITE_TURNSTILE_TOKEN ||
         ''
-    ).trim();
+    ).trim().replace(/^["'`]+|["'`]+$/g, '').trim();
+    const rawTsSiteKey = getPublicTurnstileSiteKey(env);
     const encryptedTurnstileSecret = rawTsSecret
       ? (hasV2Key
           ? (await encryptAesGcmV2(rawTsSecret, env)) || safeEncrypt(rawTsSecret, edgeAesSecret)
           : safeEncrypt(rawTsSecret, edgeAesSecret))
       : '';
-    return new Response(JSON.stringify({ status: 'OK', success: true, ciphertext, encryptedTurnstileSecret }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    });
+    return new Response(
+      JSON.stringify({
+        status: 'OK',
+        success: true,
+        ciphertext,
+        encryptedTurnstileSecret,
+        turnstileSiteKey: rawTsSiteKey,
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      }
+    );
   }
 
   if ((url.pathname === '/api/v1/admin/sync-local' || url.pathname === '/api/v1/admin/backup-links' || url.pathname === '/api/v1/admin/clear-cache') && request.method === 'POST') {

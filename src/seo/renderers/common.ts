@@ -1,4 +1,4 @@
-import { getField, optimizeImageUrl } from '../utils';
+import { getField, optimizeImageUrl, resolveSiteLogoUrl, getSizedLogoUrl } from '../utils';
 import { structureHtmlFragment } from '../../lib/safeHtmlPublic';
 
 export function escapeHtml(unsafe: string): string {
@@ -15,19 +15,17 @@ export function sanitizeHtml(html: string): string {
   if (!html) return '';
   let clean = structureHtmlFragment(html);
   clean = clean.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-  clean = clean.replace(/<([a-zA-Z][a-zA-Z0-9]*)\b([^>]*)>/g, (_match, tag, attrs) => {
+  clean = clean.replace(/<([a-zA-Z][a-zA-Z0-9:-]*)\b([^>]*)>/g, (_match, tag, attrs) => {
     const safeAttrs = String(attrs || '').replace(/\s+on\w+\s*=\s*(['"][^'"]*['"]|[^>\s]+)/gi, '');
     return `<${tag}${safeAttrs}>`;
   });
   clean = clean.replace(/href\s*=\s*['"]\s*javascript:[^'"]*['"]/gi, 'href="#"');
-  clean = clean.replace(/<(iframe|object|embed|form|meta|link|style)\b[^>]*>([\s\S]*?)<\/\1>/gi, '');
-  clean = clean.replace(/<(iframe|object|embed|form|meta|link|style)\b[^>]*>/gi, '');
+  clean = clean.replace(/<(iframe|object|embed|form|meta|link)\b[^>]*>([\s\S]*?)<\/\1>/gi, '');
+  clean = clean.replace(/<(iframe|object|embed|form|meta|link)\b[^>]*>/gi, '');
   clean = clean.replace(/<!DOCTYPE\s+html[^>]*>/gi, '');
   clean = clean.replace(/<title>[^<]*<\/title>/gi, '');
   clean = clean.replace(/<head\b[^>]*>[\s\S]*?<\/head>/gi, '');
   clean = clean.replace(/<\/?(html|head|body)\b[^>]*>/gi, '');
-  clean = clean.replace(/<svg[^>]*class=["'][^"']*art[^"']*["'][^>]*>[\s\S]*?<\/svg>/gi, '');
-  clean = clean.replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, '');
   // Convert any <h1> inside user content to <h2> for strict single-H1 SEO compliance
   clean = clean.replace(/<h1([^>]*)>/gi, '<h2$1>').replace(/<\/h1>/gi, '</h2>');
   return clean.trim();
@@ -35,8 +33,8 @@ export function sanitizeHtml(html: string): string {
 
 export function renderHeader(settings: any): string {
   const siteTitle = getField(settings, 'site_title') || '';
-  const logoUrl = getField(settings, 'logo_url');
-  const optimizedLogo = logoUrl ? optimizeImageUrl(logoUrl, 120) : '';
+  const logoUrl = resolveSiteLogoUrl(settings);
+  const optimizedLogo = logoUrl ? getSizedLogoUrl(logoUrl, 240, 'auto', 'c_fit') : '';
   return `
     <header class="sticky top-0 z-50 transition-transform duration-200 ease-out will-change-transform translate-y-0 pointer-events-auto bg-white dark:bg-[#090d16] sm:bg-white/90 sm:dark:bg-[#090d16]/90 border-b border-black/5 dark:border-white/10 py-2.5 sm:py-3">
       <div class="w-full max-w-7xl px-1.5 xxs:px-2.5 xs:px-4 sm:px-6 lg:px-8 mx-auto relative flex justify-between items-center">
@@ -81,6 +79,8 @@ export function renderHeader(settings: any): string {
 
 export function renderFooter(settings: any): string {
   const siteTitle = getField(settings, 'site_title') || '';
+  const logoUrl = resolveSiteLogoUrl(settings);
+  const optimizedFooterLogo = logoUrl ? getSizedLogoUrl(logoUrl, 160, 'auto', 'c_fit') : '';
   const socialLinks = settings?.social_links || {};
   const fb = socialLinks.facebook || 'https://facebook.com';
   const ig = socialLinks.instagram || 'https://instagram.com';
@@ -95,7 +95,8 @@ export function renderFooter(settings: any): string {
         
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 pb-5 border-b border-zinc-200/80 dark:border-white/[0.08] mb-5 sm:mb-6">
           <div class="flex items-center gap-2.5 flex-wrap">
-            <a href="/" class="text-lg sm:text-xl font-black tracking-tight text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors inline-flex items-center gap-1" aria-label="${escapeHtml(siteTitle || 'Homepage')}">
+            <a href="/" class="text-lg sm:text-xl font-black tracking-tight text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors inline-flex items-center gap-2" aria-label="${escapeHtml(siteTitle || 'Homepage')}">
+              ${optimizedFooterLogo ? `<img src="${escapeHtml(optimizedFooterLogo)}" width="28" height="28" loading="lazy" decoding="async" alt="${escapeHtml(siteTitle || 'Official')} Logo" class="w-6 h-6 sm:w-7 sm:h-7 object-contain shrink-0" />` : ''}
               <span>${escapeHtml(siteTitle)}</span>
             </a>
             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 text-blue-700 dark:text-blue-400 text-[10px] font-bold tracking-wider uppercase">

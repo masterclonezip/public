@@ -107,21 +107,23 @@ export function renderDevelopersList(developers: any[], settings: any): string {
 
 function renderStandardLegalLayout(heading: string, statusLabel: string, statusValue: string, emailLabel: string, supportEmail: string, contentHtml: string): string {
   return `
-    <div class="max-w-[1000px] mx-auto px-4 sm:px-6 md:px-8 py-12 animate-fade-in pb-20 min-h-[70vh] text-left">
-      <div class="mb-10">
-        <a href="/" class="inline-flex items-center gap-1 text-sm font-medium text-zinc-500 hover:text-blue-600 transition-colors">
+    <div class="max-w-[1000px] mx-auto px-3 sm:px-6 md:px-8 py-8 sm:py-12 animate-fade-in pb-20 min-h-[70vh] text-left">
+      <div class="mb-6 sm:mb-8">
+        <a href="/" class="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 hover:text-blue-600 transition-colors">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 12H5M12 19l-7-7 7-7"></path></svg>
           Home
         </a>
       </div>
       <div class="animate-fade-in">
-        <h1 class="text-3xl sm:text-5xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mb-6 border-b border-zinc-200 dark:border-zinc-800 pb-4">${escapeHtml(heading)}</h1>
-        <div class="flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-500 dark:text-zinc-400 mb-10">
+        <h1 class="text-2xl xs:text-3xl sm:text-5xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mb-4 sm:mb-6 border-b border-zinc-200 dark:border-zinc-800 pb-4">${escapeHtml(heading)}</h1>
+        <div class="flex flex-wrap gap-x-6 gap-y-2 text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mb-6 sm:mb-8">
           <div><span class="font-semibold">${escapeHtml(statusLabel)}:</span> ${escapeHtml(statusValue)}</div>
           ${supportEmail ? `<div><span class="font-semibold">${escapeHtml(emailLabel)}:</span> ${escapeHtml(supportEmail)}</div>` : ''}
         </div>
-        <div class="prose prose-zinc dark:prose-invert max-w-none text-zinc-700 dark:text-zinc-300 font-medium leading-relaxed">
-          <div>${contentHtml}</div>
+        <div class="bg-white dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-white/10 rounded-2xl sm:rounded-3xl p-4 xs:p-5 sm:p-8 md:p-10 shadow-xs overflow-hidden">
+          <div class="rich-html-boundary prose prose-zinc dark:prose-invert max-w-none text-sm sm:text-base text-zinc-700 dark:text-zinc-300 font-medium leading-relaxed">
+            <div>${contentHtml}</div>
+          </div>
         </div>
       </div>
     </div>
@@ -151,7 +153,7 @@ export function renderContact(settings: any): string {
         <div class="lg:col-span-12 xl:col-span-5 space-y-8">
           <div>
             <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100 mb-6">Contact Us</h1>
-            <div class="markdown-body text-lg text-zinc-600 dark:text-zinc-400 leading-relaxed font-medium">${content}</div>
+            <div class="rich-html-boundary markdown-body text-base sm:text-lg text-zinc-600 dark:text-zinc-400 leading-relaxed font-medium">${content}</div>
           </div>
           <div class="space-y-6">
             <div class="flex items-start gap-4 p-6 bg-white dark:bg-zinc-900 rounded-[24px] border border-black/5 dark:border-white/5 shadow-sm">
@@ -297,7 +299,7 @@ export function renderFaqPage(settings: any): string {
               <span class="text-blue-500 font-bold select-none">+</span>
             </summary>
             <div class="mt-3 pt-3 border-t border-black/5 dark:border-white/5 text-sm text-zinc-600 dark:text-zinc-300 leading-relaxed pl-5">
-              ${sanitizeHtml(faq.answer)}
+              <div class="rich-html-boundary prose prose-zinc dark:prose-invert max-w-none">${sanitizeHtml(faq.answer)}</div>
             </div>
           </details>
         `).join('')}

@@ -39,7 +39,7 @@ export default function AppAboutSection({ app, isFetching }: AppAboutSectionProp
 
   // Shared rich HTML typography class string for clean, professional rendering with bold blue highlights
   const richHtmlContentStyle = `
-    w-full text-xs xs:text-sm sm:text-base text-zinc-700 dark:text-zinc-300 leading-relaxed
+    rich-html-boundary w-full text-xs xs:text-sm sm:text-base text-zinc-700 dark:text-zinc-300 leading-relaxed
     [&_strong]:text-blue-600 dark:[&_strong]:text-blue-400 [&_strong]:font-semibold
     [&_b]:text-blue-600 dark:[&_b]:text-blue-400 [&_b]:font-semibold
     [&_p]:mb-3 [&_p]:leading-relaxed [&_p]:text-zinc-700 dark:[&_p]:text-zinc-300
@@ -52,7 +52,6 @@ export default function AppAboutSection({ app, isFetching }: AppAboutSectionProp
     [&_ol]:my-2.5 [&_ol]:space-y-1 [&_ol]:list-decimal [&_ol]:pl-4 xs:[&_ol]:pl-5
     [&_li]:leading-relaxed [&_li]:pl-1 [&_li::marker]:text-blue-600 dark:[&_li::marker]:text-blue-400 [&_li::marker]:font-bold
     [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500 [&_blockquote]:pl-3.5 [&_blockquote]:py-1.5 [&_blockquote]:my-3 [&_blockquote]:bg-blue-50/50 dark:[&_blockquote]:bg-blue-950/20 [&_blockquote]:rounded-r-xl [&_blockquote]:italic
-    [&_.art]:hidden [&_svg.art]:hidden
   `.trim().replace(/\s+/g, ' ');
 
   const defaultDescription = `<p>Comprehensive application profile and details for <strong>${app.name}</strong>.</p>`;

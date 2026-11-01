@@ -7,8 +7,11 @@ export const CLIENT_VAULT_FALLBACK_KEY = 'yono_secure_vault_key_2026_x99_product
 export function getEnvSecretKeys(explicitKey?: string): string[] {
   const keys: string[] = [];
   const add = (k?: string) => {
-    if (k && typeof k === 'string' && k.trim().length > 0 && !keys.includes(k.trim())) {
-      keys.push(k.trim());
+    if (k && typeof k === 'string') {
+      const clean = k.trim().replace(/^["'`]+|["'`]+$/g, '').trim();
+      if (clean.length > 0 && !keys.includes(clean)) {
+        keys.push(clean);
+      }
     }
   };
   add(explicitKey);

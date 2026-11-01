@@ -20,9 +20,21 @@ function normalizeIdentifier(id: string): string {
     .replace(/[^a-z0-9]/g, '');
 }
 
+function sanitizeKey(raw: unknown): string {
+  if (!raw || typeof raw !== 'string') return '';
+  return raw.trim().replace(/^["'`]+|["'`]+$/g, '').trim();
+}
+
+function isTestTurnstileKey(k: string): boolean {
+  return (
+    k.startsWith('1x00000000000000000000') ||
+    k.startsWith('2x00000000000000000000') ||
+    k.startsWith('3x00000000000000000000')
+  );
+}
+
 function isRealTurnstileKeyValue(k: unknown): k is string {
-  if (!k || typeof k !== 'string') return false;
-  const trimmed = k.trim();
+  const trimmed = sanitizeKey(k);
   if (trimmed.length < 10) return false;
   if (
     trimmed.includes('<') ||
@@ -428,38 +440,67 @@ async function resolveFromT3FirestoreRest(
 }
 
 /**
- * Resolves the public Turnstile site key from runtime environment variables or bundled/local staticData.json
+ * Resolves all candidate public Turnstile site keys across environment variables and Admin Settings.
+ * Real production keys (0x4...) always take precedence over any test keys (1x000...).
+ */
+export function getCandidateTurnstileSiteKeys(
+  env?: Record<string, string | undefined>
+): string[] {
+  const procEnv =
+    typeof process !== 'undefined' && process.env
+      ? (process.env as Record<string, string | undefined>)
+      : {};
+  const settingsSiteKey = (bundledStaticData as any)?.settings?.turnstile_site_key;
+  const rawCandidates = [
+    env?.VITE_TURNSTILE_SITE_KEY,
+    env?.TURNSTILE_SITE_KEY,
+    env?.CF_TURNSTILE_SITE_KEY,
+    env?.CLOUDFLARE_TURNSTILE_SITE_KEY,
+    env?.PUBLIC_TURNSTILE_SITE_KEY,
+    env?.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+    env?.VITE_TURNSTILE_KEY,
+    env?.TURNSTILE_KEY,
+    env?.CLOUDFLARE_TURNSTILE_KEY,
+    procEnv.VITE_TURNSTILE_SITE_KEY,
+    procEnv.TURNSTILE_SITE_KEY,
+    procEnv.CF_TURNSTILE_SITE_KEY,
+    procEnv.CLOUDFLARE_TURNSTILE_SITE_KEY,
+    procEnv.PUBLIC_TURNSTILE_SITE_KEY,
+    procEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+    procEnv.VITE_TURNSTILE_KEY,
+    procEnv.TURNSTILE_KEY,
+    procEnv.CLOUDFLARE_TURNSTILE_KEY,
+    settingsSiteKey,
+  ];
+  const realKeys: string[] = [];
+  for (const c of rawCandidates) {
+    const clean = sanitizeKey(c);
+    if (isRealTurnstileKeyValue(clean) && !isTestTurnstileKey(clean)) {
+      if (!realKeys.includes(clean)) {
+        realKeys.push(clean);
+      }
+    }
+  }
+  return realKeys;
+}
+
+/**
+ * Resolves the primary public Turnstile site key from runtime environment variables or bundled/local staticData.json
  * so `/api/v1/app/session-init` can supply it to clients even when `VITE_TURNSTILE_SITE_KEY` was added
  * in Cloudflare Pages / Vercel environment settings after build time.
  */
 export function getPublicTurnstileSiteKey(
   env?: Record<string, string | undefined>
 ): string {
-  const procEnv =
-    typeof process !== 'undefined' && process.env
-      ? (process.env as Record<string, string | undefined>)
-      : {};
-  const settingsSiteKey = (bundledStaticData as any)?.settings?.turnstile_site_key;
-  const candidates = [
-    settingsSiteKey,
-    env?.VITE_TURNSTILE_SITE_KEY,
-    env?.TURNSTILE_SITE_KEY,
-    procEnv.VITE_TURNSTILE_SITE_KEY,
-    procEnv.TURNSTILE_SITE_KEY,
-  ];
-  for (const c of candidates) {
-    if (isRealTurnstileKeyValue(c)) {
-      return c.trim();
-    }
-  }
-  return '';
+  const keys = getCandidateTurnstileSiteKeys(env);
+  return keys[0] || '';
 }
 
 /**
  * Resolves all candidate Cloudflare Turnstile secret keys across:
- * 1. Sealed `ENCRYPTED_TURNSTILE_SECRET` in `src/lib/secureVault.ts` (zero-Firebase static edge resolution)
- * 2. Admin Settings `turnstile_secret_key` (from local or bundled `staticData.json`)
- * 3. Environment variable `TURNSTILE_SECRET_KEY` / `VITE_TURNSTILE_SECRET_KEY`
+ * 1. Environment variables (`TURNSTILE_SECRET_KEY`, `VITE_TURNSTILE_SECRET_KEY`, `CF_TURNSTILE_SECRET_KEY`, `TURNSTILE_TOKEN`, etc.)
+ * 2. Sealed `ENCRYPTED_TURNSTILE_SECRET` in `src/lib/secureVault.ts` (zero-Firebase static edge resolution)
+ * 3. Admin Settings `turnstile_secret_key` (from local or bundled `staticData.json`)
  *
  * Completely independent of Firebase/Firestore so Firebase quota exhaustion (429)
  * has zero impact on the /moreinfo gateway.
@@ -471,50 +512,84 @@ export async function getCandidateTurnstileSecrets(
     typeof process !== 'undefined' && process.env
       ? (process.env as Record<string, string | undefined>)
       : {};
-  const secrets: string[] = [];
+  const realSecrets: string[] = [];
+  const testSecrets: string[] = [];
+
   const addSecret = (s: unknown) => {
-    if (isRealTurnstileKeyValue(s) && !secrets.includes(s.trim())) {
-      secrets.push(s.trim());
+    const clean = sanitizeKey(s);
+    if (!isRealTurnstileKeyValue(clean)) return;
+    if (isTestTurnstileKey(clean)) {
+      if (!testSecrets.includes(clean)) testSecrets.push(clean);
+    } else {
+      if (!realSecrets.includes(clean)) realSecrets.push(clean);
     }
   };
 
-  // 1. Check in-memory cached secret first
+  // 1. Always check runtime environment variables FIRST so any dashboard update is active immediately
+  const envCandidates = [
+    env?.TURNSTILE_SECRET_KEY,
+    env?.VITE_TURNSTILE_SECRET_KEY,
+    env?.CF_TURNSTILE_SECRET_KEY,
+    env?.CLOUDFLARE_TURNSTILE_SECRET_KEY,
+    env?.TURNSTILE_SECRET,
+    env?.VITE_TURNSTILE_SECRET,
+    env?.CF_TURNSTILE_SECRET,
+    env?.CLOUDFLARE_TURNSTILE_SECRET,
+    env?.TURNSTILE_TOKEN,
+    env?.VITE_TURNSTILE_TOKEN,
+    env?.CF_TURNSTILE_TOKEN,
+    env?.CLOUDFLARE_TURNSTILE_TOKEN,
+    procEnv.TURNSTILE_SECRET_KEY,
+    procEnv.VITE_TURNSTILE_SECRET_KEY,
+    procEnv.CF_TURNSTILE_SECRET_KEY,
+    procEnv.CLOUDFLARE_TURNSTILE_SECRET_KEY,
+    procEnv.TURNSTILE_SECRET,
+    procEnv.VITE_TURNSTILE_SECRET,
+    procEnv.CF_TURNSTILE_SECRET,
+    procEnv.CLOUDFLARE_TURNSTILE_SECRET,
+    procEnv.TURNSTILE_TOKEN,
+    procEnv.VITE_TURNSTILE_TOKEN,
+    procEnv.CF_TURNSTILE_TOKEN,
+    procEnv.CLOUDFLARE_TURNSTILE_TOKEN,
+  ];
+  for (const c of envCandidates) {
+    addSecret(c);
+  }
+
+  // 2. Check in-memory cached secret from store/vault
   if (
     cachedTurnstileSecretFromStore &&
     cachedTurnstileSecretFromStore.secret &&
     Date.now() < cachedTurnstileSecretFromStore.expiresAt
   ) {
     addSecret(cachedTurnstileSecretFromStore.secret);
-    addSecret(env?.TURNSTILE_SECRET_KEY);
-    addSecret(env?.VITE_TURNSTILE_SECRET_KEY);
-    addSecret(procEnv.TURNSTILE_SECRET_KEY);
-    addSecret(procEnv.VITE_TURNSTILE_SECRET_KEY);
-    return secrets;
+    return [...realSecrets, ...testSecrets];
   }
 
-  // 2. Decrypt sealed ENCRYPTED_TURNSTILE_SECRET from src/lib/secureVault.ts (works on Cloudflare Edge & Node with 0 I/O)
+  // 3. Decrypt sealed ENCRYPTED_TURNSTILE_SECRET from src/lib/secureVault.ts (works on Cloudflare Edge & Node with 0 I/O)
   try {
     if (ENCRYPTED_TURNSTILE_SECRET && typeof ENCRYPTED_TURNSTILE_SECRET === 'string') {
       const decSecret = await decryptVaultValue(ENCRYPTED_TURNSTILE_SECRET, env);
-      if (decSecret && decSecret.trim()) {
+      const cleanDec = sanitizeKey(decSecret);
+      if (cleanDec && isRealTurnstileKeyValue(cleanDec) && !isTestTurnstileKey(cleanDec)) {
         cachedTurnstileSecretFromStore = {
-          secret: decSecret.trim(),
+          secret: cleanDec,
           expiresAt: Date.now() + 3_600_000,
         };
-        addSecret(decSecret);
+        addSecret(cleanDec);
       }
     }
   } catch {
     // Ignore decryption error and continue to local backup / env var
   }
 
-  // 3. Try reading from local or bundled staticData.json
+  // 4. Try reading from local or bundled staticData.json
   try {
     const parsed = await loadStaticDataSnapshot();
-    const sec = parsed?.settings?.turnstile_secret_key;
-    if (typeof sec === 'string' && sec.trim()) {
+    const sec = sanitizeKey(parsed?.settings?.turnstile_secret_key);
+    if (sec && isRealTurnstileKeyValue(sec) && !isTestTurnstileKey(sec)) {
       cachedTurnstileSecretFromStore = {
-        secret: sec.trim(),
+        secret: sec,
         expiresAt: Date.now() + 3_600_000,
       };
       addSecret(sec);
@@ -523,12 +598,7 @@ export async function getCandidateTurnstileSecrets(
     // Ignore local fs errors on Edge
   }
 
-  addSecret(env?.TURNSTILE_SECRET_KEY);
-  addSecret(env?.VITE_TURNSTILE_SECRET_KEY);
-  addSecret(procEnv.TURNSTILE_SECRET_KEY);
-  addSecret(procEnv.VITE_TURNSTILE_SECRET_KEY);
-
-  return secrets;
+  return [...realSecrets, ...testSecrets];
 }
 
 /**

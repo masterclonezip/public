@@ -21,7 +21,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { safeVibrate } from '../../lib/utils';
-import { getOptimizedImageUrl } from '../../seo/utils';
+import { getSizedLogoUrl } from '../../seo/utils';
 
 export interface AdminMenuItem {
   id: string;
@@ -131,7 +131,7 @@ export const AdminMobileMenu: React.FC<AdminMobileMenuProps> = ({
     const trimmed = (url || '').trim();
     if (!trimmed) return '/logo.png';
     if (trimmed.includes('res.cloudinary.com')) {
-      return getOptimizedImageUrl(trimmed, 120) || '/logo.png';
+      return getSizedLogoUrl(trimmed, 160, 'auto', 'c_fit') || '/logo.png';
     }
     return trimmed;
   };

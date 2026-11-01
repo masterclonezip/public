@@ -85,31 +85,38 @@ async function generateSha1(str: string): Promise<string> {
  * Optimizes image for upload while strictly preserving natural aspect ratio 
  * and full clarity up to 2560px without destructive cropping or cut-off.
  */
-async function compressImageForUpload(file: File, maxDim = 2560, quality = 0.90, targetFormat: 'webp' | 'png' = 'webp'): Promise<Blob> {
+async function compressImageForUpload(file: File, maxDim = 2560, quality = 0.92, targetFormat: 'webp' | 'png' = 'webp'): Promise<Blob> {
   return new Promise((resolve) => {
     const mimeType = targetFormat === 'png' ? 'image/png' : 'image/webp';
-    // If image is already an optimized WebP or small PNG under 500KB matching requested format, keep untouched
-    if (file.size < 500 * 1024 && (file.type === mimeType || (targetFormat === 'webp' && file.type === 'image/png'))) {
-      resolve(file);
-      return;
-    }
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
       URL.revokeObjectURL(url);
       let { width, height } = img;
-      
-      // Only scale down if width or height exceeds maxDim, maintaining strict 100% aspect ratio
-      if (width > maxDim || height > maxDim) {
+      const effectiveMaxDim = targetFormat === 'png' ? Math.min(maxDim, 1024) : maxDim;
+
+      // If image is already within target dimensions and a reasonably sized PNG/WebP, keep original file untouched for 100% lossless quality
+      if (
+        width <= effectiveMaxDim &&
+        height <= effectiveMaxDim &&
+        file.size < 1500 * 1024 &&
+        (file.type === mimeType || (targetFormat === 'webp' && file.type === 'image/png'))
+      ) {
+        resolve(file);
+        return;
+      }
+
+      // Only scale down if width or height exceeds effectiveMaxDim, maintaining strict 100% aspect ratio
+      if (width > effectiveMaxDim || height > effectiveMaxDim) {
         if (width > height) {
-          height = Math.round((height * maxDim) / width);
-          width = maxDim;
+          height = Math.round((height * effectiveMaxDim) / width);
+          width = effectiveMaxDim;
         } else {
-          width = Math.round((width * maxDim) / height);
-          height = maxDim;
+          width = Math.round((width * effectiveMaxDim) / height);
+          height = effectiveMaxDim;
         }
       }
-      
+
       const canvas = document.createElement('canvas');
       canvas.width = width;
       canvas.height = height;
@@ -121,7 +128,16 @@ async function compressImageForUpload(file: File, maxDim = 2560, quality = 0.90,
         ctx.drawImage(img, 0, 0, width, height);
         canvas.toBlob(
           (blob) => {
-            resolve(blob || file);
+            if (!blob) {
+              resolve(file);
+              return;
+            }
+            // If re-encoded blob is larger than original and no resize was needed, keep original
+            if (blob.size > file.size && width === img.width && height === img.height && file.type === mimeType) {
+              resolve(file);
+              return;
+            }
+            resolve(blob);
           },
           mimeType,
           targetFormat === 'png' ? undefined : quality

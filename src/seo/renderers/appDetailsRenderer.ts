@@ -20,7 +20,7 @@ function getAvatarStyle(name: string): string {
 }
 
 const RICH_HTML_CONTENT_STYLE = `
-  w-full text-xs xs:text-sm sm:text-base text-zinc-700 dark:text-zinc-300 leading-relaxed
+  rich-html-boundary w-full text-xs xs:text-sm sm:text-base text-zinc-700 dark:text-zinc-300 leading-relaxed
   [&_strong]:text-blue-600 dark:[&_strong]:text-blue-400 [&_strong]:font-semibold
   [&_b]:text-blue-600 dark:[&_b]:text-blue-400 [&_b]:font-semibold
   [&_p]:mb-3 [&_p]:leading-relaxed [&_p]:text-zinc-700 dark:[&_p]:text-zinc-300
@@ -30,10 +30,9 @@ const RICH_HTML_CONTENT_STYLE = `
   [&_h3]:text-xs sm:[&_h3]:text-lg [&_h3]:font-bold [&_h3]:tracking-tight [&_h3]:text-zinc-900 dark:[&_h3]:text-zinc-100 [&_h3]:mt-3.5 [&_h3]:mb-1.5
   [&_h4]:text-[11px] sm:[&_h4]:text-base [&_h4]:font-semibold [&_h4]:tracking-tight [&_h4]:text-zinc-900 dark:[&_h4]:text-zinc-100 [&_h4]:mt-3 [&_h4]:mb-1
   [&_ul]:my-2.5 [&_ul]:space-y-1 [&_ul]:list-disc [&_ul]:pl-4 xs:[&_ul]:pl-5
-  [&_ol]:my-2.5 [&_ol]:space-y-1 [&_ol]:list-decimal [&_ol]:pl-4 xs:[&_ul]:pl-5
+  [&_ol]:my-2.5 [&_ol]:space-y-1 [&_ol]:list-decimal [&_ol]:pl-4 xs:[&_ol]:pl-5
   [&_li]:leading-relaxed [&_li]:pl-1 [&_li::marker]:text-blue-600 dark:[&_li::marker]:text-blue-400 [&_li::marker]:font-bold
   [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500 [&_blockquote]:pl-3.5 [&_blockquote]:py-1.5 [&_blockquote]:my-3 [&_blockquote]:bg-blue-50/50 dark:[&_blockquote]:bg-blue-950/20 [&_blockquote]:rounded-r-xl [&_blockquote]:italic
-  [&_.art]:hidden [&_svg.art]:hidden
 `.trim().replace(/\s+/g, ' ');
 
 export function renderAppDetails(slug: string, apps: any[], _settings: any, sampleReviews: any[] = [], liveStats: any = null, news: any[] = []): string {
@@ -208,7 +207,7 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
                 </summary>
                 <div class="px-4 sm:px-5 pb-5 pt-1 border-t border-black/5 dark:border-white/5 text-sm sm:text-base text-zinc-700 dark:text-zinc-300 leading-relaxed">
                   <div class="pl-6 sm:pl-7 pt-2">
-                    <div class="prose prose-zinc dark:prose-invert prose-sm sm:prose-base max-w-none w-full break-words overflow-wrap-anywhere whitespace-normal">
+                    <div class="rich-html-boundary prose prose-zinc dark:prose-invert prose-sm sm:prose-base max-w-none w-full break-words overflow-wrap-anywhere whitespace-normal">
                       ${sanitizeHtml(faq.answer)}
                     </div>
                   </div>

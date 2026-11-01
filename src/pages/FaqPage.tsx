@@ -90,7 +90,7 @@ export default function FaqPage() {
               <div className="px-5 sm:px-6 pb-6 pt-2 border-t border-black/5 dark:border-white/5 text-sm sm:text-base text-zinc-700 dark:text-zinc-300 leading-relaxed">
                 <div className="pl-6 sm:pl-7">
                   <div
-                    className="prose prose-zinc dark:prose-invert prose-sm sm:prose-base max-w-none w-full break-words whitespace-normal"
+                    className="rich-html-boundary prose prose-zinc dark:prose-invert prose-sm sm:prose-base max-w-none w-full break-words whitespace-normal"
                     dangerouslySetInnerHTML={{ __html: safeHtml(faq.answer) }}
                   />
                 </div>

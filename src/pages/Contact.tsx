@@ -43,7 +43,7 @@ export default function Contact() {
           <div>
             <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100 mb-6">Contact Us</h1>
             <div 
-              className="markdown-body text-lg text-zinc-600 dark:text-zinc-400 leading-relaxed font-medium"
+              className="rich-html-boundary markdown-body text-base sm:text-lg text-zinc-600 dark:text-zinc-400 leading-relaxed font-medium"
               dangerouslySetInnerHTML={{ __html: safeHtml(mockSettings.contact_content || '' ) }}
             />
           </div>

@@ -1,5 +1,6 @@
 // src/lib/sitemapGenerator.ts
 // Standardized XML Sitemap Generation
+import { resolveSiteLogoUrl, getOptimizedImageUrl } from '../seo/utils';
 
 export interface SitemapGenOptions {
   host?: string;
@@ -30,6 +31,28 @@ export const escapeXml = (unsafe: any): string => {
 export const cleanSlug = (slug: string): string => {
   if (!slug) return '';
   return escapeXml(encodeURI(slug.trim().replace(/^\/+|\/+$/g, '')));
+};
+
+export const normalizeSitemapImageUrl = (
+  rawUrl: any,
+  cleanHost: string,
+  width: number = 800,
+  fallbackUrl: string = ''
+): string => {
+  let candidate = typeof rawUrl === 'string' ? rawUrl.trim() : '';
+  if (!candidate) {
+    candidate = typeof fallbackUrl === 'string' ? fallbackUrl.trim() : '';
+  }
+  if (!candidate) {
+    return cleanHost ? `${cleanHost}/logo.png` : '/logo.png';
+  }
+  if (!candidate.startsWith('http://') && !candidate.startsWith('https://')) {
+    candidate = `${cleanHost}${candidate.startsWith('/') ? '' : '/'}${candidate}`;
+  }
+  if (candidate.includes('res.cloudinary.com')) {
+    return getOptimizedImageUrl(candidate, width);
+  }
+  return candidate;
 };
 
 export const STABLE_BASELINE_DATE = '2026-09-01T00:00:00+00:00';
@@ -130,9 +153,12 @@ export function generateMasterSitemapXml(
 export function generateAppsSitemapXml(
   apps: any[] = [],
   host: string = getDefaultSitemapHost(),
-  siteLogo: string = ''
+  siteLogo: string = '',
+  siteTitle: string = ''
 ): string {
   const cleanHost = host.replace(/\/$/, '');
+  const fallbackLogo = normalizeSitemapImageUrl(siteLogo, cleanHost, 512);
+  const brandTitle = siteTitle || 'Official Brand Logo';
 
   // Filter public-ready apps
   const publicApps = apps.filter((a: any) => a && (a.slug || a.id) && a.sync_to_public !== false);
@@ -156,16 +182,7 @@ export function generateAppsSitemapXml(
     seenUrls.add(loc);
 
     const appDate = resolveItemTimestamp(app, STABLE_BASELINE_DATE);
-    let appImage = app.og_image_url || app.icon_url || siteLogo;
-    if (appImage && typeof appImage === 'string') {
-      appImage = appImage.trim();
-      if (!appImage.startsWith('http')) {
-        appImage = `${cleanHost}${appImage.startsWith('/') ? '' : '/'}${appImage}`;
-      }
-      if (appImage.includes('res.cloudinary.com')) {
-        appImage = appImage.replace(/\/upload\/(?:[a-zA-Z0-9_.,-]+\/)*(v\d+\/)/, '/upload/f_auto,q_auto,w_800/$1');
-      }
-    }
+    const appImage = normalizeSitemapImageUrl(app.og_image_url || app.icon_url, cleanHost, 800, fallbackLogo);
     const appName = app.name || 'Application';
 
     const isFeatured = app.is_featured === true || app.is_hot === true;
@@ -185,16 +202,8 @@ export function generateAppsSitemapXml(
     }
     if (Array.isArray(app.screenshots)) {
       app.screenshots.forEach((s: string, idx: number) => {
-        let shotImage = s;
-        if (shotImage && typeof shotImage === 'string') {
-          shotImage = shotImage.trim();
-          if (!shotImage.startsWith('http')) {
-            shotImage = `${cleanHost}${shotImage.startsWith('/') ? '' : '/'}${shotImage}`;
-          }
-          if (shotImage.includes('res.cloudinary.com')) {
-            shotImage = shotImage.replace(/\/upload\/(?:[a-zA-Z0-9_.,-]+\/)*(v\d+\/)/, '/upload/f_auto,q_auto,w_800/$1');
-          }
-        }
+        if (!s || typeof s !== 'string' || !s.trim()) return;
+        const shotImage = normalizeSitemapImageUrl(s, cleanHost, 800);
         xml += `    <image:image>\n`;
         xml += `      <image:loc>${escapeXml(shotImage)}</image:loc>\n`;
         xml += `      <image:caption>Screenshot ${idx + 1} of ${escapeXml(appName)} showing gameplay</image:caption>\n`;
@@ -206,7 +215,18 @@ export function generateAppsSitemapXml(
 
   // Safety: If no apps matched, add fallback so XML is never empty
   if (seenUrls.size === 0) {
-    xml += `  <url>\n    <loc>${cleanHost}/</loc>\n    <lastmod>${STABLE_BASELINE_DATE}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n  </url>\n`;
+    xml += `  <url>\n`;
+    xml += `    <loc>${cleanHost}/</loc>\n`;
+    xml += `    <lastmod>${STABLE_BASELINE_DATE}</lastmod>\n`;
+    xml += `    <changefreq>daily</changefreq>\n`;
+    xml += `    <priority>1.0</priority>\n`;
+    if (fallbackLogo) {
+      xml += `    <image:image>\n`;
+      xml += `      <image:loc>${escapeXml(fallbackLogo)}</image:loc>\n`;
+      xml += `      <image:title>${escapeXml(brandTitle)}</image:title>\n`;
+      xml += `    </image:image>\n`;
+    }
+    xml += `  </url>\n`;
   }
 
   xml += `</urlset>\n`;
@@ -216,9 +236,13 @@ export function generateAppsSitemapXml(
 // 3. News Sitemap (sitemap-news.xml)
 export function generateNewsSitemapXml(
   news: any[] = [],
-  host: string = getDefaultSitemapHost()
+  host: string = getDefaultSitemapHost(),
+  siteLogo: string = '',
+  siteTitle: string = ''
 ): string {
   const cleanHost = host.replace(/\/$/, '');
+  const fallbackLogo = normalizeSitemapImageUrl(siteLogo, cleanHost, 512);
+  const brandTitle = siteTitle || 'News & Updates';
   const publicNews = news.filter((n: any) => n && n.slug && n.sync_to_public !== false);
 
   publicNews.sort((a, b) => {
@@ -239,16 +263,8 @@ export function generateNewsSitemapXml(
     seenUrls.add(loc);
 
     const itemDate = formatSitemapDate(item.updated_at || item.published_at || item.publish_date || item.created_at || item.date, STABLE_BASELINE_DATE);
-    let itemImage = item.logo_url || item.image_url || item.thumbnail_url || item.og_image_url || '';
-    if (itemImage && typeof itemImage === 'string') {
-      itemImage = itemImage.trim();
-      if (!itemImage.startsWith('http')) {
-        itemImage = `${cleanHost}${itemImage.startsWith('/') ? '' : '/'}${itemImage}`;
-      }
-      if (itemImage.includes('res.cloudinary.com')) {
-        itemImage = itemImage.replace(/\/upload\/(?:[a-zA-Z0-9_.,-]+\/)*(v\d+\/)/, '/upload/f_auto,q_auto,w_800/$1');
-      }
-    }
+    const rawItemImg = item.logo_url || item.image_url || item.thumbnail_url || item.og_image_url || item.image || '';
+    const itemImage = normalizeSitemapImageUrl(rawItemImg, cleanHost, 800, fallbackLogo);
     const itemTitle = item.title || 'News Article';
 
     xml += `  <url>\n`;
@@ -266,7 +282,18 @@ export function generateNewsSitemapXml(
   }
 
   if (seenUrls.size === 0) {
-    xml += `  <url>\n    <loc>${cleanHost}/news</loc>\n    <lastmod>${STABLE_BASELINE_DATE}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.8</priority>\n  </url>\n`;
+    xml += `  <url>\n`;
+    xml += `    <loc>${cleanHost}/news</loc>\n`;
+    xml += `    <lastmod>${STABLE_BASELINE_DATE}</lastmod>\n`;
+    xml += `    <changefreq>daily</changefreq>\n`;
+    xml += `    <priority>0.8</priority>\n`;
+    if (fallbackLogo) {
+      xml += `    <image:image>\n`;
+      xml += `      <image:loc>${escapeXml(fallbackLogo)}</image:loc>\n`;
+      xml += `      <image:title>${escapeXml(brandTitle)}</image:title>\n`;
+      xml += `    </image:image>\n`;
+    }
+    xml += `  </url>\n`;
   }
 
   xml += `</urlset>\n`;
@@ -277,10 +304,13 @@ export function generateNewsSitemapXml(
 export function generateVideosSitemapXml(
   videos: any[] = [],
   host: string = getDefaultSitemapHost(),
-  siteLogo: string = ''
+  siteLogo: string = '',
+  siteTitle: string = ''
 ): string {
   const cleanHost = host.replace(/\/$/, '');
   const now = STABLE_BASELINE_DATE;
+  const fallbackLogo = normalizeSitemapImageUrl(siteLogo, cleanHost, 512);
+  const brandTitle = siteTitle || 'Video Reviews';
 
   const extractYoutubeIdForSitemap = (urlStr: string): string => {
     if (!urlStr) return '';
@@ -303,13 +333,8 @@ export function generateVideosSitemapXml(
     const itemDate = resolveItemTimestamp(item, now);
     const ytUrl = item.youtube_url || item.video_url || item.url || '';
     const ytId = extractYoutubeIdForSitemap(ytUrl);
-    let itemImage = item.thumbnail_url || item.image_url || (ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : siteLogo);
-    if (itemImage && typeof itemImage === 'string') {
-      itemImage = itemImage.trim();
-      if (!itemImage.startsWith('http')) {
-        itemImage = `${cleanHost}${itemImage.startsWith('/') ? '' : '/'}${itemImage}`;
-      }
-    }
+    const rawThumb = item.thumbnail_url || item.image_url || (ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : '');
+    const itemImage = normalizeSitemapImageUrl(rawThumb, cleanHost, 800, fallbackLogo);
     const itemTitle = item.title || 'Video Walkthrough';
     const itemDesc = (item.seo_description || item.description || itemTitle).replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
     const playerLoc = ytId ? `https://www.youtube.com/embed/${ytId}` : (ytUrl && ytUrl.startsWith('http') ? ytUrl : '');
@@ -344,6 +369,12 @@ export function generateVideosSitemapXml(
     xml += `    <lastmod>${now}</lastmod>\n`;
     xml += `    <changefreq>weekly</changefreq>\n`;
     xml += `    <priority>0.7</priority>\n`;
+    if (fallbackLogo) {
+      xml += `    <image:image>\n`;
+      xml += `      <image:loc>${escapeXml(fallbackLogo)}</image:loc>\n`;
+      xml += `      <image:title>${escapeXml(brandTitle)}</image:title>\n`;
+      xml += `    </image:image>\n`;
+    }
     xml += `  </url>\n`;
   }
 
@@ -361,7 +392,9 @@ export interface StaticSitemapDates {
 // 5. Static Pages Sitemap (sitemap-static.xml)
 export function generateStaticSitemapXml(
   host: string = getDefaultSitemapHost(),
-  datesOrFallback?: string | StaticSitemapDates
+  datesOrFallback?: string | StaticSitemapDates,
+  siteLogo: string = '',
+  siteTitle: string = ''
 ): string {
   const cleanHost = host.replace(/\/$/, '');
   const isObj = typeof datesOrFallback === 'object' && datesOrFallback !== null;
@@ -372,32 +405,40 @@ export function generateStaticSitemapXml(
   const infoDate = isObj ? formatSitemapDate(datesOrFallback.settingsDate, STABLE_BASELINE_DATE) : fallback;
   const newsDate = isObj && datesOrFallback.latestNewsDate ? formatSitemapDate(datesOrFallback.latestNewsDate, infoDate) : infoDate;
   const videoDate = isObj && datesOrFallback.latestVideoDate ? formatSitemapDate(datesOrFallback.latestVideoDate, infoDate) : infoDate;
+  const resolvedLogo = normalizeSitemapImageUrl(siteLogo, cleanHost, 512);
+  const brandPrefix = siteTitle ? `${siteTitle} - ` : '';
 
   const staticPages = [
-    { path: '/', priority: '1.0', changefreq: 'daily', lastmod: infoDate },
-    { path: '/new-apps', priority: '0.8', changefreq: 'daily', lastmod: infoDate },
-    { path: '/categories', priority: '0.8', changefreq: 'weekly', lastmod: infoDate },
-    { path: '/news', priority: '0.8', changefreq: 'daily', lastmod: newsDate },
-    { path: '/videos', priority: '0.7', changefreq: 'weekly', lastmod: videoDate },
-    { path: '/about', priority: '0.5', changefreq: 'monthly', lastmod: infoDate },
-    { path: '/contact', priority: '0.5', changefreq: 'monthly', lastmod: infoDate },
-    { path: '/faq', priority: '0.5', changefreq: 'monthly', lastmod: infoDate },
-    { path: '/privacy', priority: '0.3', changefreq: 'monthly', lastmod: infoDate },
-    { path: '/terms', priority: '0.3', changefreq: 'monthly', lastmod: infoDate },
-    { path: '/disclaimer', priority: '0.3', changefreq: 'monthly', lastmod: infoDate },
-    { path: '/notice', priority: '0.3', changefreq: 'monthly', lastmod: infoDate },
-    { path: '/ethics', priority: '0.3', changefreq: 'monthly', lastmod: infoDate },
-    { path: '/responsibility', priority: '0.3', changefreq: 'monthly', lastmod: infoDate },
-    { path: '/report-removal', priority: '0.3', changefreq: 'monthly', lastmod: infoDate }
+    { path: '/', title: siteTitle || 'Official Portal', priority: '1.0', changefreq: 'daily', lastmod: infoDate },
+    { path: '/new-apps', title: `${brandPrefix}New Apps`, priority: '0.8', changefreq: 'daily', lastmod: infoDate },
+    { path: '/categories', title: `${brandPrefix}App Categories`, priority: '0.8', changefreq: 'weekly', lastmod: infoDate },
+    { path: '/news', title: `${brandPrefix}Industry News`, priority: '0.8', changefreq: 'daily', lastmod: newsDate },
+    { path: '/videos', title: `${brandPrefix}Video Reviews`, priority: '0.7', changefreq: 'weekly', lastmod: videoDate },
+    { path: '/about', title: `${brandPrefix}About Us`, priority: '0.5', changefreq: 'monthly', lastmod: infoDate },
+    { path: '/contact', title: `${brandPrefix}Contact Support`, priority: '0.5', changefreq: 'monthly', lastmod: infoDate },
+    { path: '/faq', title: `${brandPrefix}Frequently Asked Questions`, priority: '0.5', changefreq: 'monthly', lastmod: infoDate },
+    { path: '/privacy', title: `${brandPrefix}Privacy Policy`, priority: '0.3', changefreq: 'monthly', lastmod: infoDate },
+    { path: '/terms', title: `${brandPrefix}Terms of Service`, priority: '0.3', changefreq: 'monthly', lastmod: infoDate },
+    { path: '/disclaimer', title: `${brandPrefix}Disclaimer`, priority: '0.3', changefreq: 'monthly', lastmod: infoDate },
+    { path: '/notice', title: `${brandPrefix}Legal Notice`, priority: '0.3', changefreq: 'monthly', lastmod: infoDate },
+    { path: '/ethics', title: `${brandPrefix}Ethics Policy`, priority: '0.3', changefreq: 'monthly', lastmod: infoDate },
+    { path: '/responsibility', title: `${brandPrefix}Responsible Gaming`, priority: '0.3', changefreq: 'monthly', lastmod: infoDate },
+    { path: '/report-removal', title: `${brandPrefix}Report & Removal`, priority: '0.3', changefreq: 'monthly', lastmod: infoDate }
   ];
 
-  let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+  let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n`;
   for (const page of staticPages) {
     xml += `  <url>\n`;
     xml += `    <loc>${cleanHost}${page.path === '/' ? '/' : page.path}</loc>\n`;
     xml += `    <lastmod>${page.lastmod}</lastmod>\n`;
     xml += `    <changefreq>${page.changefreq}</changefreq>\n`;
     xml += `    <priority>${page.priority}</priority>\n`;
+    if (resolvedLogo) {
+      xml += `    <image:image>\n`;
+      xml += `      <image:loc>${escapeXml(resolvedLogo)}</image:loc>\n`;
+      xml += `      <image:title>${escapeXml(page.title)}</image:title>\n`;
+      xml += `    </image:image>\n`;
+    }
     xml += `  </url>\n`;
   }
   xml += `</urlset>\n`;
@@ -407,19 +448,39 @@ export function generateStaticSitemapXml(
 // 6. Developers Sitemap (sitemap-developers.xml)
 export function generateDevelopersSitemapXml(
   host: string = getDefaultSitemapHost(),
-  latestDate?: string
+  latestDate?: string,
+  siteLogo: string = '',
+  siteTitle: string = '',
+  developers: any[] = []
 ): string {
   const cleanHost = host.replace(/\/$/, '');
   const now = formatSitemapDate(latestDate, STABLE_BASELINE_DATE);
+  const resolvedLogo = normalizeSitemapImageUrl(siteLogo, cleanHost, 512);
+  const pageTitle = siteTitle ? `${siteTitle} - Developer Profiles` : 'Developer Profiles';
+
+  let devImagesXml = '';
+  if (resolvedLogo) {
+    devImagesXml += `    <image:image>\n      <image:loc>${escapeXml(resolvedLogo)}</image:loc>\n      <image:title>${escapeXml(pageTitle)}</image:title>\n    </image:image>\n`;
+  }
+  if (Array.isArray(developers)) {
+    developers.forEach((dev: any) => {
+      const rawAvatar = dev?.avatar_url || dev?.image_url || dev?.photo_url || dev?.logo_url || '';
+      if (rawAvatar && typeof rawAvatar === 'string' && rawAvatar.trim()) {
+        const avatarLoc = normalizeSitemapImageUrl(rawAvatar, cleanHost, 512);
+        const devName = dev?.name || dev?.role || 'Developer';
+        devImagesXml += `    <image:image>\n      <image:loc>${escapeXml(avatarLoc)}</image:loc>\n      <image:title>${escapeXml(devName)}</image:title>\n    </image:image>\n`;
+      }
+    });
+  }
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>${cleanHost}/developers</loc>
     <lastmod>${now}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
-  </url>
+${devImagesXml}  </url>
 </urlset>
 `;
 }
@@ -433,24 +494,31 @@ export function generateAllSitemaps(
   const news = data.news || [];
   const videos = data.videos || [];
   const settings = data.settings || {};
-  const siteLogo = settings?.logo_url || settings?.favicon_url || '';
+  const siteLogo = resolveSiteLogoUrl(settings);
+  const siteTitle = String(settings?.site_title || '').trim();
+  const developers = Array.isArray(settings?.developers) ? settings.developers : [];
   const latestAppDate = getLatestItemDate(apps, STABLE_BASELINE_DATE);
   const latestNewsDate = getLatestItemDate(news, STABLE_BASELINE_DATE);
   const latestVideoDate = getLatestItemDate(videos, STABLE_BASELINE_DATE);
   const settingsDate = formatSitemapDate(settings?.last_updated || settings?.updated_at, STABLE_BASELINE_DATE);
-  const latestDevDate = getLatestItemDate(settings?.developers || [], STABLE_BASELINE_DATE);
+  const latestDevDate = getLatestItemDate(developers, STABLE_BASELINE_DATE);
 
   return {
     'sitemap.xml': generateMasterSitemapXml(apps, news, videos, host, settings),
-    'sitemap-apps.xml': generateAppsSitemapXml(apps, host, siteLogo),
-    'sitemap-news.xml': generateNewsSitemapXml(news, host),
-    'sitemap-videos.xml': generateVideosSitemapXml(videos, host, siteLogo),
-    'sitemap-static.xml': generateStaticSitemapXml(host, {
-      latestAppDate,
-      latestNewsDate,
-      latestVideoDate,
-      settingsDate
-    }),
-    'sitemap-developers.xml': generateDevelopersSitemapXml(host, latestDevDate)
+    'sitemap-apps.xml': generateAppsSitemapXml(apps, host, siteLogo, siteTitle),
+    'sitemap-news.xml': generateNewsSitemapXml(news, host, siteLogo, siteTitle),
+    'sitemap-videos.xml': generateVideosSitemapXml(videos, host, siteLogo, siteTitle),
+    'sitemap-static.xml': generateStaticSitemapXml(
+      host,
+      {
+        latestAppDate,
+        latestNewsDate,
+        latestVideoDate,
+        settingsDate
+      },
+      siteLogo,
+      siteTitle
+    ),
+    'sitemap-developers.xml': generateDevelopersSitemapXml(host, latestDevDate, siteLogo, siteTitle, developers)
   };
 }

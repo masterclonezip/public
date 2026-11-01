@@ -124,6 +124,7 @@ const Meta: React.FC<MetaProps> = ({
 
     // 2b. Synchronize Favicon, Apple Touch Icon, and Google Search Result Multi-Size Icons in <head>
     if (iconSet.masterFavicon || iconSet.masterLogo) {
+      document.head.querySelectorAll('link[rel="icon"][type="image/svg+xml"]').forEach(el => el.remove());
       const upsertIconLink = (rel: string, sizes: string | null, type: string | null, href: string) => {
         if (!href) return;
         const selector = sizes
@@ -133,14 +134,23 @@ const Meta: React.FC<MetaProps> = ({
         if (!linkEl) {
           linkEl = document.createElement('link');
           linkEl.setAttribute('rel', rel);
-          if (sizes) linkEl.setAttribute('sizes', sizes);
-          if (type) linkEl.setAttribute('type', type);
           document.head.appendChild(linkEl);
+        }
+        if (sizes) {
+          linkEl.setAttribute('sizes', sizes);
+        } else {
+          linkEl.removeAttribute('sizes');
+        }
+        if (type) {
+          linkEl.setAttribute('type', type);
+        } else {
+          linkEl.removeAttribute('type');
         }
         linkEl.setAttribute('href', href);
       };
-      upsertIconLink('icon', null, 'image/x-icon', iconSet.faviconIco);
-      upsertIconLink('shortcut icon', null, null, iconSet.faviconIco);
+      const primaryIconType = iconSet.faviconIco.endsWith('.ico') ? 'image/x-icon' : 'image/png';
+      upsertIconLink('icon', null, primaryIconType, iconSet.faviconIco);
+      upsertIconLink('shortcut icon', null, primaryIconType, iconSet.faviconIco);
       upsertIconLink('icon', '48x48', 'image/png', iconSet.favicon48);
       upsertIconLink('icon', '96x96', 'image/png', iconSet.favicon96);
       upsertIconLink('icon', '144x144', 'image/png', iconSet.favicon144);
@@ -148,7 +158,7 @@ const Meta: React.FC<MetaProps> = ({
       upsertIconLink('icon', '512x512', 'image/png', iconSet.pwa512);
       upsertIconLink('icon', '32x32', 'image/png', iconSet.favicon32);
       upsertIconLink('icon', '16x16', 'image/png', iconSet.favicon16);
-      upsertIconLink('apple-touch-icon', '180x180', null, iconSet.appleTouch180);
+      upsertIconLink('apple-touch-icon', '180x180', 'image/png', iconSet.appleTouch180);
     }
 
     if (!isIndexable) {
@@ -375,6 +385,9 @@ const Meta: React.FC<MetaProps> = ({
     section, 
     tags, 
     metaImage, 
+    squareThumbnail,
+    iconSet.faviconIco,
+    iconSet.searchLogo512,
     siteTitle, 
     schema, 
     breadcrumbSchema, 

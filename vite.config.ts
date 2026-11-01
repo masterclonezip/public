@@ -230,9 +230,25 @@ function adminAuthDevPlugin(env: Record<string, string>) {
             return;
           }
 
+          const envTurnstileSiteKey = (
+            env.VITE_TURNSTILE_SITE_KEY ||
+            env.TURNSTILE_SITE_KEY ||
+            env.CF_TURNSTILE_SITE_KEY ||
+            env.CLOUDFLARE_TURNSTILE_SITE_KEY ||
+            process.env.VITE_TURNSTILE_SITE_KEY ||
+            process.env.TURNSTILE_SITE_KEY ||
+            process.env.CF_TURNSTILE_SITE_KEY ||
+            process.env.CLOUDFLARE_TURNSTILE_SITE_KEY ||
+            ''
+          ).trim().replace(/^["'`]+|["'`]+$/g, '').trim();
+
           if (req.url === '/api/v1/public/settings' || req.url.startsWith('/api/v1/public/settings?')) {
+            const mergedSettings = { ...(staticData.settings || {}) };
+            if (!mergedSettings.turnstile_site_key && envTurnstileSiteKey) {
+              mergedSettings.turnstile_site_key = envTurnstileSiteKey;
+            }
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ status: 'OK', settings: staticData.settings || {} }));
+            res.end(JSON.stringify({ status: 'OK', settings: mergedSettings }));
             return;
           }
 
@@ -257,8 +273,12 @@ function adminAuthDevPlugin(env: Record<string, string>) {
           }
 
           if (req.url.startsWith('/api/v1/public/backup-data')) {
+            const mergedStatic = { ...staticData, settings: { ...(staticData.settings || {}) } };
+            if (!mergedStatic.settings.turnstile_site_key && envTurnstileSiteKey) {
+              mergedStatic.settings.turnstile_site_key = envTurnstileSiteKey;
+            }
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(staticData));
+            res.end(JSON.stringify(mergedStatic));
             return;
           }
         }
@@ -540,7 +560,7 @@ export default defineConfig(({mode}) => {
 
   const pickEnv = (...keys: string[]): string => {
     for (const k of keys) {
-      const val = (env[k] ?? process.env[k] ?? '').trim();
+      const val = (env[k] ?? process.env[k] ?? '').trim().replace(/^["'`]+|["'`]+$/g, '').trim();
       if (val && !val.startsWith('YOUR_') && !val.includes('replace_with_')) {
         return val;
       }
@@ -564,6 +584,18 @@ export default defineConfig(({mode}) => {
   const communityMessagingSenderId = pickEnv('VITE_COMMUNITY_FIREBASE_MESSAGING_SENDER_ID', 'COMMUNITY_FIREBASE_MESSAGING_SENDER_ID', 'VITE_COMMUNITY_FIREBASE_MESSAGING_ID', 'VITE_FIREBASE_MESSAGING_SENDER_ID');
   const communityDatabaseId = pickEnv('VITE_COMMUNITY_FIREBASE_DATABASE_ID', 'COMMUNITY_FIREBASE_DATABASE_ID') || '(default)';
 
+  const turnstileSiteKey = pickEnv(
+    'VITE_TURNSTILE_SITE_KEY',
+    'TURNSTILE_SITE_KEY',
+    'CF_TURNSTILE_SITE_KEY',
+    'CLOUDFLARE_TURNSTILE_SITE_KEY',
+    'PUBLIC_TURNSTILE_SITE_KEY',
+    'NEXT_PUBLIC_TURNSTILE_SITE_KEY',
+    'VITE_TURNSTILE_KEY',
+    'TURNSTILE_KEY',
+    'CLOUDFLARE_TURNSTILE_KEY'
+  );
+
   const resolvedBuildEnv: Record<string, string> = {
     VITE_ADMIN_PATH: pickEnv('VITE_ADMIN_PATH', 'ADMIN_PATH') || 'masterworld',
     ADMIN_PATH: pickEnv('ADMIN_PATH', 'VITE_ADMIN_PATH') || 'masterworld',
@@ -574,7 +606,8 @@ export default defineConfig(({mode}) => {
     VITE_SITE_LOGO_URL: pickEnv('VITE_SITE_LOGO_URL', 'SITE_LOGO_URL'),
     VITE_SITE_FAVICON_URL: pickEnv('VITE_SITE_FAVICON_URL', 'SITE_FAVICON_URL'),
     VITE_SUPPORT_EMAIL: pickEnv('VITE_SUPPORT_EMAIL', 'SUPPORT_EMAIL'),
-    VITE_TURNSTILE_SITE_KEY: pickEnv('VITE_TURNSTILE_SITE_KEY', 'TURNSTILE_SITE_KEY'),
+    VITE_TURNSTILE_SITE_KEY: turnstileSiteKey,
+    TURNSTILE_SITE_KEY: turnstileSiteKey,
     VITE_FIREBASE_PROJECT_ID: primaryProjectId,
     FIREBASE_PROJECT_ID: primaryProjectId,
     VITE_FIREBASE_API_KEY: primaryApiKey,
@@ -625,6 +658,10 @@ export default defineConfig(({mode}) => {
       'process.env.NODE_ENV': JSON.stringify(mode === 'production' ? 'production' : (process.env.NODE_ENV || 'development')),
       'process.env.ADMIN_PATH': JSON.stringify(resolvedBuildEnv.ADMIN_PATH),
       'process.env.VITE_ADMIN_PATH': JSON.stringify(resolvedBuildEnv.VITE_ADMIN_PATH),
+      'process.env.VITE_TURNSTILE_SITE_KEY': JSON.stringify(turnstileSiteKey),
+      'process.env.TURNSTILE_SITE_KEY': JSON.stringify(turnstileSiteKey),
+      'import.meta.env.VITE_TURNSTILE_SITE_KEY': JSON.stringify(turnstileSiteKey),
+      'import.meta.env.TURNSTILE_SITE_KEY': JSON.stringify(turnstileSiteKey),
       'process.env.FIREBASE_PROJECT_ID': JSON.stringify(primaryProjectId),
       'process.env.VITE_FIREBASE_PROJECT_ID': JSON.stringify(primaryProjectId),
       'process.env.FIREBASE_APP_ID': JSON.stringify(primaryAppId),

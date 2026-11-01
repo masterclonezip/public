@@ -25,7 +25,7 @@ import { AdminSidebarItem as SidebarItem } from './AdminSidebarItem';
 import { AdminMobileMenu } from './AdminMobileMenu';
 import { useData } from '../../contexts/DataContext';
 import { fetchAdminCommunityOverviewStats, getLiveAtomicReviewStatsSync, AdminCommunityStats } from '../../lib/adminCommunityFirebase';
-import { getOptimizedImageUrl } from '../../seo/utils';
+import { resolveSiteLogoUrl, getSizedLogoUrl } from '../../seo/utils';
 
 interface AdminSidebarProps {
   activeTab: string;
@@ -150,11 +150,12 @@ export const AdminSidebar = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const resolvedAdminLogo = resolveSiteLogoUrl(settings);
   const getTransformedUrl = (url?: string) => {
     const trimmed = (url || '').trim();
     if (!trimmed) return '/logo.png';
     if (trimmed.includes('res.cloudinary.com')) {
-      return getOptimizedImageUrl(trimmed, 120) || '/logo.png';
+      return getSizedLogoUrl(trimmed, 160, 'auto', 'c_fit') || '/logo.png';
     }
     return trimmed;
   };
@@ -172,7 +173,7 @@ export const AdminSidebar = ({
         onRefresh={onRefresh}
         isRefreshing={isRefreshing}
         siteTitle={settings?.site_title || ''}
-        logoUrl={settings?.logo_url}
+        logoUrl={resolvedAdminLogo}
         pendingReviewsCount={commStats?.pendingReviews}
         pendingReportsCount={commStats?.pendingReports}
       />
@@ -182,7 +183,7 @@ export const AdminSidebar = ({
         <div className="flex flex-col h-full">
           <div className="p-4 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-3">
-              <img src={getTransformedUrl(settings?.logo_url)} 
+              <img src={getTransformedUrl(resolvedAdminLogo)} 
                 alt="Admin Logo" 
                 className="w-10 h-10 object-contain drop-shadow-sm" 
                 loading="lazy" 

@@ -158,7 +158,7 @@ export function getSizedLogoUrl(
   rawUrl?: string,
   size = 512,
   format: 'png' | 'webp' | 'auto' = 'png',
-  cropMode: 'c_fill' | 'c_fit' | 'c_pad' = 'c_fill'
+  cropMode: 'c_fill' | 'c_fit' | 'c_pad' = 'c_pad'
 ): string {
   if (!rawUrl || typeof rawUrl !== 'string') return '';
   const trimmed = rawUrl.trim();
@@ -166,11 +166,18 @@ export function getSizedLogoUrl(
   if (trimmed.includes('res.cloudinary.com') && trimmed.includes('/upload/')) {
     const cleanUrl = trimmed.replace(/\/upload\/(?:(?:[a-z]{1,3}_[a-zA-Z0-9_.:-]+,?)+\/)*/, '/upload/');
     const fmt = format === 'auto' ? 'f_auto' : `f_${format}`;
-    return cleanUrl.replace('/upload/', `/upload/${fmt},q_auto,w_${size},h_${size},${cropMode}/`);
+    if (size <= 0) {
+      return cleanUrl.replace('/upload/', `/upload/${fmt},q_auto:best/`);
+    }
+    const padBg = cropMode === 'c_pad' && format === 'png' ? ',b_transparent' : '';
+    return cleanUrl.replace('/upload/', `/upload/${fmt},q_auto:best,w_${size},h_${size},${cropMode}${padBg}/`);
   }
   if (trimmed.includes('images.unsplash.com')) {
     const fmt = format === 'png' ? 'png' : 'webp';
-    return `${trimmed}${trimmed.includes('?') ? '&' : '?'}fm=${fmt}&q=85&w=${size}&h=${size}&fit=crop`;
+    if (size <= 0) {
+      return `${trimmed}${trimmed.includes('?') ? '&' : '?'}fm=${fmt}&q=92`;
+    }
+    return `${trimmed}${trimmed.includes('?') ? '&' : '?'}fm=${fmt}&q=92&w=${size}&h=${size}&fit=max`;
   }
   return trimmed;
 }
@@ -201,25 +208,25 @@ export function getAllSiteIconUrls(settings?: any, origin = getDefaultOrigin()):
   const absLogo = rawLogo ? ensureAbsoluteUrl(rawLogo, origin) : '';
   const absFavicon = rawFavicon ? ensureAbsoluteUrl(rawFavicon, origin) : absLogo;
 
-  const pwa512Url = absFavicon ? getSizedLogoUrl(absFavicon, 512, 'png', 'c_fill') : '/android-chrome-512x512.png';
-  const pwa192Url = absFavicon ? getSizedLogoUrl(absFavicon, 192, 'png', 'c_fill') : '/android-chrome-192x192.png';
+  const pwa512Url = absFavicon ? getSizedLogoUrl(absFavicon, 512, 'png', 'c_pad') : '/android-chrome-512x512.png';
+  const pwa192Url = absFavicon ? getSizedLogoUrl(absFavicon, 192, 'png', 'c_pad') : '/android-chrome-192x192.png';
 
   return {
-    masterLogo: absLogo,
-    masterFavicon: absFavicon,
-    headerLogo: absLogo ? getOptimizedImageUrl(absLogo, 120) : '',
-    searchLogo512: absFavicon ? getSizedLogoUrl(absFavicon, 512, 'png', 'c_fill') : '/logo.png',
+    masterLogo: absLogo ? getSizedLogoUrl(absLogo, 0, 'auto', 'c_fit') : '',
+    masterFavicon: absFavicon ? getSizedLogoUrl(absFavicon, 0, 'png', 'c_fit') : '',
+    headerLogo: absLogo ? getSizedLogoUrl(absLogo, 240, 'auto', 'c_fit') : '',
+    searchLogo512: absFavicon ? getSizedLogoUrl(absFavicon, 512, 'png', 'c_pad') : ensureAbsoluteUrl('/logo.png', origin),
     pwa512: pwa512Url,
     pwa192: pwa192Url,
     android512: pwa512Url,
     android192: pwa192Url,
-    appleTouch180: absFavicon ? getSizedLogoUrl(absFavicon, 180, 'png', 'c_fill') : '/apple-touch-icon.png',
-    favicon144: absFavicon ? getSizedLogoUrl(absFavicon, 144, 'png', 'c_fill') : '/favicon.png',
-    favicon96: absFavicon ? getSizedLogoUrl(absFavicon, 96, 'png', 'c_fill') : '/favicon.png',
-    favicon48: absFavicon ? getSizedLogoUrl(absFavicon, 48, 'png', 'c_fill') : '/favicon.ico',
-    favicon32: absFavicon ? getSizedLogoUrl(absFavicon, 32, 'png', 'c_fill') : '/favicon-32x32.png',
-    favicon16: absFavicon ? getSizedLogoUrl(absFavicon, 16, 'png', 'c_fill') : '/favicon-16x16.png',
-    faviconIco: absFavicon ? getSizedLogoUrl(absFavicon, 48, 'png', 'c_fill') : '/favicon.ico',
+    appleTouch180: absFavicon ? getSizedLogoUrl(absFavicon, 180, 'png', 'c_pad') : '/apple-touch-icon.png',
+    favicon144: absFavicon ? getSizedLogoUrl(absFavicon, 144, 'png', 'c_pad') : '/favicon.png',
+    favicon96: absFavicon ? getSizedLogoUrl(absFavicon, 96, 'png', 'c_pad') : '/favicon.png',
+    favicon48: absFavicon ? getSizedLogoUrl(absFavicon, 48, 'png', 'c_pad') : '/favicon.ico',
+    favicon32: absFavicon ? getSizedLogoUrl(absFavicon, 32, 'png', 'c_pad') : '/favicon-32x32.png',
+    favicon16: absFavicon ? getSizedLogoUrl(absFavicon, 16, 'png', 'c_pad') : '/favicon-16x16.png',
+    faviconIco: absFavicon ? getSizedLogoUrl(absFavicon, 48, 'png', 'c_pad') : '/favicon.ico',
     ogBanner1200: absLogo ? getOgImageUrl(absLogo, origin) : ''
   };
 }

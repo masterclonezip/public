@@ -95,9 +95,10 @@ export function buildMetaTags(params: MetaBuilderParams): string {
     ].filter(Boolean).join('\n    ');
   })();
 
+  const primaryIconMime = resolvedFaviconIco.endsWith('.ico') ? 'image/x-icon' : 'image/png';
   const iconLinksHtml = `
-    <link data-rh="true" rel="icon" type="image/x-icon" href="${escapeHtml(resolvedFaviconIco)}">
-    <link data-rh="true" rel="shortcut icon" href="${escapeHtml(resolvedFaviconIco)}">
+    <link data-rh="true" rel="icon" type="${primaryIconMime}" href="${escapeHtml(resolvedFaviconIco)}">
+    <link data-rh="true" rel="shortcut icon" type="${primaryIconMime}" href="${escapeHtml(resolvedFaviconIco)}">
     <link data-rh="true" rel="icon" type="image/png" sizes="48x48" href="${escapeHtml(resolvedFavicon48)}">
     <link data-rh="true" rel="icon" type="image/png" sizes="96x96" href="${escapeHtml(resolvedFavicon96)}">
     <link data-rh="true" rel="icon" type="image/png" sizes="144x144" href="${escapeHtml(resolvedFavicon144)}">
@@ -105,7 +106,7 @@ export function buildMetaTags(params: MetaBuilderParams): string {
     <link data-rh="true" rel="icon" type="image/png" sizes="512x512" href="${escapeHtml(resolvedFavicon512)}">
     <link data-rh="true" rel="icon" type="image/png" sizes="32x32" href="${escapeHtml(resolvedFavicon32)}">
     <link data-rh="true" rel="icon" type="image/png" sizes="16x16" href="${escapeHtml(resolvedFavicon16)}">
-    <link data-rh="true" rel="apple-touch-icon" sizes="180x180" href="${escapeHtml(resolvedFavicon180)}">
+    <link data-rh="true" rel="apple-touch-icon" type="image/png" sizes="180x180" href="${escapeHtml(resolvedFavicon180)}">
     <link data-rh="true" rel="manifest" href="/site.webmanifest">`;
 
   if (pageType === 'gateway') {

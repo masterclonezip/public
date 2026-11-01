@@ -26,7 +26,7 @@ export function fromBase64Url(str: string): Uint8Array {
 
 export function isRealEnvKey(val?: string | null): boolean {
   if (!val || typeof val !== 'string') return false;
-  const clean = val.trim();
+  const clean = val.trim().replace(/^["'`]+|["'`]+$/g, '').trim();
   if (
     !clean ||
     clean === 'PLACEHOLDER' ||
@@ -68,8 +68,8 @@ export function getCandidateAesKeys(env?: Record<string, any>, explicitKey?: str
   const valid: string[] = [];
   for (const k of raw) {
     if (isRealEnvKey(k)) {
-      const trimmed = String(k).trim();
-      if (!valid.includes(trimmed)) valid.push(trimmed);
+      const trimmed = String(k).trim().replace(/^["'`]+|["'`]+$/g, '').trim();
+      if (trimmed && !valid.includes(trimmed)) valid.push(trimmed);
     }
   }
   return valid;

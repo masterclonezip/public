@@ -1,8 +1,8 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import zlib from 'zlib';
 import staticData from '../../lib/staticData.json';
 import { fetchStoreData } from '../../seoHelper';
-import { getAllSiteIconUrls } from '../../seo/utils';
+import { getAllSiteIconUrls, resolveSiteLogoUrl } from '../../seo/utils';
 import {
   generateMasterSitemapXml,
   generateAppsSitemapXml,
@@ -10,7 +10,9 @@ import {
   generateVideosSitemapXml,
   generateStaticSitemapXml,
   generateDevelopersSitemapXml,
-  getLatestItemDate
+  getLatestItemDate,
+  escapeXml,
+  normalizeSitemapImageUrl
 } from '../../lib/sitemapGenerator';
 
 export const seoRouter = Router();
@@ -53,6 +55,63 @@ function sendXmlOrGzip(req: Request, res: Response, xml: string, maxAgeSeconds: 
   res.send(xml);
 }
 
+// Dynamic Root Brand Icon & Logo Resolution for Browsers, Googlebot Favicon Crawler, and Apple Devices
+seoRouter.get(
+  [
+    '/favicon.ico',
+    '/favicon.svg',
+    '/favicon.png',
+    '/favicon-16x16.png',
+    '/favicon-32x32.png',
+    '/favicon-48x48.png',
+    '/apple-touch-icon.png',
+    '/apple-touch-icon-precomposed.png',
+    '/android-chrome-192x192.png',
+    '/android-chrome-512x512.png',
+    '/logo.png'
+  ],
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const host = resolveHost(req);
+      const data = await getLiveData();
+      const settings = data?.settings || {};
+      const icons = getAllSiteIconUrls(settings, host);
+      const hasCustomBrand = Boolean(icons.masterFavicon || icons.masterLogo);
+      if (!hasCustomBrand && req.path !== '/favicon.svg') {
+        return next();
+      }
+
+      const p = req.path.toLowerCase();
+      let targetUrl = '';
+      if (p === '/favicon-16x16.png') {
+        targetUrl = icons.favicon16;
+      } else if (p === '/favicon-32x32.png') {
+        targetUrl = icons.favicon32;
+      } else if (p === '/favicon.ico' || p === '/favicon.svg' || p === '/favicon.png' || p === '/favicon-48x48.png') {
+        targetUrl = icons.favicon48 || icons.faviconIco;
+      } else if (p === '/apple-touch-icon.png' || p === '/apple-touch-icon-precomposed.png') {
+        targetUrl = icons.appleTouch180;
+      } else if (p === '/android-chrome-192x192.png') {
+        targetUrl = icons.pwa192;
+      } else if (p === '/android-chrome-512x512.png') {
+        targetUrl = icons.pwa512;
+      } else if (p === '/logo.png') {
+        targetUrl = icons.masterLogo || icons.searchLogo512;
+      }
+
+      // Avoid self-redirect loops when targetUrl points back to the same local static path
+      if (targetUrl && targetUrl !== req.path && !targetUrl.endsWith(req.path)) {
+        res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600');
+        return res.redirect(302, targetUrl);
+      }
+      if (p === '/favicon.svg') {
+        return res.redirect(302, '/favicon-32x32.png');
+      }
+    } catch (_) {}
+    return next();
+  }
+);
+
 seoRouter.get('/site.webmanifest', async (req, res) => {
   const host = resolveHost(req);
   const data = await getLiveData();
@@ -72,6 +131,24 @@ seoRouter.get('/site.webmanifest', async (req, res) => {
     orientation: 'portrait',
     lang: 'en-IN',
     icons: [
+      {
+        src: icons.favicon48 || '/favicon-32x32.png',
+        sizes: '48x48',
+        type: 'image/png',
+        purpose: 'any'
+      },
+      {
+        src: icons.favicon96 || '/apple-touch-icon.png',
+        sizes: '96x96',
+        type: 'image/png',
+        purpose: 'any'
+      },
+      {
+        src: icons.favicon144 || '/apple-touch-icon.png',
+        sizes: '144x144',
+        type: 'image/png',
+        purpose: 'any'
+      },
       {
         src: icons.android192 || '/android-chrome-192x192.png',
         sizes: '192x192',
@@ -102,15 +179,19 @@ seoRouter.get('/opensearch.xml', async (req, res) => {
   const settings = data?.settings || {};
   const siteTitle = String(settings.site_title || process.env.VITE_SITE_NAME || 'Search').trim() || 'Search';
   const icons = getAllSiteIconUrls(settings, host);
-  const iconTag = icons.favicon16
-    ? `\n  <Image width="16" height="16" type="image/png">${icons.favicon16.replace(/&/g, '&amp;')}</Image>`
-    : '';
+  const iconTags = [
+    icons.favicon16 ? `  <Image width="16" height="16" type="image/png">${escapeXml(icons.favicon16)}</Image>` : '',
+    icons.favicon32 ? `  <Image width="32" height="32" type="image/png">${escapeXml(icons.favicon32)}</Image>` : '',
+    icons.favicon48 ? `  <Image width="48" height="48" type="image/png">${escapeXml(icons.favicon48)}</Image>` : '',
+    icons.searchLogo512 ? `  <Image width="512" height="512" type="image/png">${escapeXml(icons.searchLogo512)}</Image>` : ''
+  ].filter(Boolean).join('\n');
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
   <ShortName>${siteTitle.replace(/[<>&'"]/g, '')}</ShortName>
   <Description>Search applications</Description>
-  <InputEncoding>UTF-8</InputEncoding>${iconTag}
+  <InputEncoding>UTF-8</InputEncoding>
+${iconTags}
   <Url type="text/html" template="${host}/?s={searchTerms}"/>
 </OpenSearchDescription>`;
   sendXmlOrGzip(req, res, xml, 3600);
@@ -206,7 +287,9 @@ seoRouter.get(['/sitemap.xml', '/sitemap.xml.gz'], async (req, res) => {
 seoRouter.get(['/sitemap-news.xml', '/sitemap_news.xml', '/sitemap-news.xml.gz', '/sitemap_news.xml.gz'], async (req, res) => {
   const host = resolveHost(req);
   const data = await getLiveData();
-  const xml = generateNewsSitemapXml(data.news || [], host);
+  const siteLogo = resolveSiteLogoUrl(data.settings);
+  const siteTitle = String(data.settings?.site_title || '').trim();
+  const xml = generateNewsSitemapXml(data.news || [], host, siteLogo, siteTitle);
   sendXmlOrGzip(req, res, xml, 3600);
 });
 
@@ -214,7 +297,9 @@ seoRouter.get(['/sitemap-news.xml', '/sitemap_news.xml', '/sitemap-news.xml.gz',
 seoRouter.get(['/sitemap-apps.xml', '/sitemap_apps.xml', '/sitemap-apps.xml.gz', '/sitemap_apps.xml.gz'], async (req, res) => {
   const host = resolveHost(req);
   const data = await getLiveData();
-  const xml = generateAppsSitemapXml(data.apps || [], host);
+  const siteLogo = resolveSiteLogoUrl(data.settings);
+  const siteTitle = String(data.settings?.site_title || '').trim();
+  const xml = generateAppsSitemapXml(data.apps || [], host, siteLogo, siteTitle);
   sendXmlOrGzip(req, res, xml, 3600);
 });
 
@@ -222,16 +307,23 @@ seoRouter.get(['/sitemap-apps.xml', '/sitemap_apps.xml', '/sitemap-apps.xml.gz',
 seoRouter.get(['/sitemap-static.xml', '/sitemap_static.xml', '/sitemap-static.xml.gz', '/sitemap_static.xml.gz'], async (req, res) => {
   const host = resolveHost(req);
   const data = await getLiveData();
+  const siteLogo = resolveSiteLogoUrl(data.settings);
+  const siteTitle = String(data.settings?.site_title || '').trim();
   const latestAppDate = getLatestItemDate(data.apps || []);
   const latestNewsDate = getLatestItemDate(data.news || []);
   const latestVideoDate = getLatestItemDate(data.videos || []);
   const settingsDate = data.settings?.last_updated || data.settings?.updated_at;
-  const xml = generateStaticSitemapXml(host, {
-    latestAppDate,
-    latestNewsDate,
-    latestVideoDate,
-    settingsDate
-  });
+  const xml = generateStaticSitemapXml(
+    host,
+    {
+      latestAppDate,
+      latestNewsDate,
+      latestVideoDate,
+      settingsDate
+    },
+    siteLogo,
+    siteTitle
+  );
   sendXmlOrGzip(req, res, xml, 86400);
 });
 
@@ -239,7 +331,9 @@ seoRouter.get(['/sitemap-static.xml', '/sitemap_static.xml', '/sitemap-static.xm
 seoRouter.get(['/sitemap-videos.xml', '/sitemap_videos.xml', '/sitemap-videos.xml.gz', '/sitemap_videos.xml.gz'], async (req, res) => {
   const host = resolveHost(req);
   const data = await getLiveData();
-  const xml = generateVideosSitemapXml(data.videos || [], host);
+  const siteLogo = resolveSiteLogoUrl(data.settings);
+  const siteTitle = String(data.settings?.site_title || '').trim();
+  const xml = generateVideosSitemapXml(data.videos || [], host, siteLogo, siteTitle);
   sendXmlOrGzip(req, res, xml, 86400);
 });
 
@@ -247,29 +341,43 @@ seoRouter.get(['/sitemap-videos.xml', '/sitemap_videos.xml', '/sitemap-videos.xm
 seoRouter.get(['/sitemap-developers.xml', '/sitemap_developers.xml', '/sitemap-developers.xml.gz', '/sitemap_developers.xml.gz'], async (req, res) => {
   const host = resolveHost(req);
   const data = await getLiveData();
-  const latestDate = getLatestItemDate(data.settings?.developers || data.developers || []);
-  const xml = generateDevelopersSitemapXml(host, latestDate);
+  const siteLogo = resolveSiteLogoUrl(data.settings);
+  const siteTitle = String(data.settings?.site_title || '').trim();
+  const developers = data.settings?.developers || data.developers || [];
+  const latestDate = getLatestItemDate(developers);
+  const xml = generateDevelopersSitemapXml(host, latestDate, siteLogo, siteTitle, developers);
   sendXmlOrGzip(req, res, xml, 86400);
 });
 
-// Dedicated Categories Sitemap (Ensures valid XML for crawlers requesting /sitemap-categories.xml)
+// Dedicated Categories Sitemap (Ensures valid XML with brand logo for crawlers requesting /sitemap-categories.xml)
 seoRouter.get(['/sitemap-categories.xml', '/sitemap_categories.xml', '/sitemap-categories.xml.gz', '/sitemap_categories.xml.gz'], async (req, res) => {
   const host = resolveHost(req);
   const data = await getLiveData();
+  const siteLogo = normalizeSitemapImageUrl(resolveSiteLogoUrl(data.settings), host.replace(/\/$/, ''), 512);
+  const siteTitle = String(data.settings?.site_title || '').trim();
+  const brandPrefix = siteTitle ? `${siteTitle} - ` : '';
   const latestAppDate = getLatestItemDate(data.apps || []);
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>${host}/categories</loc>
     <lastmod>${latestAppDate}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+    <image:image>
+      <image:loc>${escapeXml(siteLogo)}</image:loc>
+      <image:title>${escapeXml(`${brandPrefix}App Categories`)}</image:title>
+    </image:image>
   </url>
   <url>
     <loc>${host}/new-apps</loc>
     <lastmod>${latestAppDate}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
+    <image:image>
+      <image:loc>${escapeXml(siteLogo)}</image:loc>
+      <image:title>${escapeXml(`${brandPrefix}New Apps`)}</image:title>
+    </image:image>
   </url>
 </urlset>`;
   sendXmlOrGzip(req, res, xml, 86400);
@@ -281,8 +389,14 @@ seoRouter.get('/rss.xml', async (req, res) => {
   res.setHeader('Vary', 'Accept-Encoding');
   res.type('application/xml');
   const data = await getLiveData();
-  const siteTitle = (data.settings?.site_title || process.env.VITE_SITE_NAME || '').trim();
+  const settings = data?.settings || {};
+  const siteTitle = (settings.site_title || process.env.VITE_SITE_NAME || '').trim();
   const feedTitle = siteTitle ? `${siteTitle} News Feed` : 'News Feed';
+  const icons = getAllSiteIconUrls(settings, host);
+  const feedLogoUrl = icons.favicon144 || icons.searchLogo512 || `${host}/logo.png`;
+  const channelImageXml = feedLogoUrl
+    ? `    <image>\n      <url>${escapeXml(feedLogoUrl)}</url>\n      <title><![CDATA[${feedTitle}]]></title>\n      <link>${host}/news</link>\n    </image>\n`
+    : '';
   const news = (data.news || []).filter((n: any) => n && n.slug && n.sync_to_public !== false);
   const items = news.slice(0, 30).map((n: any) => `    <item>
       <title><![CDATA[${n.title || ''}]]></title>
@@ -290,5 +404,5 @@ seoRouter.get('/rss.xml', async (req, res) => {
       <description><![CDATA[${n.description || n.seo_description || ''}]]></description>
       <pubDate>${new Date(n.published_at || n.publish_date || n.created_at || n.date || n.updated_at || Date.now()).toUTCString()}</pubDate>
     </item>`).join('\n');
-  res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0">\n  <channel>\n    <title><![CDATA[${feedTitle}]]></title>\n    <link>${host}/news</link>\n    <description>Latest News and Updates</description>\n${items}\n  </channel>\n</rss>`);
+  res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0">\n  <channel>\n    <title><![CDATA[${feedTitle}]]></title>\n    <link>${host}/news</link>\n    <description>Latest News and Updates</description>\n${channelImageXml}${items}\n  </channel>\n</rss>`);
 });

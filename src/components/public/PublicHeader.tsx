@@ -3,7 +3,7 @@ import { useLocation, Link } from 'react-router-dom';
 import { useTranslation } from '../../i18n';
 import { Menu, Shield, ShieldCheck, Info, X, LayoutGrid, Newspaper, Sparkles, Send, MoreHorizontal, Search, Video, Users, Trash2 } from 'lucide-react';
 import { useData } from '../../contexts/DataContextPublic';
-import { getOptimizedImageUrl } from '../../seo/utils';
+import { resolveSiteLogoUrl, getSizedLogoUrl } from '../../seo/utils';
 import LanguageSelector from '../LanguageSelector';
 import SupportWidget from '../SupportWidget';
 import { useScrollDirection } from '../../hooks/useScrollDirection';
@@ -21,6 +21,7 @@ export function PublicHeader() {
   
   const isHeaderHidden = scrollDirection === 'down' && !menuOpen && !searchOpen;
 
+  const resolvedLogoUrl = resolveSiteLogoUrl(settings);
   const triggerHaptic = () => {
     if (window.navigator && window.navigator.vibrate) {
       setTimeout(() => {
@@ -46,9 +47,9 @@ export function PublicHeader() {
         <div className="w-full max-w-7xl px-1.5 xxs:px-2.5 xs:px-4 sm:px-6 lg:px-8 mx-auto relative flex justify-between items-center">
           <Link to="/" onClick={triggerHaptic} className="flex items-center gap-1 xxs:gap-1.5 xs:gap-2.5 sm:gap-3 group min-w-0">
             <div className="p-0 transition-transform group-hover:scale-[1.03] duration-300 shrink-0">
-              {settings.logo_url ? (
+              {resolvedLogoUrl ? (
                 <img 
-                  src={getOptimizedImageUrl(settings.logo_url, 120)} 
+                  src={getSizedLogoUrl(resolvedLogoUrl, 240, 'auto', 'c_fit')} 
                   width={40} 
                   height={40} 
                   loading="eager" 
@@ -202,7 +203,7 @@ export function PublicHeader() {
           isOpen={menuOpen}
           onClose={() => setMenuOpen(false)}
           siteTitle={settings.site_title || ''}
-          logoUrl={settings.logo_url}
+          logoUrl={resolvedLogoUrl}
           triggerHaptic={triggerHaptic}
           helplineTelegram={settings.helpline_telegram}
         />

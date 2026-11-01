@@ -892,51 +892,464 @@ body {
   }
 }
 
-/* Ensure 100% legibility in Dark Mode for all Admin rich HTML descriptions, features, FAQs, and news articles */
-.dark .prose {
+/* ─────────────────────────────────────────────────────────────────────────
+   UNIVERSAL RICH HTML BOUNDARY & TYPOGRAPHY SYSTEM (.rich-html-boundary, .prose, .markdown-body)
+   Supports embedded SVGs, external/internal SEO links, Cloudinary images,
+   categorized cards, comparison tables, and mobile-first responsive boundaries.
+   ───────────────────────────────────────────────────────────────────────── */
+.rich-html-boundary,
+.prose,
+.markdown-body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.7;
+  color: #3f3f46;
+}
+
+.dark .rich-html-boundary,
+.dark .prose,
+.dark .markdown-body {
   color: #e4e4e7 !important;
 }
-.dark .prose h1,
-.dark .prose h2,
-.dark .prose h3,
-.dark .prose h4,
+
+.rich-html-boundary *,
+.prose *,
+.markdown-body * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Headings & Categorized Section Hierarchy */
+.rich-html-boundary h1,
+.rich-html-boundary h2,
+.prose h1,
+.prose h2,
+.markdown-body h1,
+.markdown-body h2 {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  line-height: 1.35;
+  color: #18181b;
+  margin-top: 1.5rem;
+  margin-bottom: 0.65rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(228, 228, 231, 0.8);
+}
+
+@media (min-width: 640px) {
+  .rich-html-boundary h1,
+  .rich-html-boundary h2,
+  .prose h1,
+  .prose h2,
+  .markdown-body h1,
+  .markdown-body h2 {
+    font-size: 1.35rem;
+  }
+}
+
+.rich-html-boundary h1:first-child,
+.rich-html-boundary h2:first-child,
+.prose h1:first-child,
+.prose h2:first-child,
+.markdown-body h1:first-child,
+.markdown-body h2:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.rich-html-boundary h3,
+.prose h3,
+.markdown-body h3 {
+  font-size: 1.025rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+  color: #18181b;
+  margin-top: 1.2rem;
+  margin-bottom: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .rich-html-boundary h3,
+  .prose h3,
+  .markdown-body h3 {
+    font-size: 1.15rem;
+  }
+}
+
+.rich-html-boundary h4,
+.rich-html-boundary h5,
+.rich-html-boundary h6,
+.prose h4,
+.prose h5,
+.prose h6,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.45;
+  color: #27272a;
+  margin-top: 1rem;
+  margin-bottom: 0.4rem;
+}
+
+/* Paragraphs & Spacing */
+.rich-html-boundary p,
+.prose p,
+.markdown-body p {
+  margin-top: 0;
+  margin-bottom: 0.85rem;
+  line-height: 1.7;
+}
+
+.rich-html-boundary p:last-child,
+.prose p:last-child,
+.markdown-body p:last-child {
+  margin-bottom: 0;
+}
+
+/* Bold & Highlights */
+.rich-html-boundary strong,
+.rich-html-boundary b,
+.prose strong,
+.prose b,
+.markdown-body strong,
+.markdown-body b {
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.dark .rich-html-boundary strong,
+.dark .rich-html-boundary b,
 .dark .prose strong,
-.dark .prose b {
-  color: #ffffff !important;
-}
-.dark .prose p,
-.dark .prose li,
-.dark .prose td,
-.dark .prose th,
-.dark .prose blockquote {
-  color: #d4d4d8 !important;
-}
-.dark .prose a {
+.dark .prose b,
+.dark .markdown-body strong,
+.dark .markdown-body b {
   color: #60a5fa !important;
 }
 
+/* Lists & Bullets */
+.rich-html-boundary ul,
+.prose ul,
+.markdown-body ul {
+  list-style-type: disc;
+  padding-left: 1.35rem;
+  margin-top: 0.65rem;
+  margin-bottom: 0.95rem;
+}
+
+.rich-html-boundary ol,
+.prose ol,
+.markdown-body ol {
+  list-style-type: decimal;
+  padding-left: 1.35rem;
+  margin-top: 0.65rem;
+  margin-bottom: 0.95rem;
+}
+
+.rich-html-boundary li,
+.prose li,
+.markdown-body li {
+  margin-bottom: 0.4rem;
+  padding-left: 0.2rem;
+  line-height: 1.65;
+}
+
+.rich-html-boundary li::marker,
+.prose li::marker,
+.markdown-body li::marker {
+  color: #2563eb;
+  font-weight: 700;
+}
+
+.dark .rich-html-boundary li::marker,
+.dark .prose li::marker,
+.dark .markdown-body li::marker {
+  color: #60a5fa;
+}
+
+/* External & Internal Links */
+.rich-html-boundary a:not([class*="btn"]):not([class*="button"]),
+.prose a:not([class*="btn"]):not([class*="button"]),
+.markdown-body a:not([class*="btn"]):not([class*="button"]) {
+  color: #2563eb !important;
+  font-weight: 600;
+  text-decoration: underline !important;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: color 0.15s ease, opacity 0.15s ease;
+  word-break: break-word;
+}
+
+.rich-html-boundary a:not([class*="btn"]):not([class*="button"]):hover,
+.prose a:not([class*="btn"]):not([class*="button"]):hover,
+.markdown-body a:not([class*="btn"]):not([class*="button"]):hover {
+  color: #1d4ed8 !important;
+}
+
+.dark .rich-html-boundary a:not([class*="btn"]):not([class*="button"]),
+.dark .prose a:not([class*="btn"]):not([class*="button"]),
+.dark .markdown-body a:not([class*="btn"]):not([class*="button"]) {
+  color: #60a5fa !important;
+}
+
+.dark .rich-html-boundary a:not([class*="btn"]):not([class*="button"]):hover,
+.dark .prose a:not([class*="btn"]):not([class*="button"]):hover,
+.dark .markdown-body a:not([class*="btn"]):not([class*="button"]):hover {
+  color: #93c5fd !important;
+}
+
+/* Embedded SVGs & Icons */
+.rich-html-boundary svg,
+.prose svg,
+.markdown-body svg {
+  display: inline-block !important;
+  vertical-align: middle;
+  max-width: 100%;
+  height: auto;
+  flex-shrink: 0;
+}
+
+/* Prevent un-sized icon SVGs (e.g. viewBox="0 0 24 24" without width/height/class) from expanding to 100% page width */
+.rich-html-boundary svg:not([width]):not([height]):not([class]):not([style*="width"]),
+.prose svg:not([width]):not([height]):not([class]):not([style*="width"]),
+.markdown-body svg:not([width]):not([height]):not([class]):not([style*="width"]) {
+  width: 1.35em;
+  height: 1.35em;
+  vertical-align: -0.22em;
+  margin-right: 0.25rem;
+}
+
+/* Embedded Images & Figures */
+.rich-html-boundary img,
+.prose img,
+.markdown-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.75rem;
+  margin: 0.75rem 0;
+}
+
+.rich-html-boundary figure,
+.prose figure,
+.markdown-body figure {
+  margin: 1rem 0;
+  max-width: 100%;
+}
+
+.rich-html-boundary figcaption,
+.prose figcaption,
+.markdown-body figcaption {
+  font-size: 0.775rem;
+  color: #71717a;
+  text-align: center;
+  margin-top: 0.4rem;
+}
+
+/* Blockquotes, Callouts & Categorized Cards */
+.rich-html-boundary blockquote,
+.prose blockquote,
+.markdown-body blockquote {
+  border-left: 4px solid #3b82f6;
+  padding: 0.65rem 1rem;
+  margin: 1rem 0;
+  background-color: rgba(59, 130, 246, 0.06);
+  border-radius: 0 0.75rem 0.75rem 0;
+  font-style: italic;
+}
+
+.dark .rich-html-boundary blockquote,
+.dark .prose blockquote,
+.dark .markdown-body blockquote {
+  background-color: rgba(30, 58, 138, 0.22);
+  border-left-color: #60a5fa;
+}
+
+.rich-html-boundary section,
+.rich-html-boundary article,
+.prose section,
+.prose article {
+  margin-bottom: 1rem;
+}
+
+.rich-html-boundary hr,
+.prose hr,
+.markdown-body hr {
+  border: 0;
+  border-top: 1px solid rgba(161, 161, 170, 0.25);
+  margin: 1.25rem 0;
+}
+
+/* Responsive Tables */
+.rich-html-boundary table,
+.prose table,
+.markdown-body table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.85rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(161, 161, 170, 0.25);
+}
+
+@media (min-width: 640px) {
+  .rich-html-boundary table,
+  .prose table,
+  .markdown-body table {
+    display: table;
+  }
+}
+
+.rich-html-boundary th,
+.rich-html-boundary td,
+.prose th,
+.prose td,
+.markdown-body th,
+.markdown-body td {
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid rgba(161, 161, 170, 0.18);
+  text-align: left;
+  vertical-align: top;
+}
+
+.rich-html-boundary th,
+.prose th,
+.markdown-body th {
+  background-color: rgba(59, 130, 246, 0.07);
+  font-weight: 700;
+  color: #18181b;
+}
+
+.dark .rich-html-boundary th,
+.dark .prose th,
+.dark .markdown-body th {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #f4f4f5 !important;
+}
+
+/* Mobile-First Responsive Boundary for Custom Inline Grids & Flex Cards */
+@media (max-width: 640px) {
+  .rich-html-boundary [style*="grid-template-columns"],
+  .prose [style*="grid-template-columns"],
+  .markdown-body [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .rich-html-boundary [style*="display: flex"],
+  .rich-html-boundary [style*="display:flex"],
+  .prose [style*="display: flex"],
+  .prose [style*="display:flex"] {
+    flex-wrap: wrap !important;
+  }
+
+  .rich-html-boundary [style*="padding: 3"],
+  .rich-html-boundary [style*="padding: 4"],
+  .rich-html-boundary [style*="padding:3"],
+  .rich-html-boundary [style*="padding:4"],
+  .prose [style*="padding: 3"],
+  .prose [style*="padding: 4"] {
+    padding: 1rem !important;
+  }
+}
+
+/* Dark Mode Contrast Protection for Rich HTML & Inline Light Card Styles */
+.dark .rich-html-boundary h1,
+.dark .rich-html-boundary h2,
+.dark .rich-html-boundary h3,
+.dark .rich-html-boundary h4,
+.dark .prose h1,
+.dark .prose h2,
+.dark .prose h3,
+.dark .prose h4 {
+  color: #ffffff !important;
+  border-top-color: rgba(63, 63, 70, 0.65);
+}
+
+.dark .rich-html-boundary p,
+.dark .rich-html-boundary li,
+.dark .rich-html-boundary td,
+.dark .rich-html-boundary blockquote,
+.dark .prose p,
+.dark .prose li,
+.dark .prose td,
+.dark .prose blockquote {
+  color: #d4d4d8 !important;
+}
+
+.dark .rich-html-boundary [style*="background:#fff"],
+.dark .rich-html-boundary [style*="background: #fff"],
+.dark .rich-html-boundary [style*="background-color:#fff"],
+.dark .rich-html-boundary [style*="background-color: #fff"],
+.dark .rich-html-boundary [style*="background: white"],
+.dark .rich-html-boundary [style*="background-color: white"],
+.dark .rich-html-boundary [style*="background:#f"],
+.dark .rich-html-boundary [style*="background: #f"],
+.dark .rich-html-boundary [style*="background-color:#f"],
+.dark .rich-html-boundary [style*="background-color: #f"],
+.dark .prose [style*="background:#fff"],
+.dark .prose [style*="background: #fff"],
+.dark .prose [style*="background-color:#fff"],
+.dark .prose [style*="background-color: #fff"],
+.dark .prose [style*="background:#f"],
+.dark .prose [style*="background: #f"],
+.dark .prose [style*="background-color:#f"],
+.dark .prose [style*="background-color: #f"] {
+  background-color: rgba(24, 24, 27, 0.85) !important;
+  color: #e4e4e7 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root:not(.light) .prose {
+  :root:not(.light) .rich-html-boundary,
+  :root:not(.light) .prose,
+  :root:not(.light) .markdown-body {
     color: #e4e4e7 !important;
   }
+  :root:not(.light) .rich-html-boundary h1,
+  :root:not(.light) .rich-html-boundary h2,
+  :root:not(.light) .rich-html-boundary h3,
+  :root:not(.light) .rich-html-boundary h4,
   :root:not(.light) .prose h1,
   :root:not(.light) .prose h2,
   :root:not(.light) .prose h3,
-  :root:not(.light) .prose h4,
+  :root:not(.light) .prose h4 {
+    color: #ffffff !important;
+    border-top-color: rgba(63, 63, 70, 0.65);
+  }
+  :root:not(.light) .rich-html-boundary strong,
+  :root:not(.light) .rich-html-boundary b,
   :root:not(.light) .prose strong,
   :root:not(.light) .prose b {
-    color: #ffffff !important;
+    color: #60a5fa !important;
   }
+  :root:not(.light) .rich-html-boundary p,
+  :root:not(.light) .rich-html-boundary li,
+  :root:not(.light) .rich-html-boundary td,
+  :root:not(.light) .rich-html-boundary blockquote,
   :root:not(.light) .prose p,
   :root:not(.light) .prose li,
   :root:not(.light) .prose td,
-  :root:not(.light) .prose th,
   :root:not(.light) .prose blockquote {
     color: #d4d4d8 !important;
   }
-  :root:not(.light) .prose a {
+  :root:not(.light) .rich-html-boundary a:not([class*="btn"]):not([class*="button"]),
+  :root:not(.light) .prose a:not([class*="btn"]):not([class*="button"]) {
     color: #60a5fa !important;
   }
 }
+
 
 

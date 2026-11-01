@@ -22,6 +22,13 @@ export const AdminSettingsTab = React.memo(({ settings: rawSettings, handleSaveS
   const [liveLogoUrl, setLiveLogoUrl] = useState<string>(() => settings.logo_url || settings.favicon_url || getEnvLogoUrl() || '');
   const [liveFaviconUrl, setLiveFaviconUrl] = useState<string>(() => settings.favicon_url || settings.logo_url || getEnvFaviconUrl() || '');
 
+  useEffect(() => {
+    const nextLogo = settings.logo_url || settings.favicon_url || getEnvLogoUrl() || '';
+    const nextFavicon = settings.favicon_url || settings.logo_url || getEnvFaviconUrl() || '';
+    if (nextLogo) setLiveLogoUrl(nextLogo);
+    if (nextFavicon) setLiveFaviconUrl(nextFavicon);
+  }, [settings.logo_url, settings.favicon_url]);
+
   // Unified Gemini Studio Key & Model state
   const [geminiKeyInput, setGeminiKeyInput] = useState<string>(() => {
     const cfg = loadStudioConfig(settings.gemini_api_key, settings.gemini_model);
@@ -321,8 +328,11 @@ export const AdminSettingsTab = React.memo(({ settings: rawSettings, handleSaveS
                 format="png"
                 value={liveLogoUrl}
                 onChange={(val) => {
+                  const prevLogo = liveLogoUrl;
                   setLiveLogoUrl(val);
-                  if (!liveFaviconUrl) setLiveFaviconUrl(val);
+                  if (!liveFaviconUrl || liveFaviconUrl === prevLogo) {
+                    setLiveFaviconUrl(val);
+                  }
                 }}
                 className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm dark:text-white focus-within:ring-2 focus-within:ring-blue-500 overflow-hidden"
               />

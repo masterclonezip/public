@@ -39,6 +39,7 @@ import {
   resolveDestinationUrl,
   getCandidateTurnstileSecrets,
   getPublicTurnstileSiteKey,
+  getCandidateTurnstileSiteKeys,
 } from '../services/linkService.js';
 
 export interface GateRequestContext {
@@ -378,26 +379,33 @@ export async function computeNetKey(
   return h.slice(0, 32);
 }
 
+function cleanEnvVal(raw: unknown): string {
+  if (!raw || typeof raw !== 'string') return '';
+  return raw.trim().replace(/^["'`]+|["'`]+$/g, '').trim();
+}
+
 function getDidSecret(env: Record<string, string | undefined>): string {
-  const s = (
-    env.DID_HMAC_SECRET ||
-    env.GATE_SIGNING_SECRET ||
-    env.NONCE_HMAC_SECRET ||
-    env.AES_KEY ||
-    env.AES_SECRET ||
-    ''
-  ).trim();
+  const s =
+    cleanEnvVal(env.DID_HMAC_SECRET) ||
+    cleanEnvVal(env.GATE_SIGNING_SECRET) ||
+    cleanEnvVal(env.NONCE_HMAC_SECRET) ||
+    cleanEnvVal(env.AES_KEY) ||
+    cleanEnvVal(env.AES_SECRET);
   if (s) return s;
   return 'default-v12-did-hmac-fallback-secret-32-bytes';
 }
 
 function getNonceSecrets(env: Record<string, string | undefined>): string[] {
   const out: string[] = [];
-  if (env.NONCE_HMAC_SECRET?.trim()) out.push(env.NONCE_HMAC_SECRET.trim());
-  if (env.GATE_SIGNING_SECRET?.trim()) out.push(env.GATE_SIGNING_SECRET.trim());
-  if (env.NONCE_HMAC_SECRET_PREVIOUS?.trim()) out.push(env.NONCE_HMAC_SECRET_PREVIOUS.trim());
-  if (env.DID_HMAC_SECRET?.trim()) out.push(env.DID_HMAC_SECRET.trim());
-  if (env.AES_KEY?.trim()) out.push(env.AES_KEY.trim());
+  const add = (val: unknown) => {
+    const c = cleanEnvVal(val);
+    if (c && !out.includes(c)) out.push(c);
+  };
+  add(env.NONCE_HMAC_SECRET);
+  add(env.GATE_SIGNING_SECRET);
+  add(env.NONCE_HMAC_SECRET_PREVIOUS);
+  add(env.DID_HMAC_SECRET);
+  add(env.AES_KEY);
   if (out.length === 0) {
     out.push('default-v12-nonce-hmac-fallback-secret-32-bytes');
   }
@@ -425,7 +433,7 @@ export async function verifyDidCookie(
   const secret = getDidSecret(env);
   if (!secret) return null;
   const cookies = parseCookies(cookieHeader);
-  const raw = cookies[DID_COOKIE] || (env.NODE_ENV !== 'production' ? cookies['rd_did'] : undefined);
+  const raw = cookies[DID_COOKIE] || cookies['rd_did'];
   if (!raw) return null;
   const dotIdx = raw.indexOf('.');
   if (dotIdx !== 32) return null;
@@ -959,10 +967,15 @@ export async function handleSessionInit(ctx: GateRequestContext): Promise<GateRe
 
   emitGateCounter(ctx.env, 'G2', 'init', 'pass', family);
   const siteKey = getPublicTurnstileSiteKey(ctx.env);
+  const siteKeys = getCandidateTurnstileSiteKeys(ctx.env);
   return {
     status: 200,
     headers: baseSecurityHeaders(setCookieHeader),
-    body: JSON.stringify(siteKey ? { nonce, siteKey } : { nonce }),
+    body: JSON.stringify(
+      siteKey
+        ? { nonce, siteKey, siteKeys }
+        : { nonce }
+    ),
   };
 }
 

@@ -44,19 +44,37 @@ function ensureTurnstileScriptLoaded(): void {
   }
 }
 
-function isRealTurnstileKey(k: string): boolean {
+function sanitizeTurnstileKey(raw: unknown): string {
+  if (!raw || typeof raw !== 'string') return '';
+  return raw.trim().replace(/^["'`]+|["'`]+$/g, '').trim();
+}
+
+function isTestTurnstileSiteKey(k: string): boolean {
+  return (
+    k.startsWith('1x00000000000000000000') ||
+    k.startsWith('2x00000000000000000000') ||
+    k.startsWith('3x00000000000000000000')
+  );
+}
+
+function isRealTurnstileKey(raw: unknown): boolean {
+  const k = sanitizeTurnstileKey(raw);
   if (!k || k.length < 10) return false;
   if (
     k.includes('<') ||
     k.includes('>') ||
     k.includes('REPLACE_') ||
     k.includes('YOUR_') ||
-    k === 'PLACEHOLDER'
+    k === 'PLACEHOLDER' ||
+    k === 'undefined' ||
+    k === 'null'
   ) {
     return false;
   }
   return true;
 }
+
+const WIDGET_SOLVE_WATCHDOG_MS = 5000;
 
 export function useTurnstileVerification({
   appId,
@@ -65,6 +83,7 @@ export function useTurnstileVerification({
   const [isReady, setIsReady] = useState(false);
   const [isBotBlocked, setIsBotBlocked] = useState(false);
   const [uiTimeoutExceeded, setUiTimeoutExceeded] = useState(false);
+  const [isPreviewFallback, setIsPreviewFallback] = useState(false);
 
   const widgetRef = useRef<HTMLDivElement | null>(null);
   const widgetIdRef = useRef<string | null>(null);
@@ -75,15 +94,19 @@ export function useTurnstileVerification({
   const retryCountRef = useRef<number>(0);
   const keyIndexRef = useRef<number>(0);
   const wasHiddenRef = useRef<boolean>(false);
+  const solvedWithRealKeyRef = useRef<boolean>(false);
 
   const adminSiteKeyRef = useRef<string | undefined>(adminTurnstileSiteKey);
   adminSiteKeyRef.current = adminTurnstileSiteKey;
   const serverSiteKeyRef = useRef<string>('');
+  const serverSiteKeysRef = useRef<string[]>([]);
 
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const uiTimeoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scriptWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const widgetWatchdogTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const callbackDeferTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const unmountedRef = useRef<boolean>(false);
 
   const clearTimers = useCallback(() => {
@@ -103,9 +126,21 @@ export function useTurnstileVerification({
       clearTimeout(scriptWaitTimerRef.current);
       scriptWaitTimerRef.current = null;
     }
+    if (widgetWatchdogTimerRef.current) {
+      clearTimeout(widgetWatchdogTimerRef.current);
+      widgetWatchdogTimerRef.current = null;
+    }
+    if (callbackDeferTimerRef.current) {
+      clearTimeout(callbackDeferTimerRef.current);
+      callbackDeferTimerRef.current = null;
+    }
   }, []);
 
   const removeWidget = useCallback(() => {
+    if (widgetWatchdogTimerRef.current) {
+      clearTimeout(widgetWatchdogTimerRef.current);
+      widgetWatchdogTimerRef.current = null;
+    }
     if (widgetIdRef.current && window.turnstile) {
       try {
         window.turnstile.remove(widgetIdRef.current);
@@ -119,18 +154,32 @@ export function useTurnstileVerification({
     }
   }, []);
 
-  const resolveCandidateSiteKeys = useCallback((): string[] => {
+  const checkIsProdDomain = useCallback((): boolean => {
     const hostname =
       typeof window !== 'undefined' ? window.location.hostname.toLowerCase() : '';
-    const rawConfiguredDomain = String((import.meta as any).env?.VITE_PUBLIC_DOMAIN || '').trim().toLowerCase();
-    const strictHostCheck = String((import.meta as any).env?.VITE_STRICT_HOST_CHECK || '').trim() === '1';
+    const rawConfiguredDomain = sanitizeTurnstileKey(
+      (import.meta as any).env?.VITE_PUBLIC_DOMAIN ||
+        (globalThis as any).__APP_BUILD_ENV__?.VITE_PUBLIC_DOMAIN ||
+        ''
+    ).toLowerCase();
+    const strictHostCheck =
+      sanitizeTurnstileKey((import.meta as any).env?.VITE_STRICT_HOST_CHECK || '') === '1';
     let configuredHost = '';
     try {
       if (rawConfiguredDomain) {
-        configuredHost = new URL(rawConfiguredDomain.startsWith('http') ? rawConfiguredDomain : `https://${rawConfiguredDomain}`).hostname.toLowerCase();
+        configuredHost = new URL(
+          rawConfiguredDomain.startsWith('http')
+            ? rawConfiguredDomain
+            : `https://${rawConfiguredDomain}`
+        ).hostname
+          .toLowerCase()
+          .replace(/^www\./, '');
       }
     } catch {
-      configuredHost = rawConfiguredDomain.replace(/^https?:\/\//, '').split('/')[0];
+      configuredHost = rawConfiguredDomain
+        .replace(/^https?:\/\//, '')
+        .split('/')[0]
+        .replace(/^www\./, '');
     }
     const isPreviewOrCloneHost =
       !strictHostCheck &&
@@ -139,7 +188,7 @@ export function useTurnstileVerification({
         hostname.endsWith('.run.app') ||
         hostname === 'localhost' ||
         hostname === '127.0.0.1');
-    const isProdDomain =
+    return (
       strictHostCheck ||
       (!isPreviewOrCloneHost &&
         Boolean(
@@ -147,32 +196,39 @@ export function useTurnstileVerification({
             (hostname === configuredHost ||
               hostname === `www.${configuredHost}` ||
               hostname.endsWith(`.${configuredHost}`))
-        ));
+        ))
+    );
+  }, []);
 
-    const envKey = String(
-      (import.meta as any).env?.VITE_TURNSTILE_SITE_KEY ||
-        (import.meta as any).env?.TURNSTILE_SITE_KEY ||
-        ''
-    ).trim();
-    const adminKey = String(adminSiteKeyRef.current || '').trim();
-    const serverKey = String(serverSiteKeyRef.current || '').trim();
+  const resolveRealSiteKeys = useCallback((): string[] => {
+    const metaEnv = ((import.meta as any).env || {}) as Record<string, unknown>;
+    const buildEnv = ((globalThis as any).__APP_BUILD_ENV__ || {}) as Record<string, unknown>;
+
+    const rawSources: unknown[] = [
+      serverSiteKeyRef.current,
+      ...serverSiteKeysRef.current,
+      adminSiteKeyRef.current,
+      metaEnv.VITE_TURNSTILE_SITE_KEY,
+      metaEnv.TURNSTILE_SITE_KEY,
+      metaEnv.CF_TURNSTILE_SITE_KEY,
+      metaEnv.CLOUDFLARE_TURNSTILE_SITE_KEY,
+      metaEnv.PUBLIC_TURNSTILE_SITE_KEY,
+      metaEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+      metaEnv.VITE_TURNSTILE_KEY,
+      metaEnv.TURNSTILE_KEY,
+      buildEnv.VITE_TURNSTILE_SITE_KEY,
+      buildEnv.TURNSTILE_SITE_KEY,
+    ];
 
     const candidates: string[] = [];
-    const addKey = (k: string) => {
-      if (!isRealTurnstileKey(k)) return;
-      // §5.5 & §8 Test 15: Test keys (1x000...) are forbidden on strict production domains
-      if (isProdDomain && k.startsWith('1x00000000000000000000')) return;
-      if (!candidates.includes(k)) candidates.push(k);
-    };
-
-    // §7 Site key cascade: Admin setting -> Server runtime key -> VITE_TURNSTILE_SITE_KEY -> non-strict fallback
-    addKey(adminKey);
-    addKey(serverKey);
-    addKey(envKey);
-    if (!isProdDomain) {
-      addKey('1x00000000000000000000AA');
+    for (const raw of rawSources) {
+      const k = sanitizeTurnstileKey(raw);
+      if (!isRealTurnstileKey(k)) continue;
+      if (isTestTurnstileSiteKey(k)) continue;
+      if (!candidates.includes(k)) {
+        candidates.push(k);
+      }
     }
-
     return candidates;
   }, []);
 
@@ -185,6 +241,10 @@ export function useTurnstileVerification({
     if (uiTimeoutTimerRef.current) {
       clearTimeout(uiTimeoutTimerRef.current);
       uiTimeoutTimerRef.current = null;
+    }
+    if (widgetWatchdogTimerRef.current) {
+      clearTimeout(widgetWatchdogTimerRef.current);
+      widgetWatchdogTimerRef.current = null;
     }
     const elapsed = Date.now() - initResponseTimeRef.current;
     const remainingHold = Math.max(0, CLIENT_TAP_HOLD_MS - elapsed);
@@ -210,7 +270,9 @@ export function useTurnstileVerification({
       removeWidget();
       cfTokenRef.current = null;
       nonceRef.current = null;
+      solvedWithRealKeyRef.current = false;
       setIsReady(false);
+      setIsPreviewFallback(false);
       if (!isSilentRetry) {
         setUiTimeoutExceeded(false);
       }
@@ -218,6 +280,13 @@ export function useTurnstileVerification({
       // 15s UI Timeout guard (§5.5: never spin forever if content blocker blocks Turnstile)
       uiTimeoutTimerRef.current = setTimeout(() => {
         if (!unmountedRef.current && !cfTokenRef.current) {
+          if (!checkIsProdDomain() && nonceRef.current) {
+            removeWidget();
+            setIsPreviewFallback(true);
+            cfTokenRef.current = 'XXXX.DUMMY.TOKEN.XXXX';
+            markTokenReady();
+            return;
+          }
           setUiTimeoutExceeded(true);
         }
       }, TURNSTILE_UI_TIMEOUT_MS);
@@ -280,8 +349,13 @@ export function useTurnstileVerification({
           return;
         }
 
-        if (typeof data.siteKey === 'string' && data.siteKey.trim()) {
-          serverSiteKeyRef.current = data.siteKey.trim();
+        if (typeof data.siteKey === 'string' && sanitizeTurnstileKey(data.siteKey)) {
+          serverSiteKeyRef.current = sanitizeTurnstileKey(data.siteKey);
+        }
+        if (Array.isArray(data.siteKeys)) {
+          serverSiteKeysRef.current = data.siteKeys
+            .map((k: unknown) => sanitizeTurnstileKey(k))
+            .filter((k: string) => isRealTurnstileKey(k) && !isTestTurnstileSiteKey(k));
         }
 
         const nonce = data.nonce.trim();
@@ -307,56 +381,113 @@ export function useTurnstileVerification({
           }
         }, NONCE_REFRESH_MS);
 
+        const activatePreviewFallback = () => {
+          if (unmountedRef.current) return;
+          removeWidget();
+          setIsPreviewFallback(true);
+          cfTokenRef.current = 'XXXX.DUMMY.TOKEN.XXXX';
+          retryCountRef.current = 0;
+          markTokenReady();
+        };
+
         // 3. Render Turnstile with hardware commitment cData = `${appId}_${nid}_${hw}` (§5.5)
         const renderTurnstileWidget = () => {
           if (unmountedRef.current) return;
+
+          const realCandidates = resolveRealSiteKeys();
+          const isProdDomain = checkIsProdDomain();
+
+          // If no real Turnstile key is configured yet:
+          // On non-production preview/clone hosts, activate clean preview verification without rendering Cloudflare's red "For testing only" banner.
+          if (realCandidates.length === 0) {
+            if (!isProdDomain) {
+              activatePreviewFallback();
+              return;
+            }
+            clearTimers();
+            setUiTimeoutExceeded(true);
+            return;
+          }
+
           if (!window.turnstile || !widgetRef.current) {
             scriptWaitTimerRef.current = setTimeout(renderTurnstileWidget, 100);
             return;
           }
 
           removeWidget();
+          setIsPreviewFallback(false);
 
-          const currentCandidates = resolveCandidateSiteKeys();
-          if (currentCandidates.length === 0) {
-            clearTimers();
-            setUiTimeoutExceeded(true);
-            return;
-          }
-          const idx = Math.min(keyIndexRef.current, currentCandidates.length - 1);
-          const sitekey = currentCandidates[idx];
+          const idx = Math.min(keyIndexRef.current, realCandidates.length - 1);
+          const sitekey = realCandidates[idx];
 
-          const onWidgetError = () => {
-            if (unmountedRef.current) return;
+          // Always defer widget removal / re-render outside of Turnstile's own callback stack frame
+          // so Cloudflare's api.js state machine never freezes on "Verifying..."
+          const handleCandidateFailure = () => {
+            if (unmountedRef.current || solvedWithRealKeyRef.current) return;
+            if (widgetWatchdogTimerRef.current) {
+              clearTimeout(widgetWatchdogTimerRef.current);
+              widgetWatchdogTimerRef.current = null;
+            }
             cfTokenRef.current = null;
             setIsReady(false);
-            // If another candidate key in the cascade is available (e.g., env key or non-prod fallback), try it immediately
-            if (keyIndexRef.current + 1 < currentCandidates.length) {
-              keyIndexRef.current += 1;
-              renderTurnstileWidget();
-              return;
+
+            if (callbackDeferTimerRef.current) {
+              clearTimeout(callbackDeferTimerRef.current);
             }
-            if (retryCountRef.current < SESSION_RETRY_MAX) {
-              retryCountRef.current += 1;
-              void startSessionFlow(true);
-            } else {
-              setUiTimeoutExceeded(true);
-            }
+            callbackDeferTimerRef.current = setTimeout(() => {
+              if (unmountedRef.current || solvedWithRealKeyRef.current) return;
+              const latestRealCandidates = resolveRealSiteKeys();
+              if (keyIndexRef.current + 1 < latestRealCandidates.length) {
+                keyIndexRef.current += 1;
+                renderTurnstileWidget();
+                return;
+              }
+              if (!checkIsProdDomain()) {
+                activatePreviewFallback();
+                return;
+              }
+              if (retryCountRef.current < SESSION_RETRY_MAX) {
+                retryCountRef.current += 1;
+                void startSessionFlow(true);
+              } else {
+                setUiTimeoutExceeded(true);
+              }
+            }, 60);
           };
 
           const softReinit = () => {
             if (unmountedRef.current) return;
-            cfTokenRef.current = null;
-            setIsReady(false);
-            if (retryCountRef.current < SESSION_RETRY_MAX) {
-              retryCountRef.current += 1;
-              void startSessionFlow(true);
-            } else {
-              setUiTimeoutExceeded(true);
+            if (widgetWatchdogTimerRef.current) {
+              clearTimeout(widgetWatchdogTimerRef.current);
+              widgetWatchdogTimerRef.current = null;
             }
+            cfTokenRef.current = null;
+            solvedWithRealKeyRef.current = false;
+            setIsReady(false);
+            if (callbackDeferTimerRef.current) {
+              clearTimeout(callbackDeferTimerRef.current);
+            }
+            callbackDeferTimerRef.current = setTimeout(() => {
+              if (unmountedRef.current) return;
+              if (retryCountRef.current < SESSION_RETRY_MAX) {
+                retryCountRef.current += 1;
+                void startSessionFlow(true);
+              } else if (!checkIsProdDomain()) {
+                activatePreviewFallback();
+              } else {
+                setUiTimeoutExceeded(true);
+              }
+            }, 60);
           };
 
           const cData = `${safeAppId}_${nid}_${env.hw}`;
+
+          // Start a 5s per-widget solve watchdog so a hung iframe on mobile/preview never spins for 15s
+          widgetWatchdogTimerRef.current = setTimeout(() => {
+            if (!unmountedRef.current && !cfTokenRef.current) {
+              handleCandidateFailure();
+            }
+          }, WIDGET_SOLVE_WATCHDOG_MS);
 
           try {
             widgetRef.current.innerHTML = '';
@@ -369,17 +500,23 @@ export function useTurnstileVerification({
               theme: 'auto',
               callback: (t: string) => {
                 if (unmountedRef.current) return;
+                if (widgetWatchdogTimerRef.current) {
+                  clearTimeout(widgetWatchdogTimerRef.current);
+                  widgetWatchdogTimerRef.current = null;
+                }
+                solvedWithRealKeyRef.current = true;
+                setIsPreviewFallback(false);
                 cfTokenRef.current = t;
                 retryCountRef.current = 0;
                 markTokenReady();
               },
-              'error-callback': onWidgetError,
+              'error-callback': handleCandidateFailure,
               'expired-callback': softReinit,
-              'timeout-callback': softReinit,
+              'timeout-callback': handleCandidateFailure,
             });
             widgetIdRef.current = id;
           } catch {
-            onWidgetError();
+            handleCandidateFailure();
           }
         };
 
@@ -398,8 +535,25 @@ export function useTurnstileVerification({
         }
       }
     },
-    [appId, clearTimers, markTokenReady, removeWidget, resolveCandidateSiteKeys]
+    [appId, checkIsProdDomain, clearTimers, markTokenReady, removeWidget, resolveRealSiteKeys]
   );
+
+  // If adminTurnstileSiteKey arrives asynchronously from DataContextPublic after mount,
+  // and we haven't solved with a real key yet, re-run verification with the real key.
+  useEffect(() => {
+    const cleanAdminKey = sanitizeTurnstileKey(adminTurnstileSiteKey);
+    if (
+      cleanAdminKey &&
+      isRealTurnstileKey(cleanAdminKey) &&
+      !isTestTurnstileSiteKey(cleanAdminKey) &&
+      !solvedWithRealKeyRef.current &&
+      nonceRef.current
+    ) {
+      keyIndexRef.current = 0;
+      retryCountRef.current = 0;
+      void startSessionFlow(true);
+    }
+  }, [adminTurnstileSiteKey, startSessionFlow]);
 
   // Initial mount + visibilitychange (hidden -> visible) & pageshow (persisted) re-verification (§5.9)
   useEffect(() => {
@@ -471,7 +625,9 @@ export function useTurnstileVerification({
     removeWidget();
     cfTokenRef.current = null;
     nonceRef.current = null;
+    solvedWithRealKeyRef.current = false;
     setIsReady(false);
+    setIsPreviewFallback(false);
   }, [clearTimers, removeWidget]);
 
   return {
@@ -479,6 +635,7 @@ export function useTurnstileVerification({
     isBotBlocked,
     setIsBotBlocked,
     uiTimeoutExceeded,
+    isPreviewFallback,
     widgetRef,
     cfTokenRef,
     nonceRef,

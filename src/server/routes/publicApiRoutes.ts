@@ -3,6 +3,7 @@ import staticData from '../../lib/staticData.json';
 import { fetchStoreData } from '../../seoHelper';
 import { resolveAppSlug } from '../../lib/slugResolver';
 import { formatNewsDate, calculateReadingTime, getPlainTextSnippet } from '../../lib/newsUtils';
+import { getPublicTurnstileSiteKey } from '../services/linkService';
 
 export const publicApiRouter = Router();
 
@@ -159,9 +160,14 @@ publicApiRouter.get('/api/v1/public/videos', async (req, res) => {
 });
 
 function sanitizeSettingsForPublicClient(settings: any): any {
-  if (!settings || typeof settings !== 'object') return {};
-  const copy = { ...settings };
+  const copy = settings && typeof settings === 'object' ? { ...settings } : {};
   delete copy.turnstile_secret_key;
+  if (!copy.turnstile_site_key) {
+    const envSiteKey = getPublicTurnstileSiteKey();
+    if (envSiteKey) {
+      copy.turnstile_site_key = envSiteKey;
+    }
+  }
   return copy;
 }
 

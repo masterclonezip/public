@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { HelpCircle, ChevronDown } from 'lucide-react';
 import { safeHtml } from '../../lib/safeHtmlPublic';
 import { cleanFaqQuestion } from '../../lib/seoUtils';
@@ -19,10 +20,29 @@ interface AppFaqSectionProps {
  * allowing Googlebot, Bingbot, and AI crawlers to index FAQs without relying on heavy JavaScript execution.
  */
 export default function AppFaqSection({ faqs }: AppFaqSectionProps) {
+  const navigate = useNavigate();
+
   if (!faqs || !Array.isArray(faqs) || faqs.length === 0) return null;
 
   const validFaqs = faqs.filter(f => f && f.question && f.answer);
   if (validFaqs.length === 0) return null;
+
+  const handleFaqClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = (e.target as HTMLElement).closest('a');
+    if (!target) return;
+    const href = target.getAttribute('href');
+    if (!href) return;
+    if (href.startsWith('/') && !href.startsWith('//')) {
+      e.preventDefault();
+      navigate(href);
+    } else if (typeof window !== 'undefined' && href.startsWith(window.location.origin)) {
+      try {
+        const url = new URL(href);
+        e.preventDefault();
+        navigate(url.pathname + url.search + url.hash);
+      } catch (_err) {}
+    }
+  };
 
   return (
     <section aria-labelledby="faq-heading" className="mb-8 sm:mb-12 px-1 sm:px-4 md:px-6">
@@ -42,7 +62,7 @@ export default function AppFaqSection({ faqs }: AppFaqSectionProps) {
         </div>
 
         {/* Semantic HTML5 Accordion List (Zero JavaScript execution requirement for SEO) */}
-        <div className="space-y-3 sm:space-y-4">
+        <div onClick={handleFaqClick} className="space-y-3 sm:space-y-4">
           {validFaqs.map((faq, idx) => (
             <details
               key={`faq-app-${idx}`}
@@ -62,7 +82,7 @@ export default function AppFaqSection({ faqs }: AppFaqSectionProps) {
               <div className="px-4 sm:px-5 pb-5 pt-1 border-t border-black/5 dark:border-white/5 text-sm sm:text-base text-zinc-700 dark:text-zinc-300 leading-relaxed">
                 <div className="pl-6 sm:pl-7 pt-2">
                   <div
-                    className="prose prose-zinc dark:prose-invert prose-sm sm:prose-base max-w-none w-full break-words overflow-wrap-anywhere whitespace-normal"
+                    className="rich-html-boundary prose prose-zinc dark:prose-invert prose-sm sm:prose-base max-w-none w-full break-words overflow-wrap-anywhere whitespace-normal"
                     dangerouslySetInnerHTML={{ __html: safeHtml(faq.answer) }}
                   />
                 </div>

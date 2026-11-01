@@ -168,8 +168,12 @@ export default function AdminDashboard() {
         const formSettings: any = {};
         formData.forEach((value, key) => { formSettings[key] = value; });
         
+        const cleanLogo = String(formSettings.logo_url || '').trim();
+        const cleanFavicon = String(formSettings.favicon_url || '').trim();
         await saveSettingsSection('general', {
           ...formSettings,
+          logo_url: cleanLogo || cleanFavicon,
+          favicon_url: cleanFavicon || cleanLogo,
           meta_description: formSettings.meta_description || formSettings.seo_description || '',
           seo_description: formSettings.seo_description || formSettings.meta_description || ''
         });

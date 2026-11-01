@@ -1,25 +1,44 @@
 import React, { useEffect } from 'react';
 import { safeHtml } from '../lib/safeHtmlPublic';
 import { useData } from '../contexts/DataContextPublic';
-import { Link } from 'react-router-dom';
-import { ArrowLeft, FileText } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import Meta from '../components/Meta';
+import { DEFAULT_NOTICE_HTML } from '../lib/defaultLegalContent';
 
 export default function Notice() {
   const { settings: mockSettings, fetchSettings } = useData();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!mockSettings?.important_notice && fetchSettings) {
       fetchSettings();
     }
   }, [mockSettings?.important_notice, fetchSettings]);
-  
+
+  const handleHtmlClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = (e.target as HTMLElement).closest('a');
+    if (!target) return;
+    const href = target.getAttribute('href');
+    if (!href) return;
+    if (href.startsWith('/') && !href.startsWith('//')) {
+      e.preventDefault();
+      navigate(href);
+    } else if (typeof window !== 'undefined' && href.startsWith(window.location.origin)) {
+      try {
+        const url = new URL(href);
+        e.preventDefault();
+        navigate(url.pathname + url.search + url.hash);
+      } catch (_err) {}
+    }
+  };
+
   return (
-    <div className="max-w-[1000px] mx-auto px-4 sm:px-6 md:px-8 py-12 animate-fade-in pb-20 min-h-[70vh]">
-      <div className="mb-10">
+    <div className="max-w-[1000px] mx-auto px-3 sm:px-6 md:px-8 py-8 sm:py-12 animate-fade-in pb-20 min-h-[70vh] text-left">
+      <div className="mb-6 sm:mb-8">
         <Link 
           to="/" 
-          className="inline-flex items-center gap-1 text-sm font-medium text-zinc-500 hover:text-blue-600 transition-colors"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 hover:text-blue-600 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Home
@@ -28,23 +47,31 @@ export default function Notice() {
       <Meta 
         title={mockSettings?.notice_meta_title || mockSettings?.important_notice_heading || 'Legal Notice'}
         description={mockSettings?.notice_meta_description || "Important legal notices and compliance information."}
-        canonical={window.location.origin + "/notice"}
+        canonical={(typeof window !== 'undefined' ? window.location.origin : '') + "/notice"}
       />
 
       <div className="animate-fade-in">
-        <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mb-6 border-b border-zinc-200 dark:border-zinc-800 pb-4">
+        <h1 className="text-2xl xs:text-3xl sm:text-5xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mb-4 sm:mb-6 border-b border-zinc-200 dark:border-zinc-800 pb-4">
           {mockSettings.important_notice_heading || 'Important Notice'}
         </h1>
 
-        <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-500 dark:text-zinc-400 mb-10">
-          <div><span className="font-semibold">Notice Type:</span> Official Alert</div>
-          <div><span className="font-semibold">Support Desk:</span> {mockSettings.support_email}</div>
+        <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mb-6 sm:mb-8">
+          <div><span className="font-semibold">Advisory Type:</span> Official Platform Notice</div>
+          {mockSettings.support_email && (
+            <div><span className="font-semibold">Support Contact:</span> {mockSettings.support_email}</div>
+          )}
         </div>
         
-        <div className="prose prose-zinc dark:prose-invert max-w-none text-zinc-700 dark:text-zinc-300 font-medium leading-relaxed">
-          <div dangerouslySetInnerHTML={{ __html: safeHtml(mockSettings.important_notice || '<p>No important notices at this time.</p>' ) }} />
+        <div
+          onClick={handleHtmlClick}
+          className="bg-white dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-white/10 rounded-2xl sm:rounded-3xl p-4 xs:p-5 sm:p-8 md:p-10 shadow-xs overflow-hidden"
+        >
+          <div className="rich-html-boundary prose prose-zinc dark:prose-invert max-w-none text-sm sm:text-base text-zinc-700 dark:text-zinc-300 font-medium leading-relaxed">
+            <div dangerouslySetInnerHTML={{ __html: safeHtml(mockSettings.important_notice || DEFAULT_NOTICE_HTML) }} />
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
