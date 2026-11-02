@@ -94,7 +94,7 @@ export function optimizeInitialDataForRoute(
   const targetAppId = targetApp ? String(getField(targetApp, 'id') || '').toLowerCase().trim() : '';
   const targetNewsSlug = targetNews ? (getField(targetNews, 'slug') || getField(targetNews, 'id'))?.toLowerCase().trim() : null;
 
-function getSimilarAppsForApp(targetApp: any, baseApps: any[]): any[] {
+function getSimilarAppsForApp(targetApp: any, baseApps: any[]): { similarApps: any[]; totalCategoryCount: number } {
   const checkAppIsNew = (item: any): boolean => {
     if (!item) return false;
     if (item.is_new === true || item.is_new === 'true' || item.is_new === 1) return true;
@@ -116,6 +116,7 @@ function getSimilarAppsForApp(targetApp: any, baseApps: any[]): any[] {
 
   const newApps: any[] = [];
   const regularApps: any[] = [];
+  let totalCategoryCount = 0;
 
   for (let i = 0; i < baseApps.length; i++) {
     const a = baseApps[i];
@@ -125,16 +126,18 @@ function getSimilarAppsForApp(targetApp: any, baseApps: any[]): any[] {
     const aId = String(getField(a, 'id') || '').toLowerCase().trim();
     const isCurrent = (targetAppSlug && (aSlug === targetAppSlug || aId === targetAppSlug)) ||
                       (targetAppId && (aId === targetAppId || aSlug === targetAppId));
-    if (isCurrent) continue;
 
     const aCat = (getField(a, 'category', '') || '').toLowerCase();
     const matchesCategory = isAll || aCat.includes(currentCatLower) || currentCatLower.includes(aCat);
 
     if (matchesCategory) {
-      if (checkAppIsNew(a)) {
-        newApps.push(a);
-      } else {
-        regularApps.push(a);
+      totalCategoryCount++;
+      if (!isCurrent) {
+        if (checkAppIsNew(a)) {
+          newApps.push(a);
+        } else {
+          regularApps.push(a);
+        }
       }
     }
   }
@@ -173,7 +176,7 @@ function getSimilarAppsForApp(targetApp: any, baseApps: any[]): any[] {
     }
   }
 
-  return [...pinnedNew, ...pickedRegular];
+  return { similarApps: [...pinnedNew, ...pickedRegular], totalCategoryCount };
 }
 
   // Optimized Apps Payload:
@@ -184,7 +187,7 @@ function getSimilarAppsForApp(targetApp: any, baseApps: any[]): any[] {
   let optimizedApps: any[] = [];
 
   if (isAppDetailPage && targetApp) {
-    const similarAppsList = getSimilarAppsForApp(targetApp, baseApps);
+    const { similarApps: similarAppsList, totalCategoryCount } = getSimilarAppsForApp(targetApp, baseApps);
 
     const structuredFaqs = Array.isArray(targetApp.faqs)
       ? targetApp.faqs.map((f: any) => f && typeof f === 'object' ? {
@@ -249,10 +252,11 @@ function getSimilarAppsForApp(targetApp: any, baseApps: any[]): any[] {
       created_at: targetApp.created_at || '',
       has_secure_link: hasTargetSecureLink,
       link_configured: hasTargetSecureLink,
+      _totalCategoryCount: totalCategoryCount,
       _isFullApp: true
     };
 
-    const trimmedSimilar = similarAppsList.map((app: any) => {
+    const trimmedSimilar = similarAppsList.map((app: any, idx: number) => {
       const hasSimSecureLink = Boolean(
         app.has_secure_link ||
         app.link_configured ||
@@ -277,6 +281,7 @@ function getSimilarAppsForApp(targetApp: any, baseApps: any[]): any[] {
         active: app.active !== false,
         has_secure_link: hasSimSecureLink,
         link_configured: hasSimSecureLink,
+        _similarOrder: idx,
         _isTrimmed: true
       };
     });

@@ -12,19 +12,22 @@ import {
   generateDevelopersSitemapXml,
   getLatestItemDate,
   escapeXml,
-  normalizeSitemapImageUrl
+  normalizeSitemapImageUrl,
+  normalizeSitemapHost,
+  enforceNonWwwXml
 } from '../../lib/sitemapGenerator';
 
 export const seoRouter = Router();
 
 function resolveHost(req: Request): string {
-  const configured = (process.env.PUBLIC_DOMAIN || process.env.VITE_PUBLIC_DOMAIN || '').trim().replace(/\/+$/, '');
+  const configured = (process.env.PUBLIC_DOMAIN || process.env.VITE_PUBLIC_DOMAIN || '').trim().replace(/^["']+|["']+$/g, '');
   if (configured) {
-    return configured.startsWith('http') ? configured : `https://${configured}`;
+    return normalizeSitemapHost(configured);
   }
   const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'https';
-  const host = (req.headers['x-forwarded-host'] as string) || req.get('host') || 'localhost:3000';
-  return `${proto.split(',')[0].trim()}://${host.split(',')[0].trim()}`;
+  let host = (req.headers['x-forwarded-host'] as string) || req.get('host') || 'localhost:3000';
+  host = host.split(',')[0].trim();
+  return normalizeSitemapHost(`${proto.split(',')[0].trim()}://${host}`);
 }
 
 async function getLiveData() {
@@ -41,8 +44,9 @@ async function getLiveData() {
   return staticData as any;
 }
 
-function sendXmlOrGzip(req: Request, res: Response, xml: string, maxAgeSeconds: number = 3600) {
-  res.setHeader('Cache-Control', `public, max-age=${maxAgeSeconds}, s-maxage=${maxAgeSeconds}`);
+function sendXmlOrGzip(req: Request, res: Response, rawXml: string, maxAgeSeconds: number = 60) {
+  const xml = enforceNonWwwXml(rawXml);
+  res.setHeader('Cache-Control', `public, max-age=0, s-maxage=${Math.min(maxAgeSeconds, 60)}, must-revalidate`);
   res.setHeader('Vary', 'Accept-Encoding');
   if (req.path.endsWith('.gz')) {
     const gzBuffer = zlib.gzipSync(Buffer.from(xml, 'utf8'), { level: 9 });
@@ -198,9 +202,7 @@ ${iconTags}
 });
 
 seoRouter.get('/robots.txt', (req, res) => {
-  const farFuture = new Date(Date.now() + 86400000 * 7).toUTCString();
-  res.setHeader('Cache-Control', 'public, max-age=604800, s-maxage=604800');
-  res.setHeader('Expires', farFuture);
+  res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60, must-revalidate');
   res.type('text/plain');
   const namedAgents = [
     'Googlebot',

@@ -33,16 +33,16 @@ export const AppSimilarCarousel: React.FC<AppSimilarCarouselProps> = ({
 
   if ((!relatedApps || relatedApps.length === 0) && isLoading) {
     return (
-      <aside data-nosnippet aria-labelledby="related-apps-heading" className="my-5 xs:my-6 px-0 min-h-[228px] xs:min-h-[248px] sm:min-h-[268px]">
-        <div className="flex items-center justify-between gap-2 mb-3 px-1 xs:px-2 sm:px-4 md:px-6">
+      <aside data-nosnippet aria-labelledby="related-apps-heading" className="my-5 xs:my-6 px-1 xs:px-2 sm:px-4 md:px-6 min-h-[228px] xs:min-h-[248px] sm:min-h-[268px]">
+        <div className="flex items-center justify-between gap-2 mb-3">
           <h2 id="related-apps-heading" className="text-base xs:text-lg sm:text-xl font-bold text-zinc-900 dark:text-zinc-100">
             Similar Applications
           </h2>
           <div className="h-7 w-24 rounded-full bg-zinc-200/70 dark:bg-zinc-800/70 animate-pulse" />
         </div>
-        <div className="grid grid-rows-2 grid-flow-col gap-x-3 xxs:gap-x-4 xs:gap-x-5 gap-y-3 xxs:gap-y-3.5 xs:gap-y-4 overflow-hidden pt-2.5 pb-2 px-2 xs:px-4 sm:px-0">
-          {Array.from({ length: 12 }).map((_, idx) => (
-            <div key={idx} className="flex flex-col items-center gap-1.5 w-[68px] xxs:w-[76px] xs:w-[86px] sm:w-[98px] shrink-0">
+        <div className="grid grid-rows-2 grid-flow-col auto-cols-[calc((100%-1.5rem)/4)] xs:auto-cols-[calc((100%-2.25rem)/4)] sm:auto-cols-[calc((100%-5.25rem)/8)] gap-x-2 xs:gap-x-3 gap-y-3 xs:gap-y-3.5 overflow-hidden pt-2.5 pb-2">
+          {Array.from({ length: 16 }).map((_, idx) => (
+            <div key={idx} className="flex flex-col items-center gap-1.5 w-full shrink-0">
               <div className="w-[58px] h-[58px] xxs:w-[66px] xxs:h-[66px] xs:w-[76px] xs:h-[76px] sm:w-[86px] sm:h-[86px] rounded-[24%] bg-zinc-200/70 dark:bg-zinc-800/70 animate-pulse" />
               <div className="h-3 w-14 rounded bg-zinc-200/70 dark:bg-zinc-800/70 animate-pulse" />
             </div>
@@ -57,8 +57,8 @@ export const AppSimilarCarousel: React.FC<AppSimilarCarouselProps> = ({
     : relatedApps.length;
 
   return (
-    <aside data-nosnippet aria-labelledby="related-apps-heading" className="my-5 xs:my-6 px-0">
-      <div className="flex items-center justify-between gap-2 mb-3 px-1 xs:px-2 sm:px-4 md:px-6">
+    <aside data-nosnippet aria-labelledby="related-apps-heading" className="my-5 xs:my-6 px-1 xs:px-2 sm:px-4 md:px-6">
+      <div className="flex items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-2 min-w-0">
           <h2 id="related-apps-heading" className="text-base xs:text-lg sm:text-xl font-bold flex items-center gap-1.5 xs:gap-2 text-zinc-900 dark:text-zinc-100 truncate">
             <span>Similar Applications</span>
@@ -80,10 +80,10 @@ export const AppSimilarCarousel: React.FC<AppSimilarCarouselProps> = ({
       </div>
 
       <div 
-        className="grid grid-rows-2 grid-flow-col gap-x-3 xxs:gap-x-4 xs:gap-x-5 gap-y-3 xxs:gap-y-3.5 xs:gap-y-4 overflow-x-auto pt-2.5 pb-2 snap-x snap-proximity touch-pan-y overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-2 xs:-mx-4 px-2 xs:px-4 sm:mx-0 sm:px-0"
+        className="grid grid-rows-2 grid-flow-col auto-cols-[calc((100%-1.5rem)/4)] xs:auto-cols-[calc((100%-2.25rem)/4)] sm:auto-cols-[calc((100%-5.25rem)/8)] gap-x-2 xs:gap-x-3 gap-y-3 xs:gap-y-3.5 overflow-x-auto pt-2.5 pb-2 snap-x snap-mandatory touch-pan-y overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y pan-x', overscrollBehaviorX: 'contain' }}
       >
-        {relatedApps.map((relatedApp, index) => {
+        {relatedApps.slice(0, 16).map((relatedApp, index) => {
           const iconSrc = getOptimizedImageUrl(relatedApp.icon_url, 96) || 'https://via.placeholder.com/96';
 
           return (
@@ -93,7 +93,7 @@ export const AppSimilarCarousel: React.FC<AppSimilarCarouselProps> = ({
               onMouseEnter={() => preloadAppDetails(relatedApp.slug)}
               onFocus={() => preloadAppDetails(relatedApp.slug)}
               onTouchStart={() => preloadAppDetails(relatedApp.slug)}
-              className="flex flex-col items-center justify-start gap-1 xxs:gap-1.5 xs:gap-2 w-[68px] xxs:w-[76px] xs:w-[86px] sm:w-[98px] snap-start group shrink-0 active:scale-95 transition-transform duration-150 ease-out"
+              className="flex flex-col items-center justify-start gap-1 xxs:gap-1.5 xs:gap-2 w-full snap-start group shrink-0 active:scale-95 transition-transform duration-150 ease-out"
             >
               <div className="relative inline-block shrink-0">
                 <img

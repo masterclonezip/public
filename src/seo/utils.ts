@@ -109,7 +109,19 @@ export function getYoutubeThumbnail(urlStr: string): string {
 
 export const getDefaultOrigin = (): string => {
   if (typeof process !== 'undefined' && process.env) {
-    return (process.env.PUBLIC_DOMAIN || process.env.VITE_PUBLIC_DOMAIN || '').trim().replace(/\/+$/, '');
+    const raw = (process.env.PUBLIC_DOMAIN || process.env.VITE_PUBLIC_DOMAIN || '').trim().replace(/^["']+|["']+$/g, '').replace(/\/+$/, '');
+    if (!raw) return '';
+    const hasHttp = /^https?:\/\//i.test(raw);
+    const withHttp = hasHttp ? raw : `https://${raw}`;
+    try {
+      const parsed = new URL(withHttp);
+      parsed.hostname = parsed.hostname.toLowerCase().replace(/^(?:www\.|admin\.|masterworld\.)+/i, '');
+      const isLocal = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+      const protocol = isLocal ? parsed.protocol : 'https:';
+      return `${protocol}//${parsed.hostname}${parsed.port ? `:${parsed.port}` : ''}`;
+    } catch {
+      return raw.replace(/^http:\/\/(?!localhost|127\.0\.0\.1)/i, 'https://').replace(/^(https?:\/\/)?(?:www\.|admin\.|masterworld\.)+/i, '$1');
+    }
   }
   return '';
 };

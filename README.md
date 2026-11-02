@@ -44,6 +44,8 @@ This repository serves as a **100% content-free, brand-agnostic Master Template*
 
 ## Architecture Documentation
 
+- [`CLOUDFLARE_OPTIMIZATION_GUIDE.md`](./CLOUDFLARE_OPTIMIZATION_GUIDE.md) — 100% Free Tier Cloudflare edge optimization, 301 WWW to non-WWW redirects, Tiered Cache, and SWR.
+- [`ENV_VARS_GUIDE.md`](./ENV_VARS_GUIDE.md) — Exhaustive Public vs Admin environment variable guide and security classification.
 - [`MASTER_WHITE_LABEL_BLUEPRINT.md`](./MASTER_WHITE_LABEL_BLUEPRINT.md) — Complete Master Repository engineering specification, environment variable dictionary, and cloning guide.
 - [`MORE_INFO_SECURITY_ARCHITECTURE.md`](./MORE_INFO_SECURITY_ARCHITECTURE.md) — `/moreinfo` 7-Gate security specification and link vault protocol.
 - [`AGENTS.md`](./AGENTS.md) — Developer architecture & repository structure guide.

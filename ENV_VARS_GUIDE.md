@@ -1,6 +1,6 @@
 # 🔐 Master Environment Variables Architectural Guide: Public & Admin Systems
 
-> **Platform Source of Truth**: This document provides the complete, authoritative, and exhaustive guide for configuring all environment variables across the **Public Website (Dex / `www.example.com`)** and the **Admin Management Portal (Masterworld / Admin site)**.
+> **Platform Source of Truth**: This document provides the complete, authoritative, and exhaustive guide for configuring all environment variables across the **Public Website (Dex / `example.com`)** and the **Admin Management Portal (Masterworld / Admin site)**.
 >
 > Every variable is documented with:
 > 1. **Exact Feature / Work Purpose**: What subsystem uses it and why.
@@ -35,9 +35,9 @@ The platform operates on a **strict dual-system architecture** split across two 
 
 ---
 
-# 🌐 PART 1: PUBLIC WEBSITE (Dex / `www.example.com`)
+# 🌐 PART 1: PUBLIC WEBSITE (Dex / `example.com`)
 
-The Public Website is deployed to your public domain (e.g., `https://www.example.com` or Cloudflare Pages `dex-app.pages.dev`). It requires **only** public site identity, Database B (Community Reviews client SDK), the `/moreinfo` AES decryption key, and anti-bot verification.
+The Public Website is deployed to your clean non-www canonical domain (e.g., `https://example.com` or Cloudflare Pages `dex-app.pages.dev`). It requires **only** public site identity, Database B (Community Reviews client SDK), the `/moreinfo` AES decryption key, and anti-bot verification. Note: All requests to `www.` are automatically 301 permanently redirected to the non-www canonical domain.
 
 ---
 
@@ -54,10 +54,10 @@ The Public Website is deployed to your public domain (e.g., `https://www.example
 | `VITE_SUPPORT_EMAIL` | **Non-Secret / Public** | Contact & Legal Pages | Optional (Admin settings override) |
 
 #### 1. `PUBLIC_DOMAIN` & `VITE_PUBLIC_DOMAIN`
-- **For What Work**: Sets the canonical base URL for the entire website. Used by `src/seoHelper.ts` to pre-render OpenGraph tags (`og:url`), generate absolute XML sitemaps (`/sitemap.xml`), build RSS feeds (`/rss.xml`), and enforce canonical URLs.
-- **Where to Get It**: Your actual production domain, e.g., `https://www.example.com`.
+- **For What Work**: Sets the canonical base URL for the entire website. Used by `src/seoHelper.ts` to pre-render OpenGraph tags (`og:url`), generate absolute XML sitemaps (`/sitemap.xml`), build RSS feeds (`/rss.xml`), and enforce non-www canonical URLs.
+- **Where to Get It**: Your actual production non-www domain, e.g., `https://example.com`.
 - **How to Add It**:
-  - **Cloudflare Pages**: Project Settings ➔ **Environment variables** ➔ Add variable: `PUBLIC_DOMAIN` = `https://www.example.com` and `VITE_PUBLIC_DOMAIN` = `https://www.example.com` (Plain text).
+  - **Cloudflare Pages**: Project Settings ➔ **Environment variables** ➔ Add variable: `PUBLIC_DOMAIN` = `https://example.com` and `VITE_PUBLIC_DOMAIN` = `https://example.com` (Plain text).
   - **Node.js / Docker**: Place in `.env`.
 - **Portion**: `PUBLIC_DOMAIN` is used in server routes (`seoRoutes.ts`); `VITE_PUBLIC_DOMAIN` is used in React (`useSEO.ts`).
 
@@ -159,8 +159,8 @@ The public website serves the clearance gateway `/moreinfo/:slug`. App download 
 # ==============================================================================
 
 # 1. Site Identity & Canonical Domain
-PUBLIC_DOMAIN="https://www.example.com"
-VITE_PUBLIC_DOMAIN="https://www.example.com"
+PUBLIC_DOMAIN="https://example.com"
+VITE_PUBLIC_DOMAIN="https://example.com"
 ALLOWED_HOSTNAMES="example.com,www.example.com"
 VITE_SITE_NAME="My App Directory"
 VITE_SUPPORT_EMAIL="support@example.com"

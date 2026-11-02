@@ -127,6 +127,14 @@ async function verifyAdminToken(token, sessionSecret, configuredEmail) {
 export async function onRequest(context) {
   const { request, env } = context;
   const url = new URL(request.url);
+
+  // 301 Permanent Redirect all www requests to clean canonical non-www domain
+  if (url.hostname.toLowerCase().startsWith('www.')) {
+    const redirectUrl = new URL(request.url);
+    redirectUrl.hostname = redirectUrl.hostname.toLowerCase().replace(/^www\./i, '');
+    return Response.redirect(redirectUrl.toString(), 301);
+  }
+
   const headers = {};
   request.headers.forEach((v, k) => { headers[k.toLowerCase()] = v; });
   const rawBody = request.method === 'POST' ? await request.text().catch(() => '') : '';

@@ -9,6 +9,7 @@ import { NewsArticleHeader } from '../components/public/newsDetails/NewsArticleH
 import { NewsRelatedAppBox } from '../components/public/newsDetails/NewsRelatedAppBox';
 import { formatNewsDate, calculateReadingTime, getNextNewsChain, getPlainTextSnippet } from '../lib/newsUtils';
 import { getOptimizedImageUrl, normalizeIsoDate } from '../seo/utils';
+import { getCleanCanonicalUrl, normalizeNonWwwDomain } from '../lib/seoUtils';
 
 const RICH_HTML_CONTENT_STYLE = `
   rich-html-boundary w-full text-sm sm:text-base text-zinc-800 dark:text-zinc-200 leading-relaxed
@@ -228,7 +229,7 @@ export default function NewsDetailPage() {
   }, [relatedApp, newsItem]);
 
   const handleShare = () => {
-    const url = newsItem?.canonical_url || window.location.href;
+    const url = getCleanCanonicalUrl(newsItem?.canonical_url, `/news/${newsItem?.slug || newsItem?.id || ''}`);
     const shareTitle = newsItem?.seo_title || newsItem?.title || 'News Article';
     const shareText = newsItem?.seo_description || newsItem?.description || '';
     if (navigator.share) {
@@ -284,8 +285,8 @@ export default function NewsDetailPage() {
   const articleDesc = newsItem.seo_description || newsItem.meta_description || newsItem.description || plainBody.substring(0, 160);
   const rawArticleImage = newsItem.og_image_url || newsItem.image_url || newsItem.logo_url || newsItem.image || '';
   const optimizedArticleImage = rawArticleImage ? (getOptimizedImageUrl(rawArticleImage, 1200) || rawArticleImage) : '';
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const canonicalUrl = newsItem.canonical_url || `${origin}/news/${newsItem.slug || newsItem.id}`;
+  const origin = typeof window !== 'undefined' ? normalizeNonWwwDomain(window.location.origin) : '';
+  const canonicalUrl = getCleanCanonicalUrl(newsItem.canonical_url, `/news/${newsItem.slug || newsItem.id}`);
   const rawDatePublished = newsItem.published_at || newsItem.publish_date || newsItem.created_at || newsItem.date || '';
   const datePublished = normalizeIsoDate(rawDatePublished);
   const dateModified = normalizeIsoDate(newsItem.updated_at || rawDatePublished, datePublished);

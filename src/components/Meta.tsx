@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useData } from '../contexts/DataContextPublic';
-import { getCleanCanonicalUrl, formatPageTitle } from '../lib/seoUtils';
+import { getCleanCanonicalUrl, formatPageTitle, normalizeNonWwwDomain } from '../lib/seoUtils';
 import { getOgImageUrl, getOptimizedImageUrl, getAllSiteIconUrls } from '../seo/utils';
 
 interface MetaProps {
@@ -46,7 +46,8 @@ const Meta: React.FC<MetaProps> = ({
   const metaDescription = description || settings?.meta_description || '';
   const metaKeywords = keywords || settings?.seo_keywords || '';
   
-  const origin = typeof window !== 'undefined' ? window.location.origin : ((import.meta as any).env?.VITE_PUBLIC_DOMAIN || '');
+  const rawOrigin = typeof window !== 'undefined' ? window.location.origin : ((import.meta as any).env?.VITE_PUBLIC_DOMAIN || '');
+  const origin = rawOrigin ? normalizeNonWwwDomain(rawOrigin) : '';
   const iconSet = getAllSiteIconUrls(settings, origin);
   const rawImage = image || iconSet.masterLogo || iconSet.masterFavicon || '';
   const metaImage = getOgImageUrl(rawImage, origin);
@@ -355,7 +356,10 @@ const Meta: React.FC<MetaProps> = ({
           const script = document.createElement('script');
           script.type = 'application/ld+json';
           script.setAttribute('data-dynamic-schema', 'true');
-          script.textContent = JSON.stringify(s);
+          script.textContent = JSON.stringify(s).replace(
+            /https?:\/\/www\.(?!(?:youtube\.com|w3\.org|google\.com|sitemaps\.org|schema\.org)\b)/gi,
+            'https://'
+          );
           document.head.appendChild(script);
         });
       }

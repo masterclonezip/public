@@ -134,27 +134,14 @@ export function useClearanceDispatch({
         tap.y = Math.round(fallbackClientY || 0);
       }
 
-      // §5.6 Client-side stop (disguised 404, no server call) ONLY if:
-      // e.isTrusted === false, or genuine desktop mouse click on a non-touch device
-      const hasTouch =
-        (typeof navigator !== 'undefined' && Number(navigator.maxTouchPoints ?? 0) >= 1) ||
-        (typeof window !== 'undefined' &&
-          typeof window.matchMedia === 'function' &&
-          (window.matchMedia('(pointer: coarse)').matches ||
-            window.matchMedia('(any-pointer: coarse)').matches)) ||
-        (typeof window !== 'undefined' && 'ontouchstart' in window);
-      const isDesktopMouse = tap.pt === 'mouse' && !hasTouch;
-      const isBurst = recent2s.length >= 12 || recent10s.length > 15;
+      // §5.6 Client-side stop (disguised 404, no server call) if:
+      // e.isTrusted === false, tap.pt === 'mouse', or client burst (> 3 clicks / 10 s or 3 within 2000 ms)
+      const isMouse = tap.pt === 'mouse';
+      const isBurst = recent2s.length >= 3 || recent10s.length > 3;
 
-      if (!isTrustedClick || isDesktopMouse) {
+      if (!isTrustedClick || isMouse || isBurst) {
         wipeSessionSecrets();
         setIsBotBlocked(true);
-        return;
-      }
-
-      if (isBurst) {
-        resetTapBuffer();
-        restartVerification(false);
         return;
       }
 
@@ -172,11 +159,6 @@ export function useClearanceDispatch({
       setNeedsManualRetry(false);
 
       const safeAppId = appId.replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 64);
-      const normalizedPt = hasTouch ? 'touch' : tap.pt || 'touch';
-      const normalizedEvents =
-        tap.events.includes('ts') || tap.events.includes('pd')
-          ? tap.events
-          : ['ts', 'te', ...tap.events];
       const tokenObj: TokenV12 = {
         v: TOKEN_V,
         id: safeAppId,
@@ -185,34 +167,30 @@ export function useClearanceDispatch({
         hard: env.hardStr,
         soft: env.softStr,
         tap: {
-          pt: normalizedPt,
-          mtp: Math.max(
-            hasTouch ? 1 : 0,
-            Number(typeof navigator !== 'undefined' ? navigator.maxTouchPoints ?? 0 : 0)
-          ),
+          pt: tap.pt || 'touch',
+          mtp: Number(typeof navigator !== 'undefined' ? navigator.maxTouchPoints ?? 0 : 0),
           coarse:
-            hasTouch ||
-            (typeof window !== 'undefined' &&
-              typeof window.matchMedia === 'function' &&
-              (window.matchMedia('(pointer: coarse)').matches ||
-                window.matchMedia('(any-pointer: coarse)').matches))
+            typeof window !== 'undefined' &&
+            typeof window.matchMedia === 'function' &&
+            (window.matchMedia('(pointer: coarse)').matches ||
+              window.matchMedia('(any-pointer: coarse)').matches)
               ? 1
               : 0,
           rx: Math.round((tap.rx || 0) * 100) / 100,
           ry: Math.round((tap.ry || 0) * 100) / 100,
           pr: Math.round((tap.pr || 0) * 100) / 100,
-          x: Math.round(tap.x || fallbackClientX || 120),
-          y: Math.round(tap.y || fallbackClientY || 320),
-          d: Math.max(15, Math.round(tap.d || 24)),
+          x: Math.round(tap.x || fallbackClientX || 0),
+          y: Math.round(tap.y || fallbackClientY || 0),
+          d: Math.round(tap.d || 0),
           gap: Math.round(tap.gap || 0),
-          ev: normalizedEvents.join(','),
+          ev: tap.events.join(','),
         },
         f: {
           wb: env.gate.wb,
           hl: env.gate.hl,
           dk: env.gate.dk,
-          cb: 0,
-          tr: 1,
+          cb: isBurst ? 1 : 0,
+          tr: isTrustedClick ? 1 : 0,
         },
       };
 
@@ -236,18 +214,6 @@ export function useClearanceDispatch({
           inFlightRef.current = false;
           setIsDispatching(false);
           resetTapBuffer();
-          // If this is a real touch device without webdriver/headless flags, allow clean re-verification
-          // instead of trapping the user on a permanent 404 screen
-          if (hasTouch && env.gate.wb === 0 && env.gate.hl === 0 && env.gate.dk === 0) {
-            if (clearanceRetriesRef.current < SESSION_RETRY_MAX) {
-              clearanceRetriesRef.current += 1;
-              restartVerification(false);
-            } else {
-              wipeSessionSecrets();
-              setNeedsManualRetry(true);
-            }
-            return;
-          }
           wipeSessionSecrets();
           setIsBotBlocked(true);
           return;

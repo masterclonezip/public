@@ -7,6 +7,7 @@ import path from 'path';
 import fs from 'fs';
 
 import { injectSeoTags, fetchStoreData, resolveAppSlug, cleanRootContainer } from './src/seoHelper';
+import { normalizeNonWwwDomain } from './src/lib/seoUtils';
 import { adminAuthRouter } from './src/server/routes/adminAuthRoutes';
 import { communityRouter } from './src/server/routes/communityRoutes';
 import { reportRouter } from './src/server/routes/reportRoutes';
@@ -65,17 +66,28 @@ async function startServer() {
     }
   }));
   app.use(cookieParser());
-  const configuredDomain = (process.env.PUBLIC_DOMAIN || process.env.VITE_PUBLIC_DOMAIN || '').trim().replace(/\/+$/, '');
+  const rawConfiguredDomain = (process.env.PUBLIC_DOMAIN || process.env.VITE_PUBLIC_DOMAIN || '').trim().replace(/^["']+|["']+$/g, '');
+  const configuredDomain = rawConfiguredDomain ? normalizeNonWwwDomain(rawConfiguredDomain) : '';
   let allowedOrigins: boolean | string[] = true;
   if (process.env.NODE_ENV === 'production' && configuredDomain) {
     try {
-      const parsed = new URL(configuredDomain.startsWith('http') ? configuredDomain : `https://${configuredDomain}`);
-      const bareHost = parsed.hostname.replace(/^www\./, '');
+      const parsed = new URL(configuredDomain);
+      const bareHost = parsed.hostname;
       allowedOrigins = [
         `https://${bareHost}`,
         `https://www.${bareHost}`,
         `https://admin.${bareHost}`,
       ];
+      const rawAllowed = (process.env.ALLOWED_HOSTNAMES || '').trim();
+      if (rawAllowed) {
+        const extraHosts = rawAllowed.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+        for (const h of extraHosts) {
+          const cleanH = h.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+          if (cleanH) {
+            allowedOrigins.push(`https://${cleanH}`, `http://${cleanH}`);
+          }
+        }
+      }
     } catch {
       allowedOrigins = true;
     }
@@ -110,21 +122,23 @@ async function startServer() {
     next();
   });
 
-  // 301 Redirect non-www -> www when PUBLIC_DOMAIN uses www.
+  // 301 Permanent Redirect: strictly enforce non-www domain for all www requests (SEO canonical consistency)
   app.use((req, res, next) => {
-    const host = (req.headers['x-forwarded-host'] as string || req.get('host') || '').split(',')[0].trim();
-    if (configuredDomain && host) {
-      try {
-        const parsed = new URL(configuredDomain.startsWith('http') ? configuredDomain : `https://${configuredDomain}`);
-        if (parsed.hostname.startsWith('www.')) {
-          const bareHost = parsed.hostname.replace(/^www\./, '');
-          if (host === bareHost) {
-            return res.redirect(301, `${parsed.protocol}//${parsed.hostname}${req.originalUrl}`);
-          }
+    const rawHost = (req.headers['x-forwarded-host'] as string || req.get('host') || '').split(',')[0].trim().toLowerCase();
+    const host = rawHost.split(':')[0];
+    if (host.startsWith('www.')) {
+      const bareHost = host.replace(/^www\./, '');
+      const port = rawHost.includes(':') ? `:${rawHost.split(':')[1]}` : '';
+      let targetProto = (req.headers['x-forwarded-proto'] as string || req.protocol || 'https').split(',')[0].trim();
+      if (configuredDomain) {
+        try {
+          const parsed = new URL(configuredDomain.startsWith('http') ? configuredDomain : `https://${configuredDomain}`);
+          if (parsed.protocol) targetProto = parsed.protocol.replace(':', '');
+        } catch {
+          // ignore
         }
-      } catch {
-        // ignore invalid URL
       }
+      return res.redirect(301, `${targetProto}://${bareHost}${port}${req.originalUrl}`);
     }
     next();
   });
@@ -624,18 +638,23 @@ async function startServer() {
         }
       }
 
-      const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
-      let defaultHost = "localhost:3000";
+      const protocol = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
+      let cleanHost = "localhost:3000";
       if (configuredDomain) {
         try {
-          defaultHost = new URL(configuredDomain.startsWith('http') ? configuredDomain : `https://${configuredDomain}`).host;
+          cleanHost = new URL(configuredDomain).host;
         } catch {
-          defaultHost = configuredDomain.replace(/^https?:\/\//, '');
+          cleanHost = configuredDomain.replace(/^https?:\/\//, '');
         }
+      } else {
+        const hostHeader = req.headers["x-forwarded-host"] || req.get("host") || "localhost:3000";
+        cleanHost = String(hostHeader).split(',')[0].trim();
       }
-      let hostHeader = req.headers["x-forwarded-host"] || req.get("host") || defaultHost;
-      let cleanHost = String(hostHeader).split(',')[0].trim();
-      const hostUrl = `${String(protocol).split(',')[0].trim()}://${cleanHost}`;
+      if (cleanHost.toLowerCase().startsWith('www.')) {
+        cleanHost = cleanHost.replace(/^www\./i, '');
+      }
+      const proto = String(protocol).split(',')[0].trim();
+      const hostUrl = `${proto}://${cleanHost}`;
       const userAgent = req.headers['user-agent'] || '';
 
       const seoResult = await injectSeoTags(template, req.originalUrl, hostUrl, userAgent);

@@ -1,6 +1,6 @@
 import { getField, stripHtml, optimizeImageUrl, normalizeSchemaCategory, getYoutubeThumbnail, normalizeIsoDate, cleanFaqQuestion } from './utils';
 import { fetchSEOReviewsForApp } from './reviewFallback';
-import { formatPageTitle } from '../lib/seoUtils';
+import { formatPageTitle, normalizeNonWwwDomain } from '../lib/seoUtils';
 
 export interface BuildSchemaParams {
   pageType: 'home' | 'app' | 'news' | 'video' | 'static' | 'collection' | 'gateway' | '404';
@@ -38,12 +38,14 @@ export async function buildJsonLdSchema(params: BuildSchemaParams): Promise<stri
   const schemas: any[] = [];
   let defaultHostOrigin = '';
   if (typeof process !== 'undefined' && process.env) {
-    defaultHostOrigin = (process.env.PUBLIC_DOMAIN || process.env.VITE_PUBLIC_DOMAIN || '').trim().replace(/\/+$/, '');
+    const rawDefault = (process.env.PUBLIC_DOMAIN || process.env.VITE_PUBLIC_DOMAIN || '').trim().replace(/^["']+|["']+$/g, '');
+    defaultHostOrigin = rawDefault ? normalizeNonWwwDomain(rawDefault) : '';
   }
   let hostOrigin = defaultHostOrigin;
   if (params.url) {
     try {
-      hostOrigin = new URL(params.url).origin;
+      const parsedOrigin = new URL(params.url).origin;
+      hostOrigin = normalizeNonWwwDomain(parsedOrigin);
     } catch {
       hostOrigin = defaultHostOrigin;
     }

@@ -345,22 +345,27 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (initialFetchDoneRef.current) return;
     initialFetchDoneRef.current = true;
 
-    // Pre-warm the offline static dataset in background idle time so client navigation has 0ms instant content
-    const timer = setTimeout(() => {
-      loadFullStaticDataset().then(full => {
-        if (full?.apps && full.apps.length > 0) {
-          setApps(prev => mergeUniqueApps(prev, full.apps));
-        }
-        if (full?.news && full.news.length > 0) {
-          setNews(prev => mergeUniqueNews(prev, full.news));
-        }
-      }).catch(() => {});
-    }, 200);
-
-    // Fetch backup data once on initial load if SSR cache was empty or trimmed
     const p = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
+    const isAppOrGateway = p.startsWith('/app/') || p.startsWith('/moreinfo/');
     const isCatalog = p === '/' || p === '/new-apps' || p.startsWith('/categories') || p.startsWith('/category');
     const isNewsRoute = p === '/news' || p.startsWith('/news/');
+
+    // Keep /app/:slug strictly on its 17-app SSR slice (1 target app + 16 similar apps) for peak performance.
+    // Only pre-warm the full static dataset in background on catalog/news routes or if initial apps state is empty.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    if (!isAppOrGateway || apps.length === 0) {
+      timer = setTimeout(() => {
+        loadFullStaticDataset().then(full => {
+          if (full?.apps && full.apps.length > 0) {
+            setApps(prev => mergeUniqueApps(prev, full.apps));
+          }
+          if (full?.news && full.news.length > 0) {
+            setNews(prev => mergeUniqueNews(prev, full.news));
+          }
+        }).catch(() => {});
+      }, 200);
+    }
+
     if (isNewsRoute) {
       if (news.length === 0) {
         fetchBackupData(true);
@@ -368,34 +373,42 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else if (apps.length === 0 || (isCatalog && apps.length < 50)) {
       fetchBackupData(false);
     }
-    return () => clearTimeout(timer);
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [apps.length, news.length, fetchBackupData]);
 
-  // Ensure full catalog is loaded if user navigates to catalog listing routes or opens search
+  // Ensure full catalog is loaded if user navigates from an /app/:slug page to catalog listing routes or opens search
   const routeFetchDoneRef = React.useRef(false);
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const checkCatalogRoute = () => {
+    const ensureFullCatalogLoaded = () => {
       if (routeFetchDoneRef.current) return;
-      const p = window.location.pathname.toLowerCase();
-      const isCatalog = p === '/' || p === '/new-apps' || p.startsWith('/categories') || p.startsWith('/category');
-      if (isCatalog && apps.length > 0 && apps.length < 50) {
+      if (apps.length < 50) {
         routeFetchDoneRef.current = true;
+        loadFullStaticDataset().then(full => {
+          if (full?.apps && full.apps.length > 0) {
+            setApps(prev => mergeUniqueApps(prev, full.apps));
+          }
+          if (full?.news && full.news.length > 0) {
+            setNews(prev => mergeUniqueNews(prev, full.news));
+          }
+        }).catch(() => {});
         fetchBackupData(true);
       }
     };
-    const handleSearchOpen = () => {
-      if (routeFetchDoneRef.current) return;
-      if (apps.length > 0 && apps.length < 50) {
-        routeFetchDoneRef.current = true;
-        fetchBackupData(true);
+    const checkCatalogRoute = () => {
+      const p = window.location.pathname.toLowerCase();
+      const isCatalog = p === '/' || p === '/new-apps' || p.startsWith('/categories') || p.startsWith('/category');
+      if (isCatalog) {
+        ensureFullCatalogLoaded();
       }
     };
     window.addEventListener('popstate', checkCatalogRoute);
-    window.addEventListener('open-search-modal', handleSearchOpen);
+    window.addEventListener('open-search-modal', ensureFullCatalogLoaded);
     return () => {
       window.removeEventListener('popstate', checkCatalogRoute);
-      window.removeEventListener('open-search-modal', handleSearchOpen);
+      window.removeEventListener('open-search-modal', ensureFullCatalogLoaded);
     };
   }, [apps.length, fetchBackupData]);
 

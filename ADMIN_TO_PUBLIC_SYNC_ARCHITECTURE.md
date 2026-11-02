@@ -42,7 +42,7 @@ Platform operates as a decoupled 3-node ecosystem designed for maximum security,
        │         NODE A: ADMIN CONTROL REPO           │   │         NODE B: PUBLIC WEBSITE REPO          │
        │                (`masterworld`)               │   │                   (`Dex`)                    │
        ├──────────────────────────────────────────────┤   ├──────────────────────────────────────────────┤
-       │ • Admin Dashboard (`AdminDashboard.tsx`)     │   │ • Public App Store (`www.example.com`)      │
+       │ • Admin Dashboard (`AdminDashboard.tsx`)     │   │ • Public App Store (`example.com`)          │
        │ • TOTP 2FA & Secure Link Vault Node          │   │ • Fast Static SPA (`staticData.json`)        │
        │ • Master Catalog Firebase (`store_data`)     │   │ • Community Reviews (`community-firebase-project`)    │
        │ • AI Review Studio Generation Engine         │   │ • Zero Admin Code / Zero Server Secrets      │

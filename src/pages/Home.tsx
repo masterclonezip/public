@@ -7,6 +7,7 @@ import { useState, useEffect, useMemo, useDeferredValue, useRef } from 'react';
 import { useSearchParams, useLocation, useNavigate, useNavigationType, useParams } from 'react-router-dom';
 import { useData } from '../contexts/DataContextPublic';
 import Meta from '../components/Meta';
+import { normalizeNonWwwDomain } from '../lib/seoUtils';
 import { FeaturedBanner, PlayStoreTabs, TopChartItem, AppListItem } from '../components/PlayStoreUI';
 import { WebsiteTitleHero } from '../components/WebsiteTitleHero';
 import NewAdditions from '../components/public/NewAdditions';
@@ -299,7 +300,7 @@ export default function Home() {
   const isNewAppsRoute = cleanPathLower === '/new-apps';
   const isCategoriesIndexRoute = cleanPathLower === '/categories';
   const siteTitleLabel = mockSettings.site_title || '';
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const origin = typeof window !== 'undefined' ? normalizeNonWwwDomain(window.location.origin) : '';
 
   const resolvedTitle = isNewAppsRoute
     ? ((mockSettings as any).new_apps_meta_title || 'New Apps & Latest Releases')

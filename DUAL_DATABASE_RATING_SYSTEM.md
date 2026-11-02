@@ -93,7 +93,7 @@ To ensure high performance, we will NOT calculate the average rating by reading 
 
 Because Firebase does not support cross-project joins, our Express.js backend (`server.ts`) will act as the orchestrator:
 
-1. A user visits `www.example.com/app/spin-crush`.
+1. A user visits `example.com/app/spin-crush`.
 2. The server requests the App Details from **Database A**.
 3. The server simultaneously requests the Rating Stats (`app_rating_stats`) from **Database B**.
 4. The server merges them into a single JSON object in memory.

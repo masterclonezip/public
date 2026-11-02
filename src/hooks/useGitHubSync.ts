@@ -3,13 +3,59 @@ import { auth, db, isFirebaseReal, readFirestoreDoc, writeFirestoreDoc, handleFi
 import { adminFetch, getValidAdminToken, loadSession } from '../services/adminAuthService';
 import { GitConfig, generateStaticDataFileCode, generateCommunityReviewsFileCode, commitFileToGitHub, commitMultiFilesToGitHub, encryptUrlIfNeeded, compileCanonicalApp, compileCanonicalNews, generateSecureVaultFile, sanitizePublicSettings } from '../lib/githubSync';
 import { getAesSecret, safeDecrypt, safeEncrypt } from '../lib/cryptoUtils';
-import { generateAllSitemaps } from '../lib/sitemapGenerator';
+import { generateAllSitemaps, normalizeSitemapHost } from '../lib/sitemapGenerator';
 import { ensureDefaultSettings } from '../lib/defaultLegalContent';
 import { AppConfig, GlobalSettings, NewsItem, VideoItem } from '../types';
 import { getResolvedCommunityFirebaseConfig, parseFirestoreFields } from '../lib/communityFirebase';
 
 import communityCatalogStats from '../lib/communityCatalogStats.json';
 import communityStaticReviews from '../lib/communityStaticReviews.json';
+
+import rawMiddlewareJs from '../../functions/_middleware.js?raw';
+import rawHeadersFile from '../../public/_headers?raw';
+import rawPrerenderTs from '../../scripts/prerender.ts?raw';
+import rawSitemapGeneratorTs from '../lib/sitemapGenerator.ts?raw';
+import rawSeoUtilsTs from '../lib/seoUtils.ts?raw';
+import rawSeoHelperTs from '../seoHelper.ts?raw';
+import rawSeoSubUtilsTs from '../seo/utils.ts?raw';
+import rawSchemaBuilderTs from '../seo/schemaBuilder.ts?raw';
+import rawMetaBuilderTs from '../seo/metaBuilder.ts?raw';
+import rawAppDetailsRendererTs from '../seo/renderers/appDetailsRenderer.ts?raw';
+import rawInitialDataOptimizerTs from '../seo/initialDataOptimizer.ts?raw';
+import rawSeoRoutesTs from '../server/routes/seoRoutes.ts?raw';
+import rawMetaTsx from '../components/Meta.tsx?raw';
+import rawAppSimilarCarouselTsx from '../components/public/appDetails/AppSimilarCarousel.tsx?raw';
+import rawAppDetailsPageTsx from '../pages/AppDetails.tsx?raw';
+import rawDataContextPublicTsx from '../contexts/DataContextPublic.tsx?raw';
+import rawClearanceButtonTsx from '../components/ClearanceButton.tsx?raw';
+import rawUseTurnstileTs from './useTurnstileVerification.ts?raw';
+import rawUseClearanceDispatchTs from './useClearanceDispatch.ts?raw';
+import rawGateConfigTs from '../lib/gateConfig.ts?raw';
+import rawGateCoreTs from '../server/security/gateCore.ts?raw';
+
+const BUNDLED_PUBLIC_CORE_FILES: Record<string, string> = {
+  'functions/_middleware.js': rawMiddlewareJs,
+  'public/_headers': rawHeadersFile,
+  'scripts/prerender.ts': rawPrerenderTs,
+  'src/lib/sitemapGenerator.ts': rawSitemapGeneratorTs,
+  'src/lib/seoUtils.ts': rawSeoUtilsTs,
+  'src/seoHelper.ts': rawSeoHelperTs,
+  'src/seo/utils.ts': rawSeoSubUtilsTs,
+  'src/seo/schemaBuilder.ts': rawSchemaBuilderTs,
+  'src/seo/metaBuilder.ts': rawMetaBuilderTs,
+  'src/seo/renderers/appDetailsRenderer.ts': rawAppDetailsRendererTs,
+  'src/seo/initialDataOptimizer.ts': rawInitialDataOptimizerTs,
+  'src/server/routes/seoRoutes.ts': rawSeoRoutesTs,
+  'src/components/Meta.tsx': rawMetaTsx,
+  'src/components/public/appDetails/AppSimilarCarousel.tsx': rawAppSimilarCarouselTsx,
+  'src/pages/AppDetails.tsx': rawAppDetailsPageTsx,
+  'src/contexts/DataContextPublic.tsx': rawDataContextPublicTsx,
+  'src/components/ClearanceButton.tsx': rawClearanceButtonTsx,
+  'src/hooks/useTurnstileVerification.ts': rawUseTurnstileTs,
+  'src/hooks/useClearanceDispatch.ts': rawUseClearanceDispatchTs,
+  'src/lib/gateConfig.ts': rawGateConfigTs,
+  'src/server/security/gateCore.ts': rawGateCoreTs
+};
 
 export function useGitHubSync(
   apps: AppConfig[],
@@ -734,7 +780,8 @@ export function useGitHubSync(
         }
       ];
 
-      // Pull latest public core source code (App.tsx, lazyWithRetry, GlobalErrorBoundary, PublicFooter) for Dex
+      // Pull latest public core source code (with embedded build-time fallback for Cloudflare Pages Admin)
+      const mergedCoreFiles: Record<string, string> = { ...BUNDLED_PUBLIC_CORE_FILES };
       try {
         const idToken = await getAdminToken();
         const coreRes = await adminFetch('/api/github-sync/public-core-files', {
@@ -742,18 +789,24 @@ export function useGitHubSync(
         });
         if (coreRes.ok) {
           const coreData = await coreRes.json();
-          if (coreData?.files) {
+          if (coreData?.files && typeof coreData.files === 'object') {
             for (const [fPath, fContent] of Object.entries(coreData.files)) {
               if (fContent && typeof fContent === 'string') {
-                primaryBatchFiles.push({ path: fPath, content: fContent });
+                mergedCoreFiles[fPath] = fContent;
               }
             }
-            log(`GitHub Sync: Added ${Object.keys(coreData.files).length} public core source files to sync bundle.`);
           }
         }
       } catch (coreErr: any) {
-        log(`GitHub Sync Note: Core files fetch note: ${coreErr?.message || 'skipped'}`);
+        log(`GitHub Sync Note: Using embedded core files bundle (${coreErr?.message || 'edge mode'})`);
       }
+
+      for (const [fPath, fContent] of Object.entries(mergedCoreFiles)) {
+        if (fContent && typeof fContent === 'string') {
+          primaryBatchFiles.push({ path: fPath, content: fContent });
+        }
+      }
+      log(`GitHub Sync: Added ${Object.keys(mergedCoreFiles).length} public core source files to sync bundle.`);
 
       if (vaultCode) {
         primaryBatchFiles.push({
@@ -771,7 +824,14 @@ export function useGitHubSync(
 
       // Generate XML sitemaps, site.webmanifest, and opensearch.xml for instant static hosting and search engine discoverability
       try {
-        const publicDomain = ((import.meta as any).env?.VITE_PUBLIC_DOMAIN || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/+$/, '');
+        const rawPublicDomain = (
+          (finalSettings as any)?.site_domain ||
+          (finalSettings as any)?.domain ||
+          (finalSettings as any)?.public_domain ||
+          (import.meta as any).env?.VITE_PUBLIC_DOMAIN ||
+          (typeof window !== 'undefined' ? window.location.origin : '')
+        ).trim().replace(/^["']+|["']+$/g, '');
+        const publicDomain = rawPublicDomain ? normalizeSitemapHost(rawPublicDomain) : '';
         const sitemaps = generateAllSitemaps(
           {
             apps: publicApps,

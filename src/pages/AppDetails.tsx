@@ -8,6 +8,7 @@ import { useData } from '../contexts/DataContextPublic';
 import { Check } from 'lucide-react';
 import { useEffect, useMemo, useState, useRef } from 'react';
 import Meta from '../components/Meta';
+import { getCleanCanonicalUrl } from '../lib/seoUtils';
 import { useLiveAppStats } from '../hooks/useReviews';
 import { getCachedLiveAppStats } from '../lib/communityFirebase';
 
@@ -156,10 +157,40 @@ export default function AppDetails() {
       return { relatedApps: [], totalCategoryAppsCount: 0 };
     }
 
-    const currentCatLower = specificCategory.toLowerCase();
-    const isAll = currentCatLower === 'all apps';
     const appId = String(app.id || '');
     const appSlug = String(app.slug || '').toLowerCase();
+
+    // If mockApps is the pre-computed 17-app SSR slice (1 target app + up to 16 pre-ordered similar apps),
+    // preserve the exact SSR order so client hydration matches SSR 1:1 without double-rotating.
+    const nonCurrentInSlice = mockApps.filter((a: any) => {
+      if (!a || a.sync_to_public === false || a.is_Safety_alert === true || a.status === 'flagged') return false;
+      const isCurrent = String(a.id) === appId || (a.slug && a.slug.toLowerCase() === appSlug);
+      return !isCurrent;
+    });
+
+    if (
+      mockApps.length <= 17 &&
+      nonCurrentInSlice.length > 0 &&
+      nonCurrentInSlice.every((a: any) => typeof a._similarOrder === 'number' || a._isTrimmed === true)
+    ) {
+      const ordered = [...nonCurrentInSlice].sort(
+        (a: any, b: any) => (typeof a._similarOrder === 'number' ? a._similarOrder : 0) - (typeof b._similarOrder === 'number' ? b._similarOrder : 0)
+      );
+      const mappedSlice = ordered.slice(0, 16).map((a: any) => ({
+        id: a.id,
+        name: a.name,
+        slug: a.slug,
+        icon_url: a.icon_url,
+        is_new: Boolean(a.is_new === true || a.is_new === 'true' || a.isNew || a.badge?.toLowerCase() === 'new'),
+        is_hot: Boolean(a.is_hot === true || a.is_hot === 'true' || a.isHot || a.badge?.toLowerCase() === 'hot'),
+        serial_number: a.serial_number
+      }));
+      const precomputedCatTotal = Number((app as any)._totalCategoryCount) || (mappedSlice.length + 1);
+      return { relatedApps: mappedSlice, totalCategoryAppsCount: precomputedCatTotal };
+    }
+
+    const currentCatLower = specificCategory.toLowerCase();
+    const isAll = currentCatLower === 'all apps';
 
     const newApps: any[] = [];
     const regularApps: any[] = [];
@@ -171,7 +202,7 @@ export default function AppDetails() {
 
       const isCurrent = String(a.id) === appId || (a.slug && a.slug.toLowerCase() === appSlug);
       const aCat = (a.category || '').toLowerCase();
-      const matchesCategory = isAll || aCat.includes(currentCatLower);
+      const matchesCategory = isAll || aCat.includes(currentCatLower) || currentCatLower.includes(aCat);
 
       if (matchesCategory) {
         totalCatCount++;
@@ -244,7 +275,7 @@ export default function AppDetails() {
     }));
 
     return { relatedApps: mapped, totalCategoryAppsCount: totalCatCount };
-  }, [mockApps, app?.category, app?.id, app?.slug, app?.serial_number, specificCategory]);
+  }, [mockApps, app, specificCategory]);
 
   useEffect(() => {
     if (!app?.is_coming_soon || !app?.publish_date) {
@@ -452,7 +483,7 @@ export default function AppDetails() {
   };
 
   const handleShare = async () => {
-    const shareUrl = app.canonical_url || window.location.href;
+    const shareUrl = getCleanCanonicalUrl(app.canonical_url, `/app/${app.slug}`);
     const shareTitle = title;
     const shareText = desc;
     if (navigator.share) {
@@ -506,7 +537,7 @@ export default function AppDetails() {
         description={desc}
         keywords={app.seo_keywords}
         image={ogImage}
-        canonical={app.canonical_url || `${typeof window !== 'undefined' ? window.location.origin : ''}/app/${app.slug}`}
+        canonical={getCleanCanonicalUrl(app.canonical_url, `/app/${app.slug}`)}
         schema={[softwareSchema, webPageSchema, ...(faqSchema ? [faqSchema] : [])]}
         breadcrumbSchema={breadcrumbSchema}
       />

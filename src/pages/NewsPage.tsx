@@ -9,6 +9,7 @@ import { Search, ArrowLeft, Check, X } from 'lucide-react';
 import { useData } from '../contexts/DataContextPublic';
 import { Link, useSearchParams } from 'react-router-dom';
 import Meta from '../components/Meta';
+import { normalizeNonWwwDomain } from '../lib/seoUtils';
 import NewsCard from '../components/public/news/NewsCard';
 import NewsPagination from '../components/public/news/NewsPagination';
 import { getPlainTextSnippet } from '../components/public/news/newsUtils';
@@ -132,7 +133,8 @@ export default function NewsPage() {
   };
 
   const handleShare = useCallback((item: any) => {
-    const url = `${window.location.origin}/news/${item.slug || item.id}`;
+    const cleanOrigin = typeof window !== 'undefined' ? normalizeNonWwwDomain(window.location.origin) : '';
+    const url = `${cleanOrigin}/news/${item.slug || item.id}`;
     if (navigator.share) {
       navigator.share({
         title: item.title,
@@ -165,7 +167,7 @@ export default function NewsPage() {
     return range;
   }, [totalPages, safeCurrentPage]);
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const origin = typeof window !== 'undefined' ? normalizeNonWwwDomain(window.location.origin) : '';
   const baseTitle = mockSettings?.news_meta_title || "News & Updates";
   const seoTitle = safeCurrentPage > 1 ? `${baseTitle} - Page ${safeCurrentPage}` : baseTitle;
   const seoDescription = mockSettings?.news_meta_description || "The latest news, reports, and platform updates.";

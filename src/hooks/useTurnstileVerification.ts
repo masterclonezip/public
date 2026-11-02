@@ -79,7 +79,16 @@ function isRealTurnstileKey(raw: unknown): boolean {
   return /^0x4[A-Za-z0-9_-]{17,24}$/.test(k);
 }
 
-const WIDGET_SOLVE_WATCHDOG_MS = 2500;
+function isNonProdHost(): boolean {
+  if (typeof window === 'undefined' || !window.location) return false;
+  const host = (window.location.hostname || '').toLowerCase();
+  return (
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host === '[::1]' ||
+    host.endsWith('.run.app')
+  );
+}
 
 export function useTurnstileVerification({
   appId,
@@ -88,7 +97,6 @@ export function useTurnstileVerification({
   const [isReady, setIsReady] = useState(false);
   const [isBotBlocked, setIsBotBlocked] = useState(false);
   const [uiTimeoutExceeded, setUiTimeoutExceeded] = useState(false);
-  const [isPreviewFallback, setIsPreviewFallback] = useState(false);
 
   const widgetRef = useRef<HTMLDivElement | null>(null);
   const widgetIdRef = useRef<string | null>(null);
@@ -110,7 +118,6 @@ export function useTurnstileVerification({
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const uiTimeoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scriptWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const widgetWatchdogTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const callbackDeferTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const unmountedRef = useRef<boolean>(false);
 
@@ -131,10 +138,6 @@ export function useTurnstileVerification({
       clearTimeout(scriptWaitTimerRef.current);
       scriptWaitTimerRef.current = null;
     }
-    if (widgetWatchdogTimerRef.current) {
-      clearTimeout(widgetWatchdogTimerRef.current);
-      widgetWatchdogTimerRef.current = null;
-    }
     if (callbackDeferTimerRef.current) {
       clearTimeout(callbackDeferTimerRef.current);
       callbackDeferTimerRef.current = null;
@@ -142,10 +145,6 @@ export function useTurnstileVerification({
   }, []);
 
   const removeWidget = useCallback(() => {
-    if (widgetWatchdogTimerRef.current) {
-      clearTimeout(widgetWatchdogTimerRef.current);
-      widgetWatchdogTimerRef.current = null;
-    }
     if (widgetIdRef.current && window.turnstile) {
       try {
         window.turnstile.remove(widgetIdRef.current);
@@ -159,14 +158,15 @@ export function useTurnstileVerification({
     }
   }, []);
 
-  const resolveRealSiteKeys = useCallback((): string[] => {
+  const resolveCandidateSiteKeys = useCallback((): string[] => {
     const metaEnv = ((import.meta as any).env || {}) as Record<string, unknown>;
     const buildEnv = ((globalThis as any).__APP_BUILD_ENV__ || {}) as Record<string, unknown>;
 
+    // §5.5 Site key cascade: Admin setting / Server runtime key -> VITE_TURNSTILE_SITE_KEY -> test key (non-production hosts only)
     const rawSources: unknown[] = [
+      adminSiteKeyRef.current,
       serverSiteKeyRef.current,
       ...serverSiteKeysRef.current,
-      adminSiteKeyRef.current,
       metaEnv.VITE_TURNSTILE_SITE_KEY,
       metaEnv.TURNSTILE_SITE_KEY,
       metaEnv.CF_TURNSTILE_SITE_KEY,
@@ -175,16 +175,8 @@ export function useTurnstileVerification({
       metaEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
       metaEnv.VITE_TURNSTILE_KEY,
       metaEnv.TURNSTILE_KEY,
-      metaEnv.VITE_TURNSTILE_SECRET_KEY,
-      metaEnv.TURNSTILE_SECRET_KEY,
-      metaEnv.VITE_TURNSTILE_TOKEN,
-      metaEnv.TURNSTILE_TOKEN,
       buildEnv.VITE_TURNSTILE_SITE_KEY,
       buildEnv.TURNSTILE_SITE_KEY,
-      buildEnv.VITE_TURNSTILE_SECRET_KEY,
-      buildEnv.TURNSTILE_SECRET_KEY,
-      buildEnv.VITE_TURNSTILE_TOKEN,
-      buildEnv.TURNSTILE_TOKEN,
     ];
 
     const candidates: string[] = [];
@@ -195,6 +187,12 @@ export function useTurnstileVerification({
         candidates.push(k);
       }
     }
+
+    // §5.5 & §7: Allow Cloudflare's visible pass test key ONLY on non-production hosts when no real key is configured
+    if (candidates.length === 0 && isNonProdHost()) {
+      candidates.push('1x00000000000000000000AA');
+    }
+
     return candidates;
   }, []);
 
@@ -207,10 +205,6 @@ export function useTurnstileVerification({
     if (uiTimeoutTimerRef.current) {
       clearTimeout(uiTimeoutTimerRef.current);
       uiTimeoutTimerRef.current = null;
-    }
-    if (widgetWatchdogTimerRef.current) {
-      clearTimeout(widgetWatchdogTimerRef.current);
-      widgetWatchdogTimerRef.current = null;
     }
     const elapsed = Date.now() - initResponseTimeRef.current;
     const remainingHold = Math.max(0, CLIENT_TAP_HOLD_MS - elapsed);
@@ -238,33 +232,13 @@ export function useTurnstileVerification({
       nonceRef.current = null;
       solvedWithRealKeyRef.current = false;
       setIsReady(false);
-      setIsPreviewFallback(false);
       if (!isSilentRetry) {
         setUiTimeoutExceeded(false);
       }
 
-      const activateHardwareFallback = () => {
-        if (unmountedRef.current) return;
-        removeWidget();
-        setIsPreviewFallback(true);
-        if (nonceRef.current && envRef.current && !envRef.current.gate.failed) {
-          cfTokenRef.current = `HWPROOF.${nonceRef.current}.${envRef.current.hw}`;
-          retryCountRef.current = 0;
-          setUiTimeoutExceeded(false);
-          markTokenReady();
-        } else {
-          setUiTimeoutExceeded(true);
-        }
-      };
-
-      // 15s UI Timeout guard (§5.5: never spin forever if content blocker blocks Turnstile)
+      // 15s UI Timeout guard (§5.5: if still unready after TURNSTILE_UI_TIMEOUT_MS, show neutral reload message)
       uiTimeoutTimerRef.current = setTimeout(() => {
         if (!unmountedRef.current && !cfTokenRef.current) {
-          removeWidget();
-          if (nonceRef.current && envRef.current && !envRef.current.gate.failed) {
-            activateHardwareFallback();
-            return;
-          }
           setUiTimeoutExceeded(true);
         }
       }, TURNSTILE_UI_TIMEOUT_MS);
@@ -297,20 +271,6 @@ export function useTurnstileVerification({
         if (res.status === 404) {
           clearTimers();
           removeWidget();
-          if (retryCountRef.current < SESSION_RETRY_MAX) {
-            retryCountRef.current += 1;
-            setTimeout(() => {
-              if (!unmountedRef.current) void startSessionFlow(true);
-            }, 600);
-            return;
-          }
-          const hasTouch =
-            (typeof navigator !== 'undefined' && Number(navigator.maxTouchPoints ?? 0) >= 1) ||
-            (typeof window !== 'undefined' && 'ontouchstart' in window);
-          if (hasTouch && env.gate.wb === 0 && env.gate.hl === 0 && env.gate.dk === 0) {
-            setUiTimeoutExceeded(true);
-            return;
-          }
           setIsBotBlocked(true);
           return;
         }
@@ -363,16 +323,14 @@ export function useTurnstileVerification({
           }
         }, NONCE_REFRESH_MS);
 
-        // 3. Render Turnstile with hardware commitment cData = `${appId}_${nid}_${hw}` (§5.5)
+        // 3. Render visible Turnstile widget with hardware commitment cData = `${appId}_${nid}_${hw}` (§5.5)
         const renderTurnstileWidget = () => {
           if (unmountedRef.current) return;
 
-          const realCandidates = resolveRealSiteKeys();
-
-          // If no valid 24-char Turnstile Site Key is configured, immediately use hardware-committed verification
-          // without rendering any broken or test Cloudflare iframe.
-          if (realCandidates.length === 0) {
-            activateHardwareFallback();
+          const candidates = resolveCandidateSiteKeys();
+          if (candidates.length === 0) {
+            clearTimers();
+            setUiTimeoutExceeded(true);
             return;
           }
 
@@ -382,47 +340,12 @@ export function useTurnstileVerification({
           }
 
           removeWidget();
-          setIsPreviewFallback(false);
 
-          const idx = Math.min(keyIndexRef.current, realCandidates.length - 1);
-          const sitekey = realCandidates[idx];
-
-          // Always defer widget removal / re-render outside of Turnstile's own callback stack frame
-          // so Cloudflare's api.js state machine never freezes on "Verifying..."
-          const handleCandidateFailure = () => {
-            if (unmountedRef.current || solvedWithRealKeyRef.current) return;
-            if (widgetWatchdogTimerRef.current) {
-              clearTimeout(widgetWatchdogTimerRef.current);
-              widgetWatchdogTimerRef.current = null;
-            }
-            cfTokenRef.current = null;
-            setIsReady(false);
-
-            if (callbackDeferTimerRef.current) {
-              clearTimeout(callbackDeferTimerRef.current);
-            }
-            callbackDeferTimerRef.current = setTimeout(() => {
-              if (unmountedRef.current || solvedWithRealKeyRef.current) return;
-              removeWidget();
-              const latestRealCandidates = resolveRealSiteKeys();
-              if (keyIndexRef.current + 1 < latestRealCandidates.length) {
-                keyIndexRef.current += 1;
-                renderTurnstileWidget();
-                return;
-              }
-              // When the widget domain is not yet allowlisted in Cloudflare (110200) or Turnstile
-              // fails on the user's mobile carrier, immediately destroy the iframe and activate
-              // hardware-committed verification bound to the server-signed nonce and GPU silicon hash.
-              activateHardwareFallback();
-            }, 60);
-          };
+          const idx = Math.min(keyIndexRef.current, candidates.length - 1);
+          const sitekey = candidates[idx];
 
           const softReinit = () => {
             if (unmountedRef.current) return;
-            if (widgetWatchdogTimerRef.current) {
-              clearTimeout(widgetWatchdogTimerRef.current);
-              widgetWatchdogTimerRef.current = null;
-            }
             cfTokenRef.current = null;
             solvedWithRealKeyRef.current = false;
             setIsReady(false);
@@ -432,23 +355,24 @@ export function useTurnstileVerification({
             callbackDeferTimerRef.current = setTimeout(() => {
               if (unmountedRef.current) return;
               removeWidget();
+              const latestCandidates = resolveCandidateSiteKeys();
+              if (keyIndexRef.current + 1 < latestCandidates.length) {
+                keyIndexRef.current += 1;
+                renderTurnstileWidget();
+                return;
+              }
               if (retryCountRef.current < SESSION_RETRY_MAX) {
                 retryCountRef.current += 1;
+                keyIndexRef.current = 0;
                 void startSessionFlow(true);
               } else {
-                activateHardwareFallback();
+                clearTimers();
+                setUiTimeoutExceeded(true);
               }
             }, 60);
           };
 
           const cData = `${safeAppId}_${nid}_${env.hw}`;
-
-          // Start a 2.5s per-widget solve watchdog so a hung/blocked iframe on mobile never stalls the user
-          widgetWatchdogTimerRef.current = setTimeout(() => {
-            if (!unmountedRef.current && !cfTokenRef.current) {
-              handleCandidateFailure();
-            }
-          }, WIDGET_SOLVE_WATCHDOG_MS);
 
           try {
             widgetRef.current.innerHTML = '';
@@ -456,28 +380,23 @@ export function useTurnstileVerification({
               sitekey,
               action: TURNSTILE_ACTION,
               cData,
-              appearance: 'interaction-only',
+              appearance: 'always',
               size: 'flexible',
               theme: 'auto',
               callback: (t: string) => {
                 if (unmountedRef.current) return;
-                if (widgetWatchdogTimerRef.current) {
-                  clearTimeout(widgetWatchdogTimerRef.current);
-                  widgetWatchdogTimerRef.current = null;
-                }
-                solvedWithRealKeyRef.current = true;
-                setIsPreviewFallback(false);
+                solvedWithRealKeyRef.current = !isTestTurnstileSiteKey(sitekey);
                 cfTokenRef.current = t;
                 retryCountRef.current = 0;
                 markTokenReady();
               },
-              'error-callback': handleCandidateFailure,
+              'error-callback': softReinit,
               'expired-callback': softReinit,
-              'timeout-callback': handleCandidateFailure,
+              'timeout-callback': softReinit,
             });
             widgetIdRef.current = id;
           } catch {
-            handleCandidateFailure();
+            softReinit();
           }
         };
 
@@ -497,7 +416,7 @@ export function useTurnstileVerification({
         }
       }
     },
-    [appId, clearTimers, markTokenReady, removeWidget, resolveRealSiteKeys]
+    [appId, clearTimers, markTokenReady, removeWidget, resolveCandidateSiteKeys]
   );
 
   // If adminTurnstileSiteKey arrives asynchronously from DataContextPublic after mount,
@@ -588,7 +507,6 @@ export function useTurnstileVerification({
     nonceRef.current = null;
     solvedWithRealKeyRef.current = false;
     setIsReady(false);
-    setIsPreviewFallback(false);
   }, [clearTimers, removeWidget]);
 
   return {
@@ -596,7 +514,6 @@ export function useTurnstileVerification({
     isBotBlocked,
     setIsBotBlocked,
     uiTimeoutExceeded,
-    isPreviewFallback,
     widgetRef,
     cfTokenRef,
     nonceRef,

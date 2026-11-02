@@ -202,7 +202,7 @@ To guarantee instantaneous loading on 4G/5G mobile devices and achieve a 100% Li
 ## 7. Dual-Repo Split-Sync Preservation Rules
 
 The Platform monorepo automatically synchronizes to two external repositories:
-1. **Public Site (`Dex`)**: Public user-facing website (`www.example.com`).
+1. **Public Site (`Dex`)**: Public user-facing website (`example.com`).
 2. **Admin Site (`Masterworld`)**: Admin control console.
 
 ### How SEO Remains 100% Protected During Sync

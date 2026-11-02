@@ -1,153 +1,153 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
-    <loc>https://admin.yonoappdex.com/</loc>
-    <lastmod>2026-11-02T14:34:52+00:00</lastmod>
+    <loc>http://localhost:3000/</loc>
+    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
     <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_512/v1793499107/vvqemcm3gkjsko5m6unw.png</image:loc>
-      <image:title>YonoappDex</image:title>
+      <image:loc>http://localhost:3000/logo.png</image:loc>
+      <image:title>Official Portal</image:title>
     </image:image>
   </url>
   <url>
-    <loc>https://admin.yonoappdex.com/new-apps</loc>
-    <lastmod>2026-11-02T14:34:52+00:00</lastmod>
+    <loc>http://localhost:3000/new-apps</loc>
+    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
     <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_512/v1793499107/vvqemcm3gkjsko5m6unw.png</image:loc>
-      <image:title>YonoappDex - New Apps</image:title>
+      <image:loc>http://localhost:3000/logo.png</image:loc>
+      <image:title>New Apps</image:title>
     </image:image>
   </url>
   <url>
-    <loc>https://admin.yonoappdex.com/categories</loc>
-    <lastmod>2026-11-02T14:34:52+00:00</lastmod>
+    <loc>http://localhost:3000/categories</loc>
+    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_512/v1793499107/vvqemcm3gkjsko5m6unw.png</image:loc>
-      <image:title>YonoappDex - App Categories</image:title>
+      <image:loc>http://localhost:3000/logo.png</image:loc>
+      <image:title>App Categories</image:title>
     </image:image>
   </url>
   <url>
-    <loc>https://admin.yonoappdex.com/news</loc>
+    <loc>http://localhost:3000/news</loc>
     <lastmod>2026-09-01T00:00:00+00:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
     <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_512/v1793499107/vvqemcm3gkjsko5m6unw.png</image:loc>
-      <image:title>YonoappDex - Industry News</image:title>
+      <image:loc>http://localhost:3000/logo.png</image:loc>
+      <image:title>Industry News</image:title>
     </image:image>
   </url>
   <url>
-    <loc>https://admin.yonoappdex.com/videos</loc>
+    <loc>http://localhost:3000/videos</loc>
     <lastmod>2026-09-01T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
     <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_512/v1793499107/vvqemcm3gkjsko5m6unw.png</image:loc>
-      <image:title>YonoappDex - Video Reviews</image:title>
+      <image:loc>http://localhost:3000/logo.png</image:loc>
+      <image:title>Video Reviews</image:title>
     </image:image>
   </url>
   <url>
-    <loc>https://admin.yonoappdex.com/about</loc>
-    <lastmod>2026-11-02T14:34:52+00:00</lastmod>
+    <loc>http://localhost:3000/about</loc>
+    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
     <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_512/v1793499107/vvqemcm3gkjsko5m6unw.png</image:loc>
-      <image:title>YonoappDex - About Us</image:title>
+      <image:loc>http://localhost:3000/logo.png</image:loc>
+      <image:title>About Us</image:title>
     </image:image>
   </url>
   <url>
-    <loc>https://admin.yonoappdex.com/contact</loc>
-    <lastmod>2026-11-02T14:34:52+00:00</lastmod>
+    <loc>http://localhost:3000/contact</loc>
+    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
     <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_512/v1793499107/vvqemcm3gkjsko5m6unw.png</image:loc>
-      <image:title>YonoappDex - Contact Support</image:title>
+      <image:loc>http://localhost:3000/logo.png</image:loc>
+      <image:title>Contact Support</image:title>
     </image:image>
   </url>
   <url>
-    <loc>https://admin.yonoappdex.com/faq</loc>
-    <lastmod>2026-11-02T14:34:52+00:00</lastmod>
+    <loc>http://localhost:3000/faq</loc>
+    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
     <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_512/v1793499107/vvqemcm3gkjsko5m6unw.png</image:loc>
-      <image:title>YonoappDex - Frequently Asked Questions</image:title>
+      <image:loc>http://localhost:3000/logo.png</image:loc>
+      <image:title>Frequently Asked Questions</image:title>
     </image:image>
   </url>
   <url>
-    <loc>https://admin.yonoappdex.com/privacy</loc>
-    <lastmod>2026-11-02T14:34:52+00:00</lastmod>
+    <loc>http://localhost:3000/privacy</loc>
+    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
     <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_512/v1793499107/vvqemcm3gkjsko5m6unw.png</image:loc>
-      <image:title>YonoappDex - Privacy Policy</image:title>
+      <image:loc>http://localhost:3000/logo.png</image:loc>
+      <image:title>Privacy Policy</image:title>
     </image:image>
   </url>
   <url>
-    <loc>https://admin.yonoappdex.com/terms</loc>
-    <lastmod>2026-11-02T14:34:52+00:00</lastmod>
+    <loc>http://localhost:3000/terms</loc>
+    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
     <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_512/v1793499107/vvqemcm3gkjsko5m6unw.png</image:loc>
-      <image:title>YonoappDex - Terms of Service</image:title>
+      <image:loc>http://localhost:3000/logo.png</image:loc>
+      <image:title>Terms of Service</image:title>
     </image:image>
   </url>
   <url>
-    <loc>https://admin.yonoappdex.com/disclaimer</loc>
-    <lastmod>2026-11-02T14:34:52+00:00</lastmod>
+    <loc>http://localhost:3000/disclaimer</loc>
+    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
     <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_512/v1793499107/vvqemcm3gkjsko5m6unw.png</image:loc>
-      <image:title>YonoappDex - Disclaimer</image:title>
+      <image:loc>http://localhost:3000/logo.png</image:loc>
+      <image:title>Disclaimer</image:title>
     </image:image>
   </url>
   <url>
-    <loc>https://admin.yonoappdex.com/notice</loc>
-    <lastmod>2026-11-02T14:34:52+00:00</lastmod>
+    <loc>http://localhost:3000/notice</loc>
+    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
     <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_512/v1793499107/vvqemcm3gkjsko5m6unw.png</image:loc>
-      <image:title>YonoappDex - Legal Notice</image:title>
+      <image:loc>http://localhost:3000/logo.png</image:loc>
+      <image:title>Legal Notice</image:title>
     </image:image>
   </url>
   <url>
-    <loc>https://admin.yonoappdex.com/ethics</loc>
-    <lastmod>2026-11-02T14:34:52+00:00</lastmod>
+    <loc>http://localhost:3000/ethics</loc>
+    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
     <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_512/v1793499107/vvqemcm3gkjsko5m6unw.png</image:loc>
-      <image:title>YonoappDex - Ethics Policy</image:title>
+      <image:loc>http://localhost:3000/logo.png</image:loc>
+      <image:title>Ethics Policy</image:title>
     </image:image>
   </url>
   <url>
-    <loc>https://admin.yonoappdex.com/responsibility</loc>
-    <lastmod>2026-11-02T14:34:52+00:00</lastmod>
+    <loc>http://localhost:3000/responsibility</loc>
+    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
     <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_512/v1793499107/vvqemcm3gkjsko5m6unw.png</image:loc>
-      <image:title>YonoappDex - Responsible Gaming</image:title>
+      <image:loc>http://localhost:3000/logo.png</image:loc>
+      <image:title>Responsible Gaming</image:title>
     </image:image>
   </url>
   <url>
-    <loc>https://admin.yonoappdex.com/report-removal</loc>
-    <lastmod>2026-11-02T14:34:52+00:00</lastmod>
+    <loc>http://localhost:3000/report-removal</loc>
+    <lastmod>2026-10-29T10:08:54+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
     <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_512/v1793499107/vvqemcm3gkjsko5m6unw.png</image:loc>
-      <image:title>YonoappDex - Report &amp; Removal</image:title>
+      <image:loc>http://localhost:3000/logo.png</image:loc>
+      <image:title>Report &amp; Removal</image:title>
     </image:image>
   </url>
 </urlset>

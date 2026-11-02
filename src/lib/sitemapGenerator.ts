@@ -7,13 +7,46 @@ export interface SitemapGenOptions {
   defaultLogo?: string;
 }
 
+export const normalizeSitemapHost = (host: string): string => {
+  if (!host) return '';
+  let h = host.trim().replace(/^["']+|["']+$/g, '').replace(/\/+$/, '');
+  if (!h) return '';
+  const hasHttp = /^https?:\/\//i.test(h);
+  if (!hasHttp) h = `https://${h}`;
+  try {
+    const parsed = new URL(h);
+    parsed.hostname = parsed.hostname.toLowerCase().replace(/^(?:www\.|admin\.|masterworld\.)+/i, '');
+    const isLocal = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+    const protocol = isLocal ? parsed.protocol : 'https:';
+    return `${protocol}//${parsed.hostname}${parsed.port ? `:${parsed.port}` : ''}`;
+  } catch {
+    return h
+      .replace(/^http:\/\/(?!localhost|127\.0\.0\.1)/i, 'https://')
+      .replace(/^(https?:\/\/)(?:www\.|admin\.|masterworld\.)+/i, '$1');
+  }
+};
+
+export const enforceNonWwwXml = (xml: string): string => {
+  if (!xml) return '';
+  return xml.replace(
+    /(<(?:loc|image:loc|video:thumbnail_loc)>\s*https?:\/\/)(?:www\.|admin\.|masterworld\.)+([^<\s]+\s*<\/(?:loc|image:loc|video:thumbnail_loc)>)/gi,
+    (_, openTag, rest) => `${openTag.replace(/^<(loc|image:loc|video:thumbnail_loc)>\s*http:\/\/(?!localhost|127\.0\.0\.1)/i, '<$1>https://')}${rest}`
+  );
+};
+
 const getDefaultSitemapHost = (): string => {
   if (typeof process !== 'undefined' && process.env) {
-    const d = (process.env.PUBLIC_DOMAIN || process.env.VITE_PUBLIC_DOMAIN || '').trim().replace(/\/+$/, '');
-    if (d) return d.startsWith('http') ? d : `https://${d}`;
+    const d = (
+      process.env.PUBLIC_DOMAIN ||
+      process.env.VITE_PUBLIC_DOMAIN ||
+      process.env.SITE_DOMAIN ||
+      process.env.DOMAIN ||
+      ''
+    ).trim();
+    if (d) return normalizeSitemapHost(d);
   }
   if (typeof window !== 'undefined' && window.location?.origin) {
-    return window.location.origin.replace(/\/+$/, '');
+    return normalizeSitemapHost(window.location.origin);
   }
   return '';
 };
@@ -48,6 +81,8 @@ export const normalizeSitemapImageUrl = (
   }
   if (!candidate.startsWith('http://') && !candidate.startsWith('https://')) {
     candidate = `${cleanHost}${candidate.startsWith('/') ? '' : '/'}${candidate}`;
+  } else if (!candidate.includes('res.cloudinary.com') && !candidate.includes('img.youtube.com') && !candidate.includes('images.unsplash.com')) {
+    candidate = candidate.replace(/^(https?:\/\/)(?:www\.|admin\.|masterworld\.)+/i, '$1');
   }
   if (candidate.includes('res.cloudinary.com')) {
     return getOptimizedImageUrl(candidate, width);
@@ -116,7 +151,7 @@ export function generateMasterSitemapXml(
   host: string = getDefaultSitemapHost(),
   settings?: any
 ): string {
-  const cleanHost = host.replace(/\/$/, '');
+  const cleanHost = normalizeSitemapHost(host);
   const latestAppDate = getLatestItemDate(apps, STABLE_BASELINE_DATE);
   const latestNewsDate = getLatestItemDate(news, STABLE_BASELINE_DATE);
   const latestVideoDate = getLatestItemDate(videos, STABLE_BASELINE_DATE);
@@ -156,7 +191,7 @@ export function generateAppsSitemapXml(
   siteLogo: string = '',
   siteTitle: string = ''
 ): string {
-  const cleanHost = host.replace(/\/$/, '');
+  const cleanHost = normalizeSitemapHost(host);
   const fallbackLogo = normalizeSitemapImageUrl(siteLogo, cleanHost, 512);
   const brandTitle = siteTitle || 'Official Brand Logo';
 
@@ -240,7 +275,7 @@ export function generateNewsSitemapXml(
   siteLogo: string = '',
   siteTitle: string = ''
 ): string {
-  const cleanHost = host.replace(/\/$/, '');
+  const cleanHost = normalizeSitemapHost(host);
   const fallbackLogo = normalizeSitemapImageUrl(siteLogo, cleanHost, 512);
   const brandTitle = siteTitle || 'News & Updates';
   const publicNews = news.filter((n: any) => n && n.slug && n.sync_to_public !== false);
@@ -307,7 +342,7 @@ export function generateVideosSitemapXml(
   siteLogo: string = '',
   siteTitle: string = ''
 ): string {
-  const cleanHost = host.replace(/\/$/, '');
+  const cleanHost = normalizeSitemapHost(host);
   const now = STABLE_BASELINE_DATE;
   const fallbackLogo = normalizeSitemapImageUrl(siteLogo, cleanHost, 512);
   const brandTitle = siteTitle || 'Video Reviews';
@@ -396,7 +431,7 @@ export function generateStaticSitemapXml(
   siteLogo: string = '',
   siteTitle: string = ''
 ): string {
-  const cleanHost = host.replace(/\/$/, '');
+  const cleanHost = normalizeSitemapHost(host);
   const isObj = typeof datesOrFallback === 'object' && datesOrFallback !== null;
   const fallback = !isObj && typeof datesOrFallback === 'string'
     ? formatSitemapDate(datesOrFallback, STABLE_BASELINE_DATE)
@@ -453,7 +488,7 @@ export function generateDevelopersSitemapXml(
   siteTitle: string = '',
   developers: any[] = []
 ): string {
-  const cleanHost = host.replace(/\/$/, '');
+  const cleanHost = normalizeSitemapHost(host);
   const now = formatSitemapDate(latestDate, STABLE_BASELINE_DATE);
   const resolvedLogo = normalizeSitemapImageUrl(siteLogo, cleanHost, 512);
   const pageTitle = siteTitle ? `${siteTitle} - Developer Profiles` : 'Developer Profiles';
@@ -503,22 +538,32 @@ export function generateAllSitemaps(
   const settingsDate = formatSitemapDate(settings?.last_updated || settings?.updated_at, STABLE_BASELINE_DATE);
   const latestDevDate = getLatestItemDate(developers, STABLE_BASELINE_DATE);
 
+  const resolvedHost = normalizeSitemapHost(
+    host ||
+    settings?.site_domain ||
+    settings?.domain ||
+    settings?.public_domain ||
+    getDefaultSitemapHost()
+  );
+
   return {
-    'sitemap.xml': generateMasterSitemapXml(apps, news, videos, host, settings),
-    'sitemap-apps.xml': generateAppsSitemapXml(apps, host, siteLogo, siteTitle),
-    'sitemap-news.xml': generateNewsSitemapXml(news, host, siteLogo, siteTitle),
-    'sitemap-videos.xml': generateVideosSitemapXml(videos, host, siteLogo, siteTitle),
-    'sitemap-static.xml': generateStaticSitemapXml(
-      host,
-      {
-        latestAppDate,
-        latestNewsDate,
-        latestVideoDate,
-        settingsDate
-      },
-      siteLogo,
-      siteTitle
+    'sitemap.xml': enforceNonWwwXml(generateMasterSitemapXml(apps, news, videos, resolvedHost, settings)),
+    'sitemap-apps.xml': enforceNonWwwXml(generateAppsSitemapXml(apps, resolvedHost, siteLogo, siteTitle)),
+    'sitemap-news.xml': enforceNonWwwXml(generateNewsSitemapXml(news, resolvedHost, siteLogo, siteTitle)),
+    'sitemap-videos.xml': enforceNonWwwXml(generateVideosSitemapXml(videos, resolvedHost, siteLogo, siteTitle)),
+    'sitemap-static.xml': enforceNonWwwXml(
+      generateStaticSitemapXml(
+        resolvedHost,
+        {
+          latestAppDate,
+          latestNewsDate,
+          latestVideoDate,
+          settingsDate
+        },
+        siteLogo,
+        siteTitle
+      )
     ),
-    'sitemap-developers.xml': generateDevelopersSitemapXml(host, latestDevDate, siteLogo, siteTitle, developers)
+    'sitemap-developers.xml': enforceNonWwwXml(generateDevelopersSitemapXml(resolvedHost, latestDevDate, siteLogo, siteTitle, developers))
   };
 }

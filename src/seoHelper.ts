@@ -3,7 +3,7 @@ import path from 'path';
 import { getSafeFirebaseConfig } from './seo/firebaseConfig';
 import { syncFromFirestore, mergeItemsByTimestamp } from './seo/sync';
 import { getField, stripHtml, getYoutubeThumbnail, getOgImageUrl, isBotUserAgent, optimizeImageUrl, getAllSiteIconUrls } from './seo/utils';
-import { getCleanCanonicalUrl, formatPageTitle } from './lib/seoUtils';
+import { getCleanCanonicalUrl, formatPageTitle, normalizeNonWwwDomain } from './lib/seoUtils';
 import { resolveAppSlug, SLUG_ALIAS_MAP } from './lib/slugResolver';
 import { buildJsonLdSchema } from './seo/schemaBuilder';
 import { buildMetaTags } from './seo/metaBuilder';
@@ -205,7 +205,8 @@ export async function injectSeoTags(template: string, urlPath: string, hostUrl?:
   let news = (data.news || []).filter((n: any) => n && n.sync_to_public !== false);
   let videos = data.videos || [];
   const siteTitle = getField(settings, 'site_title') || (process.env.VITE_SITE_NAME || '').trim();
-  const baseOrigin = (hostUrl || process.env.PUBLIC_DOMAIN || process.env.VITE_PUBLIC_DOMAIN || '').trim().replace(/\/+$/, '');
+  const rawOrigin = (hostUrl || process.env.PUBLIC_DOMAIN || process.env.VITE_PUBLIC_DOMAIN || '').trim().replace(/^["']+|["']+$/g, '');
+  const baseOrigin = rawOrigin ? normalizeNonWwwDomain(rawOrigin) : '';
   let title = getField(settings, 'seo_title') || getField(settings, 'meta_title') || '';
   let description = getField(settings, 'seo_description') || getField(settings, 'meta_description', '');
   const keywords = getField(settings, 'seo_keywords', '');
@@ -540,15 +541,15 @@ export async function injectSeoTags(template: string, urlPath: string, hostUrl?:
     const rawAppCanonical = getField(targetApp, 'canonical_url');
     const expectedAppSlug = String(getField(targetApp, 'slug')).trim().toLowerCase();
     if (rawAppCanonical && typeof rawAppCanonical === 'string' && rawAppCanonical.toLowerCase().includes(`/app/${expectedAppSlug}`)) {
-      canonicalUrl = getCleanCanonicalUrl(rawAppCanonical, `/app/${expectedAppSlug}`);
+      canonicalUrl = getCleanCanonicalUrl(rawAppCanonical, `/app/${expectedAppSlug}`, baseOrigin);
     } else {
-      canonicalUrl = `${baseOrigin}/app/${expectedAppSlug}`;
+      canonicalUrl = baseOrigin ? `${baseOrigin}/app/${expectedAppSlug}` : getCleanCanonicalUrl(undefined, `/app/${expectedAppSlug}`, baseOrigin);
     }
   } else if (pageType === 'news' && targetNews) {
     const nSlug = getField(targetNews, 'slug') || getField(targetNews, 'id');
-    canonicalUrl = `${baseOrigin}/news/${nSlug}`;
+    canonicalUrl = baseOrigin ? `${baseOrigin}/news/${nSlug}` : getCleanCanonicalUrl(undefined, `/news/${nSlug}`, baseOrigin);
   } else {
-    canonicalUrl = getCleanCanonicalUrl(customCanonicalUrl, canonicalPath);
+    canonicalUrl = getCleanCanonicalUrl(customCanonicalUrl, canonicalPath, baseOrigin);
   }
 
   let pageOgImage = logoUrl;

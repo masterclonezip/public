@@ -111,36 +111,61 @@ export function cleanSettingsMetaTitles<T extends Record<string, any>>(settings:
 
 declare const __APP_BUILD_ENV__: Record<string, string> | undefined;
 
-function getConfiguredPrimaryDomain(): string {
+export function normalizeNonWwwDomain(domain: string): string {
+  if (!domain) return '';
+  let d = domain.trim().replace(/^["']+|["']+$/g, '').replace(/\/+$/, '');
+  if (!d) return '';
+  const hasHttp = /^https?:\/\//i.test(d);
+  if (!hasHttp) d = `https://${d}`;
+  try {
+    const parsed = new URL(d);
+    parsed.hostname = parsed.hostname.toLowerCase().replace(/^(?:www\.|admin\.|masterworld\.)+/i, '');
+    const isLocal = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+    const protocol = isLocal ? parsed.protocol : 'https:';
+    return `${protocol}//${parsed.hostname}${parsed.port ? `:${parsed.port}` : ''}`;
+  } catch {
+    return d
+      .replace(/^http:\/\/(?!localhost|127\.0\.0\.1)/i, 'https://')
+      .replace(/^(https?:\/\/)?(?:www\.|admin\.|masterworld\.)+/i, '$1');
+  }
+}
+
+export function getConfiguredPrimaryDomain(): string {
   try {
     if (typeof __APP_BUILD_ENV__ !== 'undefined' && __APP_BUILD_ENV__) {
-      const d = (__APP_BUILD_ENV__.PUBLIC_DOMAIN || __APP_BUILD_ENV__.VITE_PUBLIC_DOMAIN || '').trim().replace(/\/+$/, '');
-      if (d) return d.startsWith('http') ? d : `https://${d}`;
+      const d = (__APP_BUILD_ENV__.PUBLIC_DOMAIN || __APP_BUILD_ENV__.VITE_PUBLIC_DOMAIN || '').trim();
+      if (d) return normalizeNonWwwDomain(d);
     }
   } catch {
     // ignore
   }
   if (typeof process !== 'undefined' && process.env) {
-    const d = (process.env.PUBLIC_DOMAIN || process.env.VITE_PUBLIC_DOMAIN || '').trim().replace(/\/+$/, '');
-    if (d) return d.startsWith('http') ? d : `https://${d}`;
+    const d = (
+      process.env.PUBLIC_DOMAIN ||
+      process.env.VITE_PUBLIC_DOMAIN ||
+      process.env.SITE_DOMAIN ||
+      process.env.DOMAIN ||
+      ''
+    ).trim();
+    if (d) return normalizeNonWwwDomain(d);
   }
   try {
     const metaEnv = import.meta.env as Record<string, any> | undefined;
     if (metaEnv) {
-      const d = String(metaEnv.VITE_PUBLIC_DOMAIN || metaEnv.PUBLIC_DOMAIN || '').trim().replace(/\/+$/, '');
-      if (d) return d.startsWith('http') ? d : `https://${d}`;
+      const d = String(metaEnv.VITE_PUBLIC_DOMAIN || metaEnv.PUBLIC_DOMAIN || '').trim();
+      if (d) return normalizeNonWwwDomain(d);
     }
   } catch {
     // ignore
   }
   if (typeof window !== 'undefined' && window.location?.origin) {
-    return window.location.origin;
+    return normalizeNonWwwDomain(window.location.origin);
   }
   return '';
 }
 
-export function getCleanCanonicalUrl(rawUrl?: string, fallbackPath: string = '/'): string {
-  const primaryDomain = getConfiguredPrimaryDomain();
+export function getCleanCanonicalUrl(rawUrl?: string, fallbackPath: string = '/', overrideDomain?: string): string {
+  const primaryDomain = (overrideDomain ? normalizeNonWwwDomain(overrideDomain) : '') || getConfiguredPrimaryDomain();
   let input = (rawUrl || '').trim();
 
   if (!input) {
@@ -150,15 +175,23 @@ export function getCleanCanonicalUrl(rawUrl?: string, fallbackPath: string = '/'
   }
 
   if (!primaryDomain) {
-    return input.split('?')[0].split('#')[0];
+    let clean = input.split('?')[0].split('#')[0];
+    clean = clean
+      .replace(/^http:\/\/(?!localhost|127\.0\.0\.1)/i, 'https://')
+      .replace(/^(https?:\/\/)(?:www\.|admin\.|masterworld\.)+/i, '$1');
+    if (clean.length > 1 && clean.endsWith('/')) {
+      clean = clean.slice(0, -1);
+    }
+    return clean;
   }
 
   try {
     const parsed = new URL(input, primaryDomain);
     const targetDomain = new URL(primaryDomain);
 
-    parsed.hostname = targetDomain.hostname;
-    parsed.protocol = targetDomain.protocol;
+    parsed.hostname = targetDomain.hostname.toLowerCase().replace(/^(?:www\.|admin\.|masterworld\.)+/i, '');
+    const isLocal = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+    parsed.protocol = isLocal ? targetDomain.protocol : 'https:';
 
     let pathname = parsed.pathname;
     if (pathname.length > 1 && pathname.endsWith('/')) {
@@ -169,8 +202,9 @@ export function getCleanCanonicalUrl(rawUrl?: string, fallbackPath: string = '/'
   } catch {
     let clean = input.split('?')[0].split('#')[0];
     clean = clean
-      .replace(/^http:\/\//i, 'https://')
-      .replace(/^https:\/\/[^\/]+/i, primaryDomain);
+      .replace(/^http:\/\/(?!localhost|127\.0\.0\.1)/i, 'https://')
+      .replace(/^https?:\/\/[^\/]+/i, primaryDomain)
+      .replace(/^(https?:\/\/)(?:www\.|admin\.|masterworld\.)+/i, '$1');
     if (clean.length > 1 && clean.endsWith('/')) {
       clean = clean.slice(0, -1);
     }

@@ -87,6 +87,13 @@ export function compileCanonicalApp(app: any, options?: { stripDownloadLinks?: b
   copy.seo_title = cleanTitle;
   copy.meta_title = cleanTitle;
 
+  if (typeof copy.canonical_url === 'string' && copy.canonical_url.trim()) {
+    copy.canonical_url = copy.canonical_url
+      .trim()
+      .replace(/^http:\/\/(?!localhost|127\.0\.0\.1)/i, 'https://')
+      .replace(/^(https?:\/\/)(?:www\.|admin\.|masterworld\.)+/i, '$1');
+  }
+
   // Keep seo_description and meta_description strictly synchronized
   const cleanDesc = (copy.seo_description !== undefined ? copy.seo_description : (copy.meta_description || '')).trim();
   copy.seo_description = cleanDesc;
@@ -132,6 +139,12 @@ export function compileCanonicalNews(item: any, siteTitle?: string): any {
   }
   if (typeof copy.id === 'string') {
     copy.id = copy.id.trim();
+  }
+  if (typeof copy.canonical_url === 'string' && copy.canonical_url.trim()) {
+    copy.canonical_url = copy.canonical_url
+      .trim()
+      .replace(/^http:\/\/(?!localhost|127\.0\.0\.1)/i, 'https://')
+      .replace(/^(https?:\/\/)(?:www\.|admin\.|masterworld\.)+/i, '$1');
   }
   if (typeof copy.title === 'string' && copy.title.trim()) {
     copy.title = formatPageTitle(copy.title, copy.title.trim(), siteTitle);

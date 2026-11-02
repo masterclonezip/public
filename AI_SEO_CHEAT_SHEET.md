@@ -7,10 +7,10 @@
 ## 1. 🔗 CANONICAL URL RULES (The "One True URL")
 **Format:** `https://example.com/<path>/<slug>`
 
-* ✅ **ALWAYS:** Use `https://example.com/app/callbreak`
+* ✅ **ALWAYS Non-WWW:** Use `https://example.com/app/callbreak`
 * ❌ **NEVER Trailing Slash:** `https://example.com/app/callbreak/` (Fails canonical match, triggers duplicate content penalty)
 * ❌ **NEVER Query Params:** `https://example.com/app/callbreak?ref=search` (Dilutes SEO rank)
-* ❌ **NEVER Non-WWW:** `https://example.com/...` (Canonical strictly enforces `www.example.com`)
+* ❌ **NEVER WWW:** `https://www.example.com/...` (Strict 301 Permanent Redirect enforces non-www `https://example.com` to prevent duplicate indexing penalties)
 * **Where to Apply:** `<link rel="canonical" href="...">`, `sitemap.xml`, and `<meta property="og:url">`.
 
 ---

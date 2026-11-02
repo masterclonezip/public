@@ -20,17 +20,17 @@ export const TOUCH_MIN_MS = 12 as const;
 export const TOUCH_MAX_MS = 2000 as const;
 export const TOUCH_REQUIRED_EVENTS = ['ts', 'te', 'ck'] as const;
 
-export const INIT_RATE_DEVICE = { limit: 60, windowS: 60 } as const;
-export const INIT_RATE_NET = { limit: 600, windowS: 60 } as const;
+export const INIT_RATE_DEVICE = { limit: 15, windowS: 60 } as const;
+export const INIT_RATE_NET = { limit: 120, windowS: 60 } as const;
 
 export const CLEARANCE_BURST = {
-  hardCount: 12,
+  hardCount: 3,
   hardWindowMs: 2000,
-  softCount: 15,
+  softCount: 3,
   softWindowS: 10,
 } as const;
 
-export const QUARANTINE_HARD_S = 1800 as const;
+export const QUARANTINE_HARD_S = 3600 as const;
 
 export const NET_FLOOD_HARD = {
   limit: 40,
@@ -39,15 +39,15 @@ export const NET_FLOOD_HARD = {
 export const NET_COOLDOWN_S = 60 as const;
 
 export const SOFT_STRIKES_DEVICE = {
-  limit: 25,
+  limit: 5,
   windowS: 600,
-  cooldownS: 30,
+  cooldownS: 120,
 } as const;
 
 export const SOFT_STRIKES_NET = {
-  limit: 200,
+  limit: 25,
   windowS: 600,
-  cooldownS: 30,
+  cooldownS: 60,
 } as const;
 
 export const SITEVERIFY_TIMEOUT_MS = 4000 as const;

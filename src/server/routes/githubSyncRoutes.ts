@@ -107,6 +107,7 @@ githubSyncRouter.get('/api/github-sync/public-core-files', (req, res) => {
       'src/seo/renderers/staticPageRenderer.ts',
       'src/seo/renderers/videoRenderer.ts',
       'src/seo/renderers/gatewayRenderer.ts',
+      'functions/_middleware.js',
       'functions/api/[[catchall]].js',
       'api/index.js',
       'public/robots.txt',

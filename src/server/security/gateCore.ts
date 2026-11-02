@@ -882,35 +882,20 @@ export async function handleSessionInit(ctx: GateRequestContext): Promise<GateRe
   }
 
   // Gate G2 — Read or mint __Host-rd_did, check per-device quarantine & init rates
-  const isMobileFamily = family.startsWith('android-') || family.startsWith('ios-');
   let did = await verifyDidCookie(ctx.headers['cookie'], ctx.env);
   let setCookieHeader: string | undefined;
-
-  // Always mint a per-device cookie on first visit so rate limits and quarantine are strictly isolated per phone,
-  // never shared across carrier CGNAT or Wi-Fi netKey.
-  if (!did) {
-    const minted = await mintDidCookie(ctx.env);
-    if (minted) {
-      did = minted.did;
-      setCookieHeader = minted.setCookie;
-    }
-  }
 
   if (did) {
     const memExp = isolateQuarantineCache.get(did);
     if (memExp && Date.now() < memExp) {
-      if (isMobileFamily) {
-        // Never permanently lock out a real mobile browser on session-init; rotate to a fresh device session
-        isolateQuarantineCache.delete(did);
-        const reminted = await mintDidCookie(ctx.env);
-        if (reminted) {
-          did = reminted.did;
-          setCookieHeader = reminted.setCookie;
-        }
-      } else {
-        emitGateCounter(ctx.env, 'G2', 'quarantine', 'fail', family);
-        return hard404Response();
-      }
+      emitGateCounter(ctx.env, 'G2', 'quarantine', 'fail', family);
+      return hard404Response();
+    }
+  } else {
+    const minted = await mintDidCookie(ctx.env);
+    if (minted) {
+      did = minted.did;
+      setCookieHeader = minted.setCookie;
     }
   }
 
@@ -921,6 +906,8 @@ export async function handleSessionInit(ctx: GateRequestContext): Promise<GateRe
         ['GET', `softcool:did:${did}`],
         ['INCR', `init:did:${did}`],
         ['EXPIRE', `init:did:${did}`, INIT_RATE_DEVICE.windowS, 'NX'],
+        ['INCR', `init:net:${netKey}`],
+        ['EXPIRE', `init:net:${netKey}`, INIT_RATE_NET.windowS, 'NX'],
       ],
       ctx.env
     );
@@ -928,20 +915,16 @@ export async function handleSessionInit(ctx: GateRequestContext): Promise<GateRe
       emitGateCounter(ctx.env, 'G2', 'redis_error', 'fail', family);
       return softRetryResponse({ setCookie: setCookieHeader });
     }
-    const [isQuarantined, isSoftCool, didInitCount] = g2Pipe.results;
+    const [isQuarantined, isSoftCool, didInitCount, , netInitCount] = g2Pipe.results;
     if (isQuarantined) {
-      if (isMobileFamily) {
-        await runRedisPipeline([['DEL', `quarantine:${did}`]], ctx.env);
-        isolateQuarantineCache.delete(did);
-      } else {
-        isolateQuarantineCache.set(did, Date.now() + 60000);
-        emitGateCounter(ctx.env, 'G2', 'quarantine', 'fail', family);
-        return hard404Response();
-      }
+      isolateQuarantineCache.set(did, Date.now() + 60000);
+      emitGateCounter(ctx.env, 'G2', 'quarantine', 'fail', family);
+      return hard404Response();
     }
     if (
       isSoftCool ||
-      Number(didInitCount ?? 0) > INIT_RATE_DEVICE.limit
+      Number(didInitCount ?? 0) > INIT_RATE_DEVICE.limit ||
+      Number(netInitCount ?? 0) > INIT_RATE_NET.limit
     ) {
       emitGateCounter(ctx.env, 'G2', 'init_rate', 'fail', family);
       return softRetryResponse({ setCookie: setCookieHeader });
@@ -991,26 +974,17 @@ export async function handleSessionClearance(ctx: GateRequestContext): Promise<G
     return hard404Response();
   }
   const family = g1.family;
-  const isMobileFamily = family.startsWith('android-') || family.startsWith('ios-');
   emitGateCounter(ctx.env, 'G1', 'edge', 'pass', family);
 
   // --------------------------------------------------------------------------
   // Gate G2 — Per-Device Quarantine & Burst (< 1 ms)
   // --------------------------------------------------------------------------
-  let did = await verifyDidCookie(ctx.headers['cookie'], ctx.env);
-  let setCookieHeader: string | undefined;
-
-  if (!did && isMobileFamily) {
-    const minted = await mintDidCookie(ctx.env);
-    if (minted) {
-      did = minted.did;
-      setCookieHeader = minted.setCookie;
-    }
-  }
+  const did = await verifyDidCookie(ctx.headers['cookie'], ctx.env);
+  const setCookieHeader: string | undefined = undefined;
 
   if (did) {
     const memExp = isolateQuarantineCache.get(did);
-    if (memExp && Date.now() < memExp && !isMobileFamily) {
+    if (memExp && Date.now() < memExp) {
       emitGateCounter(ctx.env, 'G2', 'quarantine', 'fail', family);
       return hard404Response();
     }
@@ -1028,32 +1002,30 @@ export async function handleSessionClearance(ctx: GateRequestContext): Promise<G
     );
     if (!g2Pipe.ok) {
       emitGateCounter(ctx.env, 'G2', 'redis_error', 'fail', family);
-      return softRetryResponse({ setCookie: setCookieHeader });
+      return softRetryResponse();
     }
     const [isQuarantined, isSoftCool, burst2s, , burst10s] = g2Pipe.results;
-    if (isQuarantined && !isMobileFamily) {
+    if (isQuarantined) {
       isolateQuarantineCache.set(did, Date.now() + 60000);
       emitGateCounter(ctx.env, 'G2', 'quarantine', 'fail', family);
       return hard404Response();
     }
     if (Number(burst2s ?? 0) >= CLEARANCE_BURST.hardCount) {
       emitGateCounter(ctx.env, 'G2', 'burst_hard', 'fail', family);
-      if (isMobileFamily) {
-        return softRetryResponse({ setCookie: setCookieHeader });
-      }
       await recordHardFailure(did, netKey, ctx.env, true);
       return hard404Response();
     }
     if (isSoftCool || Number(burst10s ?? 0) > CLEARANCE_BURST.softCount) {
       emitGateCounter(ctx.env, 'G2', 'burst_soft', 'fail', family);
       await recordSoftStrike(did, netKey, ctx.env);
-      return softRetryResponse({ setCookie: setCookieHeader });
+      return softRetryResponse();
     }
   } else {
-    // Cookie-less client: governed by net burst ceiling (never block shared mobile CGNAT via netcool)
+    // Cookie-less client: governed by net burst ceiling & netcool
     const g2Pipe = await runRedisPipeline(
       [
         ['GET', `netcool:${netKey}`],
+        ['GET', `softcool:net:${netKey}`],
         ['INCR', `burst2s:net:${netKey}`],
         ['PEXPIRE', `burst2s:net:${netKey}`, CLEARANCE_BURST.hardWindowMs, 'NX'],
         ['INCR', `burst10s:net:${netKey}`],
@@ -1065,20 +1037,17 @@ export async function handleSessionClearance(ctx: GateRequestContext): Promise<G
       emitGateCounter(ctx.env, 'G2', 'redis_error', 'fail', family);
       return softRetryResponse();
     }
-    const [isNetCool, burst2s, , burst10s] = g2Pipe.results;
-    if (isNetCool && !isMobileFamily) {
+    const [isNetCool, isNetSoftCool, burst2s, , burst10s] = g2Pipe.results;
+    if (isNetCool) {
       emitGateCounter(ctx.env, 'G2', 'netcool', 'fail', family);
       return hard404Response();
     }
-    if (Number(burst2s ?? 0) >= CLEARANCE_BURST.hardCount * 4) {
+    if (Number(burst2s ?? 0) >= CLEARANCE_BURST.hardCount) {
       emitGateCounter(ctx.env, 'G2', 'burst_net_hard', 'fail', family);
-      if (isMobileFamily) {
-        return softRetryResponse();
-      }
       await recordHardFailure(null, netKey, ctx.env, false);
       return hard404Response();
     }
-    if (Number(burst10s ?? 0) > CLEARANCE_BURST.softCount * 4) {
+    if (isNetSoftCool || Number(burst10s ?? 0) > CLEARANCE_BURST.softCount) {
       emitGateCounter(ctx.env, 'G2', 'burst_net_soft', 'fail', family);
       await recordSoftStrike(null, netKey, ctx.env);
       return softRetryResponse();
@@ -1408,13 +1377,8 @@ export async function handleSessionClearance(ctx: GateRequestContext): Promise<G
   const evList = typeof tap.ev === 'string' ? tap.ev.split(',').map((s: string) => s.trim()) : [];
   const idxTs = evList.indexOf('ts');
   const idxTe = evList.indexOf('te');
-  const idxPd = evList.indexOf('pd');
-  const idxPu = evList.indexOf('pu');
   const idxCk = evList.indexOf('ck');
   const hasTsTeCk = idxTs !== -1 && idxTe !== -1 && idxCk !== -1 && idxTs < idxTe && idxTe < idxCk;
-  const hasPdPuCk = idxPd !== -1 && idxPu !== -1 && idxCk !== -1 && idxPd < idxPu && idxPu <= idxCk;
-  const hasTouchGesture = (idxTs !== -1 || idxPd !== -1) && idxCk !== -1;
-  const causalEventsOk = hasTsTeCk || hasPdPuCk || hasTouchGesture;
 
   const duration = Number(tap.d);
   const coordX = Number(tap.x);
@@ -1422,25 +1386,22 @@ export async function handleSessionClearance(ctx: GateRequestContext): Promise<G
   const mtpCount = Number(tap.mtp);
 
   const g5CoreOk =
-    tap.pt !== 'mouse' &&
+    tap.pt === 'touch' &&
     mtpCount >= 1 &&
-    (tap.coarse === 1 || mtpCount >= 1) &&
-    causalEventsOk &&
+    tap.coarse === 1 &&
+    hasTsTeCk &&
     Number.isFinite(duration) &&
-    duration >= 0 &&
+    duration >= TOUCH_MIN_MS &&
     duration <= TOUCH_MAX_MS &&
-    ((Number.isFinite(coordX) && coordX > 0) || (Number.isFinite(coordY) && coordY > 0));
+    Number.isFinite(coordX) &&
+    coordX > 0 &&
+    Number.isFinite(coordY) &&
+    coordY > 0;
 
   if (!g5CoreOk) {
     emitGateCounter(ctx.env, 'G5', 'touch_core', 'fail', family);
-    // Desktop mouse pointer or zero touch points => immediate Hard 404
-    if (tap.pt === 'mouse' || mtpCount < 1) {
-      await recordHardFailure(did, netKey, ctx.env, !isMobileFamily);
-      return paddedHard404Response();
-    }
-    // Real touch hardware with transient event/duration anomaly => Soft retry with strike
-    await recordSoftStrike(did, netKey, ctx.env);
-    return softRetryResponse({ setCookie: setCookieHeader });
+    await recordHardFailure(did, netKey, ctx.env, false);
+    return paddedHard404Response();
   }
 
   // G5 Shadow extras (counters only)
@@ -1472,218 +1433,162 @@ export async function handleSessionClearance(ctx: GateRequestContext): Promise<G
     return paddedHard404Response();
   }
 
-  // 2. Turnstile siteverify or Hardware-Committed Proof (HWPROOF.<nonce>.<hw>)
+  // 2. Turnstile siteverify (§5.7 G6)
   const rawHost = (ctx.headers['x-forwarded-host'] || ctx.headers['host'] || '')
     .split(',')[0]
     .trim()
     .toLowerCase()
     .split(':')[0];
-  const pubDomain = (ctx.env.PUBLIC_DOMAIN || ctx.env.VITE_PUBLIC_DOMAIN || '').trim();
-  let configuredBareHost = '';
-  if (pubDomain) {
-    try {
-      configuredBareHost = new URL(
-        pubDomain.startsWith('http') ? pubDomain : `https://${pubDomain}`
-      ).hostname
-        .toLowerCase()
-        .replace(/^www\./, '');
-    } catch {
-      // ignore
-    }
-  }
-  const isPreviewOrCloneHost =
+  const isLocalOrRunAppPreview =
     ctx.env.STRICT_HOST_CHECK !== '1' &&
-    (rawHost.endsWith('.pages.dev') ||
-      rawHost.endsWith('.vercel.app') ||
-      rawHost.endsWith('.run.app') ||
-      rawHost === 'localhost' ||
-      rawHost === '127.0.0.1');
+    (rawHost === 'localhost' ||
+      rawHost === '127.0.0.1' ||
+      rawHost === '[::1]' ||
+      rawHost.endsWith('.run.app'));
   const isProdDomain =
     ctx.env.STRICT_HOST_CHECK === '1' ||
-    (!isPreviewOrCloneHost &&
-      Boolean(configuredBareHost) &&
-      (rawHost === configuredBareHost ||
-        rawHost === `www.${configuredBareHost}` ||
-        rawHost.endsWith(`.${configuredBareHost}`)));
+    !isLocalOrRunAppPreview;
 
-  // Check if client submitted a Hardware-Committed Proof token (HWPROOF.<nonce>.<hw>)
-  // when Turnstile widget is unconfigured, domain-restricted (110200), or blocked on mobile carrier.
-  // Because G1 (mobile UA/ASN), G2 (device rate limit), G3 (HMAC nonce + server dwell >= 500ms + wb=0,hl=0,dk=0),
-  // G4 (mobile GPU silicon + ARM platform + hw hash), G5 (physical touch gesture ts->te->ck), and
-  // G6 Step 1 (single-use atomic nonce burn) have all already passed, verifying the cryptographic
-  // commitment to `nonceStr` and `hw` strictly blocks bots/replays while guaranteeing human access.
-  if (cfToken.startsWith('HWPROOF.')) {
-    const hwParts = cfToken.split('.');
-    const tokenNonce = hwParts.slice(1, -1).join('.');
-    const tokenHw = hwParts[hwParts.length - 1] || '';
-    if (
-      isMobileFamily &&
-      tokenNonce &&
-      tokenHw &&
-      timingSafeEqualStr(tokenNonce, nonceStr) &&
-      timingSafeEqualStr(tokenHw, hw)
-    ) {
-      emitGateCounter(ctx.env, 'G6', 'hwproof_fallback', 'pass', family);
-    } else {
-      emitGateCounter(ctx.env, 'G6', 'hwproof_invalid', 'fail', family);
-      await recordHardFailure(did, netKey, ctx.env, true);
-      return paddedHard404Response();
-    }
-  } else {
-    const rawSecrets = await getCandidateTurnstileSecrets(ctx.env);
-    const isNonProdDummyToken =
-      !isProdDomain &&
-      ctx.env.STRICT_HOST_CHECK !== '1' &&
-      !ctx.env.TURNSTILE_SITEVERIFY_URL &&
-      cfToken.includes('DUMMY.TOKEN');
+  const rawSecrets = await getCandidateTurnstileSecrets(ctx.env);
+  const isNonProdDummyToken =
+    !isProdDomain &&
+    ctx.env.STRICT_HOST_CHECK !== '1' &&
+    !ctx.env.TURNSTILE_SITEVERIFY_URL &&
+    cfToken.includes('DUMMY.TOKEN');
 
-    if (isNonProdDummyToken) {
-      rawSecrets.unshift('1x0000000000000000000000000000000AA');
-    } else if (
-      !isProdDomain &&
-      ctx.env.STRICT_HOST_CHECK !== '1' &&
-      rawSecrets.length === 0 &&
-      !ctx.env.TURNSTILE_SITEVERIFY_URL
-    ) {
-      rawSecrets.push('1x0000000000000000000000000000000AA');
-    }
+  if (isNonProdDummyToken) {
+    rawSecrets.unshift('1x0000000000000000000000000000000AA');
+  } else if (
+    !isProdDomain &&
+    ctx.env.STRICT_HOST_CHECK !== '1' &&
+    rawSecrets.length === 0 &&
+    !ctx.env.TURNSTILE_SITEVERIFY_URL
+  ) {
+    rawSecrets.push('1x0000000000000000000000000000000AA');
+  }
 
-    // Filter out dummy test keys on production domains
-    const validSecrets = rawSecrets.filter(
-      (s) => s && !(isProdDomain && s.startsWith('1x00000000000000000000'))
-    );
+  // Filter out dummy test keys on production domains (§5.7 G6.3 & §7)
+  const validSecrets = rawSecrets.filter(
+    (s) => s && !(isProdDomain && s.startsWith('1x00000000000000000000'))
+  );
 
-    if (validSecrets.length === 0) {
-      if (isMobileFamily) {
-        emitGateCounter(ctx.env, 'G6', 'secret_unconfigured_mobile_pass', 'pass', family);
-      } else {
-        emitGateCounter(ctx.env, 'G6', 'secret-missing', 'fail', family);
-        await recordSoftStrike(did, netKey, ctx.env);
-        return softRetryResponse();
+  // §5.7 G6.3: Secret missing/empty => fail closed (SOFT + alert counter).
+  if (validSecrets.length === 0) {
+    emitGateCounter(ctx.env, 'G6', 'secret-missing', 'fail', family);
+    await recordSoftStrike(did, netKey, ctx.env);
+    return softRetryResponse({ setCookie: setCookieHeader });
+  }
+
+  const svEndpoint =
+    ctx.env.TURNSTILE_SITEVERIFY_URL ||
+    'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+
+  let svData: {
+    success?: boolean;
+    action?: string;
+    hostname?: string;
+    cdata?: string;
+    'error-codes'?: string[];
+  } | null = null;
+  let sawSoftTokenError = false;
+  let sawNetworkOr5xxError = false;
+
+  for (let i = 0; i < validSecrets.length; i++) {
+    const candidateSecret = validSecrets[i];
+    const svController = new AbortController();
+    const svTimer = setTimeout(() => svController.abort(), SITEVERIFY_TIMEOUT_MS);
+    try {
+      const svRes = await fetch(svEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          secret: candidateSecret,
+          response: cfToken,
+          remoteip: ctx.ip,
+        }),
+        signal: svController.signal,
+      });
+      if (svRes.status >= 500) {
+        sawNetworkOr5xxError = true;
+        continue;
       }
-    } else {
-      const svEndpoint =
-        ctx.env.TURNSTILE_SITEVERIFY_URL ||
-        'https://challenges.cloudflare.com/turnstile/v0/siteverify';
-
-      let svData: {
-        success?: boolean;
-        action?: string;
-        hostname?: string;
-        cdata?: string;
-        'error-codes'?: string[];
-      } | null = null;
-      let sawSoftTokenError = false;
-      let sawNetworkOr5xxError = false;
-
-      for (let i = 0; i < validSecrets.length; i++) {
-        const candidateSecret = validSecrets[i];
-        const svController = new AbortController();
-        const svTimer = setTimeout(() => svController.abort(), SITEVERIFY_TIMEOUT_MS);
-        try {
-          const svRes = await fetch(svEndpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              secret: candidateSecret,
-              response: cfToken,
-              remoteip: ctx.ip,
-            }),
-            signal: svController.signal,
-          });
-          if (svRes.status >= 500) {
-            sawNetworkOr5xxError = true;
-            continue;
-          }
-          svData = (await svRes.json()) as typeof svData;
-          if (svData?.success === true) {
-            break;
-          }
-          const codes = Array.isArray(svData?.['error-codes']) ? svData!['error-codes']! : [];
-          if (
-            codes.includes('timeout-or-duplicate') ||
-            codes.includes('internal-error') ||
-            codes.includes('invalid-input-response') ||
-            codes.includes('invalid-input-secret')
-          ) {
-            sawSoftTokenError = true;
-          }
-        } catch {
-          sawNetworkOr5xxError = true;
-        } finally {
-          clearTimeout(svTimer);
-        }
+      svData = (await svRes.json()) as typeof svData;
+      if (svData?.success === true) {
+        break;
       }
-
-      if (!svData || svData.success !== true) {
-        // If siteverify failed due to secret mismatch or network timeout on a verified mobile device
-        // that already passed G1..G5 + atomic nonce burn, allow progression when no custom test siteverify URL is forced.
-        if (
-          isMobileFamily &&
-          !ctx.env.TURNSTILE_SITEVERIFY_URL &&
-          (sawSoftTokenError || sawNetworkOr5xxError)
-        ) {
-          emitGateCounter(ctx.env, 'G6', 'siteverify_fallback_mobile_pass', 'pass', family);
-        } else if (sawNetworkOr5xxError) {
-          emitGateCounter(ctx.env, 'G6', 'siteverify_network', 'fail', family);
-          await recordSoftStrike(did, netKey, ctx.env);
-          return softRetryResponse();
-        } else if (isMobileFamily || sawSoftTokenError) {
-          emitGateCounter(ctx.env, 'G6', 'siteverify_soft_err', 'fail', family);
-          await recordSoftStrike(did, netKey, ctx.env);
-          return softRetryResponse({ setCookie: setCookieHeader });
-        } else {
-          emitGateCounter(ctx.env, 'G6', 'siteverify_invalid', 'fail', family);
-          await recordHardFailure(did, netKey, ctx.env, true);
-          return paddedHard404Response();
-        }
-      } else {
-        // Verify action, hostname, and cData commitment (parsed from the END: _<nid 32>_<hw 24>)
-        const svAction = String(svData.action || '');
-        const svHostname = String(svData.hostname || '').toLowerCase();
-        const svCdata = String(svData.cdata || '');
-        const allowedHosts = getAllowedHostnames(ctx.env);
-
-        let cdataValid = false;
-        if (svCdata.length >= 58) {
-          const cdataHw = svCdata.slice(-24);
-          const sep2 = svCdata.slice(-25, -24);
-          const cdataNid = svCdata.slice(-57, -25);
-          const sep1 = svCdata.slice(-58, -57);
-          const cdataAppId = svCdata.slice(0, -58);
-          if (
-            sep1 === '_' &&
-            sep2 === '_' &&
-            cdataAppId === appId &&
-            timingSafeEqualStr(cdataNid, nid) &&
-            timingSafeEqualStr(cdataHw, hw)
-          ) {
-            cdataValid = true;
-          }
-        } else if (isNonProdDummyToken && !svCdata && !svAction) {
-          cdataValid = true;
-        }
-
-        const actionValid = svAction === TURNSTILE_ACTION || (isNonProdDummyToken && !svAction);
-        const hostAllowed =
-          allowedHosts.has(svHostname) ||
-          (ctx.env.STRICT_HOST_CHECK !== '1' &&
-            (svHostname === rawHost ||
-              Boolean(cdataValid && svHostname) ||
-              svHostname.endsWith('.run.app') ||
-              svHostname.endsWith('.pages.dev') ||
-              svHostname.endsWith('.vercel.app'))) ||
-          (isNonProdDummyToken && svHostname === 'example.com');
-
-        if (!actionValid || !hostAllowed || !cdataValid) {
-          emitGateCounter(ctx.env, 'G6', 'cdata_binding', 'fail', family);
-          await recordHardFailure(did, netKey, ctx.env, false);
-          return paddedHard404Response();
-        }
-        emitGateCounter(ctx.env, 'G6', 'turnstile', 'pass', family);
+      const codes = Array.isArray(svData?.['error-codes']) ? svData!['error-codes']! : [];
+      if (
+        codes.includes('timeout-or-duplicate') ||
+        codes.includes('internal-error')
+      ) {
+        sawSoftTokenError = true;
       }
+    } catch {
+      sawNetworkOr5xxError = true;
+    } finally {
+      clearTimeout(svTimer);
     }
   }
+
+  if (!svData || svData.success !== true) {
+    if (sawNetworkOr5xxError) {
+      emitGateCounter(ctx.env, 'G6', 'siteverify_network', 'fail', family);
+      await recordSoftStrike(did, netKey, ctx.env);
+      return softRetryResponse({ setCookie: setCookieHeader });
+    }
+    if (sawSoftTokenError) {
+      emitGateCounter(ctx.env, 'G6', 'siteverify_soft_err', 'fail', family);
+      await recordSoftStrike(did, netKey, ctx.env);
+      return softRetryResponse({ setCookie: setCookieHeader });
+    }
+    emitGateCounter(ctx.env, 'G6', 'siteverify_invalid', 'fail', family);
+    await recordHardFailure(did, netKey, ctx.env, true);
+    return paddedHard404Response();
+  }
+
+  // Verify action, hostname, and cData commitment (parsed from the END: _<nid 32>_<hw 24>)
+  const svAction = String(svData.action || '');
+  const svHostname = String(svData.hostname || '').toLowerCase();
+  const svCdata = String(svData.cdata || '');
+  const allowedHosts = getAllowedHostnames(ctx.env);
+
+  let cdataValid = false;
+  if (svCdata.length >= 58) {
+    const cdataHw = svCdata.slice(-24);
+    const sep2 = svCdata.slice(-25, -24);
+    const cdataNid = svCdata.slice(-57, -25);
+    const sep1 = svCdata.slice(-58, -57);
+    const cdataAppId = svCdata.slice(0, -58);
+    if (
+      sep1 === '_' &&
+      sep2 === '_' &&
+      cdataAppId === appId &&
+      timingSafeEqualStr(cdataNid, nid) &&
+      timingSafeEqualStr(cdataHw, hw)
+    ) {
+      cdataValid = true;
+    }
+  } else if (isNonProdDummyToken && !svCdata && !svAction) {
+    cdataValid = true;
+  }
+
+  const actionValid = svAction === TURNSTILE_ACTION || (isNonProdDummyToken && !svAction);
+  const hostAllowed =
+    allowedHosts.has(svHostname) ||
+    (ctx.env.STRICT_HOST_CHECK !== '1' &&
+      (svHostname === rawHost ||
+        Boolean(cdataValid && svHostname) ||
+        svHostname.endsWith('.run.app') ||
+        svHostname.endsWith('.pages.dev') ||
+        svHostname.endsWith('.vercel.app'))) ||
+    (isNonProdDummyToken && svHostname === 'example.com');
+
+  if (!actionValid || !hostAllowed || !cdataValid) {
+    emitGateCounter(ctx.env, 'G6', 'cdata_binding', 'fail', family);
+    await recordHardFailure(did, netKey, ctx.env, false);
+    return paddedHard404Response();
+  }
+  emitGateCounter(ctx.env, 'G6', 'turnstile', 'pass', family);
 
   // --------------------------------------------------------------------------
   // Gate G7 — Late Decrypt & Dispatch (< 0.5 ms)

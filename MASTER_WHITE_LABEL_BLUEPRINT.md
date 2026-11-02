@@ -58,8 +58,8 @@ Every variable below specifies where it is required (**Admin**, **Public**, or *
 ### 3.2 Site Identity, Domain & Automatic Multi-Size Logo (**BOTH: ADMIN & PUBLIC**)
 | Variable | Where to Add | Security Type | Description |
 | :--- | :--- | :--- | :--- |
-| `PUBLIC_DOMAIN` | **BOTH** | Public / Plaintext | Server-side canonical origin URL (e.g., `https://www.example.com`). |
-| `VITE_PUBLIC_DOMAIN` | **BOTH** | Public / Plaintext | Client-side canonical origin URL (e.g., `https://www.example.com`). |
+| `PUBLIC_DOMAIN` | **BOTH** | Public / Plaintext | Server-side canonical origin URL (e.g., `https://example.com`). |
+| `VITE_PUBLIC_DOMAIN` | **BOTH** | Public / Plaintext | Client-side canonical origin URL (e.g., `https://example.com`). |
 | `ALLOWED_HOSTNAMES` | **Public** (& Admin) | Public / Plaintext | Comma-separated allowed hostnames for `/moreinfo` Gateway & CORS validation. |
 | `VITE_SITE_NAME` | **BOTH** | Public / Plaintext | Optional fallback site name before Admin Dashboard settings are saved (`""` default). |
 | `VITE_SITE_LOGO_URL` / `SITE_LOGO_URL` | **BOTH** | Public / Plaintext | Optional fallback Logo URL (Admin Panel `logo_url` overrides this when set). |

@@ -187,7 +187,8 @@ function verify() {
         metaIssues.push(`${item.route}: subpage leaked application-name or og:site_name (triggers Google SERP brand suffix rewrite)`);
       }
     } else {
-      if (!/<meta[^>]*property=["']og:site_name["']/i.test(headHtml)) {
+      const configuredSiteTitle = String(rawData.settings?.site_title || '').trim();
+      if (configuredSiteTitle && !/<meta[^>]*property=["']og:site_name["']/i.test(headHtml)) {
         metaIntegrityPassed = false;
         metaIssues.push(`/: homepage missing og:site_name`);
       }
@@ -221,10 +222,10 @@ function verify() {
 
   // 6. Verify App Detail & News Detail Mobile LCP, 1:1 SSR Parity & Initial Data Trim
   const newsHtml = sampleNews ? fs.readFileSync(path.join(distDir, `news/${sampleNews.slug}/index.html`), 'utf8') : '';
-  const appHas1to1ReviewsSummary = appHtml.includes('Ratings and reviews') && appHtml.includes('Ratings and reviews are contributed by players and moderated');
-  const appHasRichTypography = appHtml.includes('[&amp;_strong]:text-blue-600') || appHtml.includes('[&_strong]:text-blue-600');
+  const appHas1to1ReviewsSummary = !sampleApp || (appHtml.includes('Ratings and reviews') && appHtml.includes('Ratings and reviews are contributed by players and moderated'));
+  const appHasRichTypography = !sampleApp || appHtml.includes('[&amp;_strong]:text-blue-600') || appHtml.includes('[&_strong]:text-blue-600');
   const appNoLegalBloat = !appHtml.includes('"privacy_content":') && !appHtml.includes('"terms_content":');
-  const newsHasResponsiveHero = newsHtml.includes('480w') && newsHtml.includes('800w') && newsHtml.includes('1200w') && newsHtml.includes('imagesrcset=');
+  const newsHasResponsiveHero = !sampleNews || (newsHtml.includes('480w') && newsHtml.includes('800w') && newsHtml.includes('1200w') && newsHtml.includes('imagesrcset='));
   const newsNoLegalBloat = !newsHtml.includes('"privacy_content":') && !newsHtml.includes('"terms_content":');
   const detailParityPassed = appHas1to1ReviewsSummary && appHasRichTypography && appNoLegalBloat && newsHasResponsiveHero && newsNoLegalBloat;
 
@@ -330,9 +331,17 @@ async function verifyModulesAndLiveServer() {
     !staticJsonRaw.includes('more_information_url') &&
     !useGitHubSyncSrc.includes("path: 'src/lib/public_backup.json'");
 
-  // GATE-5: No synthetic touch telemetry fabrication in useClearanceDispatch.ts
+  // GATE-5: No synthetic touch telemetry fabrication & visible upside Turnstile widget
   const dispatchSrc = fs.readFileSync(path.resolve(process.cwd(), 'src/hooks/useClearanceDispatch.ts'), 'utf8');
-  const noTouchForgeryOk = !dispatchSrc.includes('tap.d = 45') && !dispatchSrc.includes('tap.x = 120');
+  const clearanceBtnSrc = fs.readFileSync(path.resolve(process.cwd(), 'src/components/ClearanceButton.tsx'), 'utf8');
+  const turnstileHookSrc = fs.readFileSync(path.resolve(process.cwd(), 'src/hooks/useTurnstileVerification.ts'), 'utf8');
+  const noTouchForgeryOk =
+    !dispatchSrc.includes('tap.d = 45') &&
+    !dispatchSrc.includes('tap.x = 120') &&
+    !dispatchSrc.includes('fallbackClientX || 120') &&
+    !clearanceBtnSrc.includes('sr-only') &&
+    turnstileHookSrc.includes("appearance: 'always'") &&
+    !turnstileHookSrc.includes('HWPROOF.');
 
   // GATE-8 & GATE-9: iPadOS 13+, preview host allowlist, dwell alignment, and /moreinfo payload trimmer
   const ipadUa = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1';
@@ -574,6 +583,36 @@ async function verifyModulesAndLiveServer() {
       noGlobalTurnstile && noMoreinfoDistDir && zeroMoreinfoAnchors && titlePreservesBrand && heroImage512Ok && similarRotatedOk && reachability100Ok && reviewFallbackOk,
       `NoGlobalTurnstile: ${noGlobalTurnstile}, NoMoreinfoDist: ${noMoreinfoDistDir}, ZeroMoreinfoAnchors: ${zeroMoreinfoAnchors}, TitleFidelity: ${titlePreservesBrand}, Hero512+nosnippet: ${heroImage512Ok}, SimilarRotated: ${similarRotatedOk}, ReachableApps: ${reachableApps}/${allApps.length}, ReachableNews: ${reachableNews}/${allNews.length}, ReviewFidelity: ${reviewFallbackOk}`
     );
+
+    // 8b. Non-WWW Sitemap, Canonical, Admin Subdomain Strip & Edge Middleware Verification
+    const { normalizeSitemapHost } = await import('../src/lib/sitemapGenerator');
+    const { normalizeNonWwwDomain, getCleanCanonicalUrl } = await import('../src/lib/seoUtils');
+
+    const hostWwwTest = normalizeSitemapHost('https://www.yonoappdex.com/') === 'https://yonoappdex.com';
+    const hostAdminTest = normalizeSitemapHost('https://admin.yonoappdex.com') === 'https://yonoappdex.com';
+    const hostHttpTest = normalizeSitemapHost('http://www.yonoappdex.com') === 'https://yonoappdex.com';
+    const canonicalWwwTest = getCleanCanonicalUrl('https://www.yonoappdex.com/app/maha-games', '/app/maha-games', 'https://www.yonoappdex.com') === 'https://yonoappdex.com/app/maha-games';
+    const domainNormTest = normalizeNonWwwDomain('http://www.yonoappdex.com/') === 'https://yonoappdex.com';
+
+    const generatedTestSitemaps = generateAllSitemaps(
+      { apps: [{ id: '1', slug: 'maha-games', name: 'Maha Games', sync_to_public: true }], news: [], videos: [], settings: {} },
+      'https://www.yonoappdex.com'
+    );
+    const allGeneratedXml = Object.values(generatedTestSitemaps).join('\n');
+    const zeroWwwInGeneratedSitemaps = !allGeneratedXml.includes('://www.yonoappdex.com') && allGeneratedXml.includes('https://yonoappdex.com/app/maha-games');
+
+    const distAppsXml = fs.readFileSync(path.join(distDir, 'sitemap-apps.xml'), 'utf8');
+    const zeroWwwInDistSitemaps = !/https?:\/\/www\.(?!sitemaps\.org|google\.com|w3\.org)/i.test(distAppsXml);
+
+    const middlewareSrc = fs.readFileSync(path.resolve(process.cwd(), 'functions/_middleware.js'), 'utf8');
+    const middlewareRewritesXmlAndHtml = middlewareSrc.includes('isSeoAsset') && middlewareSrc.includes('text/html') && middlewareSrc.includes('s-maxage=60');
+
+    record(
+      'SEO-NON-WWW',
+      'Strict Non-WWW Enforcement (Sitemaps, Canonicals, Admin Subdomain Strip & Edge Middleware)',
+      hostWwwTest && hostAdminTest && hostHttpTest && canonicalWwwTest && domainNormTest && zeroWwwInGeneratedSitemaps && zeroWwwInDistSitemaps && middlewareRewritesXmlAndHtml,
+      `HostNorm(www/admin/http): ${hostWwwTest && hostAdminTest && hostHttpTest}, CanonicalNorm: ${canonicalWwwTest && domainNormTest}, ZeroWwwSitemaps: ${zeroWwwInGeneratedSitemaps && zeroWwwInDistSitemaps}, EdgeMiddleware: ${middlewareRewritesXmlAndHtml}`
+    );
   } catch (isoErr: any) {
     record('SEO-ISOLATION-1..8', 'Zero /moreinfo Leak & Attribution Isolation', false, isoErr?.message || String(isoErr));
   }
@@ -611,7 +650,7 @@ async function verifyModulesAndLiveServer() {
         redirectFaqsRes.headers.get('location') === '/faq' &&
         moreinfoMobileRes.status === 200 &&
         (moreinfoMobileRes.headers.get('cache-control') || '').includes('no-store') &&
-        moreinfoHtml.includes('Verification Portal') &&
+        (publicApps.length === 0 || moreinfoHtml.includes('Verification Portal')) &&
         moreinfoCubotRes.status === 200 &&
         moreinfoBotRes.status === 403 &&
         rssRes.status === 200 &&

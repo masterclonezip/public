@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
 import { injectSeoTags, fetchStoreData, cleanRootContainer } from '../src/seoHelper';
-import { generateAllSitemaps } from '../src/lib/sitemapGenerator';
+import { generateAllSitemaps, normalizeSitemapHost } from '../src/lib/sitemapGenerator';
 import { formatPageTitle } from '../src/lib/seoUtils';
 import { safeEncrypt, safeDecrypt, getAesSecret } from '../src/lib/cryptoUtils';
 
@@ -21,6 +21,41 @@ function decodeCandidateUrl(raw: unknown): string {
     return dec.trim();
   }
   return '';
+}
+
+function resolveBuildHost(settings?: any): string {
+  const envCandidate = (
+    process.env.PUBLIC_DOMAIN ||
+    process.env.VITE_PUBLIC_DOMAIN ||
+    process.env.SITE_DOMAIN ||
+    process.env.DOMAIN ||
+    settings?.site_domain ||
+    settings?.domain ||
+    settings?.public_domain ||
+    ''
+  )
+    .trim()
+    .replace(/^["']+|["']+$/g, '');
+
+  if (envCandidate) {
+    const normalized = normalizeSitemapHost(envCandidate);
+    if (normalized) return normalized;
+  }
+
+  // Fallback: inspect existing public/sitemap.xml or public/robots.txt if previously synced from Admin
+  try {
+    const publicSitemapPath = path.resolve(process.cwd(), 'public/sitemap.xml');
+    if (fs.existsSync(publicSitemapPath)) {
+      const xml = fs.readFileSync(publicSitemapPath, 'utf8');
+      const m = xml.match(/<loc>\s*(https?:\/\/[^/<]+)\/sitemap-apps\.xml\s*<\/loc>/i);
+      if (m && m[1] && !m[1].includes('localhost') && !m[1].includes('127.0.0.1')) {
+        const normalized = normalizeSitemapHost(m[1]);
+        if (normalized) return normalized;
+      }
+    }
+  } catch {}
+
+  return 'http://localhost:3000';
 }
 
 function sanitizePublicApp(app: any): any {
@@ -45,6 +80,12 @@ function sanitizePublicApp(app: any): any {
   if (typeof copy.slug === 'string') {
     copy.slug = copy.slug.trim().replace(/^\/+|\/+$/g, '');
   }
+  if (typeof copy.canonical_url === 'string' && copy.canonical_url.trim()) {
+    copy.canonical_url = copy.canonical_url
+      .trim()
+      .replace(/^http:\/\/(?!localhost|127\.0\.0\.1)/i, 'https://')
+      .replace(/^(https?:\/\/)(?:www\.|admin\.|masterworld\.)+/i, '$1');
+  }
   const rawSeoTitle = String(copy.seo_title || copy.meta_title || '').trim();
   if (rawSeoTitle) {
     const cleanTitle = formatPageTitle(rawSeoTitle, '');
@@ -60,6 +101,12 @@ function sanitizePublicNews(newsItem: any): any {
   if (typeof copy.slug === 'string') {
     copy.slug = copy.slug.trim().replace(/^\/+|\/+$/g, '');
   }
+  if (typeof copy.canonical_url === 'string' && copy.canonical_url.trim()) {
+    copy.canonical_url = copy.canonical_url
+      .trim()
+      .replace(/^http:\/\/(?!localhost|127\.0\.0\.1)/i, 'https://')
+      .replace(/^(https?:\/\/)(?:www\.|admin\.|masterworld\.)+/i, '$1');
+  }
   if (typeof copy.title === 'string' && copy.title.trim()) {
     copy.title = formatPageTitle(copy.title.trim(), '');
   }
@@ -73,7 +120,6 @@ function sanitizePublicNews(newsItem: any): any {
 }
 
 async function syncStaticDataAndSitemaps() {
-  const host = (process.env.PUBLIC_DOMAIN || process.env.VITE_PUBLIC_DOMAIN || 'http://localhost:3000').replace(/\/+$/, '');
   const publicPath = path.resolve(process.cwd(), 'public');
   const staticJsonPath = path.join(process.cwd(), 'src/lib/staticData.json');
   const secureVaultPath = path.join(process.cwd(), 'src/lib/secureVault.ts');
@@ -206,25 +252,34 @@ async function syncStaticDataAndSitemaps() {
     }
   }
 
+  const host = resolveBuildHost(publicSettings);
   if (fs.existsSync(publicPath)) {
-    const sitemaps = generateAllSitemaps({ ...data, apps: publicApps, news: publicNews }, host);
+    const sitemaps = generateAllSitemaps({ ...data, apps: publicApps, news: publicNews, settings: publicSettings }, host);
     for (const [filename, xmlContent] of Object.entries(sitemaps)) {
       const xmlStr = xmlContent as string;
-      const gzBuffer = zlib.gzipSync(Buffer.from(xmlStr, 'utf-8'), { level: 9 });
       try {
         fs.writeFileSync(path.join(publicPath, filename), xmlStr, 'utf-8');
-        fs.writeFileSync(path.join(publicPath, `${filename}.gz`), gzBuffer);
+        const oldGz = path.join(publicPath, `${filename}.gz`);
+        if (fs.existsSync(oldGz)) {
+          fs.unlinkSync(oldGz);
+        }
       } catch (e) {}
     }
   }
 
-  return { ...data, apps: publicApps, news: publicNews };
+  return { ...data, apps: publicApps, news: publicNews, settings: publicSettings };
 }
 
 async function prerender() {
   if (process.argv.includes('--sync-only')) {
     console.log('Running pre-build Firestore staticData & sitemap sync...');
     await syncStaticDataAndSitemaps();
+    return;
+  }
+
+  // If running inside the isolated Admin repository (where public pages like Home.tsx are removed), skip public prerender
+  if (!fs.existsSync(path.resolve(process.cwd(), 'src/pages/Home.tsx'))) {
+    console.log('Admin-only build detected — skipping public SEO prerendering.');
     return;
   }
 
@@ -238,7 +293,6 @@ async function prerender() {
   }
   
   try {
-    const HOST = (process.env.PUBLIC_DOMAIN || process.env.VITE_PUBLIC_DOMAIN || 'http://localhost:3000').replace(/\/+$/, '');
     let originalTemplate = cleanRootContainer(fs.readFileSync(indexHtmlPath, 'utf-8'));
 
     // Inline compiled Vite CSS directly into <head> to eliminate render-blocking CSS network round-trips and prevent FOUC (A1, A2, A10)
@@ -261,6 +315,7 @@ async function prerender() {
     fs.writeFileSync(path.join(distPath, 'index.spa.html'), originalTemplate, 'utf-8');
 
     const data = await syncStaticDataAndSitemaps();
+    const HOST = resolveBuildHost(data.settings);
     
     // Helper to generate both directory index.html and direct .html file for any route
     const generateRoute = async (routePath: string) => {
@@ -388,7 +443,7 @@ async function prerender() {
     await generateRoute('/safety-status');
 
     // 6. Generate Master Sitemap Index (sitemap.xml), Sub-Sitemaps, and GZip (.xml.gz) companions
-    const host = (process.env.PUBLIC_DOMAIN || process.env.VITE_PUBLIC_DOMAIN || 'http://localhost:3000').replace(/\/+$/, '');
+    const host = HOST;
 
     // Remove unwanted duplicate/legacy sitemap files if present in dist
     const unwantedFiles = [
@@ -433,10 +488,16 @@ async function prerender() {
       }
     }
 
-    // 3. Copy authoritative public/robots.txt (with per-UA Disallow rules) to dist/robots.txt
+    // 3. Copy authoritative public/robots.txt (with per-UA Disallow rules) to dist/robots.txt and normalize Sitemap URLs
     const publicRobotsPath = path.join(publicPath, 'robots.txt');
     if (fs.existsSync(publicRobotsPath)) {
-      fs.copyFileSync(publicRobotsPath, path.join(distPath, 'robots.txt'));
+      let robotsTxt = fs.readFileSync(publicRobotsPath, 'utf-8');
+      if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
+        robotsTxt = robotsTxt
+          .replace(/^Sitemap:\s*https?:\/\/[^/\s]+\/([^\s]+)$/gm, `Sitemap: ${host}/$1`)
+          .replace(/^Sitemap:\s*\/([^\s]+)$/gm, `Sitemap: ${host}/$1`);
+      }
+      fs.writeFileSync(path.join(distPath, 'robots.txt'), robotsTxt, 'utf-8');
     }
     console.log('Generated sitemaps and copied robots.txt to dist');
 

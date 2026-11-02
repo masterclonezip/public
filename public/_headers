@@ -32,14 +32,14 @@
 
 # 3. Web Crawler Acceleration (Sitemaps, RSS & Robots.txt)
 /*.xml
-  Cache-Control: public, max-age=3600, s-maxage=7200, stale-while-revalidate=86400
-  CDN-Cache-Control: public, max-age=7200
-  Cloudflare-CDN-Cache-Control: public, max-age=7200
+  Cache-Control: public, max-age=0, s-maxage=60, must-revalidate
+  CDN-Cache-Control: public, max-age=60, must-revalidate
+  Cloudflare-CDN-Cache-Control: public, max-age=60, must-revalidate
 
 /robots.txt
-  Cache-Control: public, max-age=3600, s-maxage=7200
-  CDN-Cache-Control: public, max-age=7200
-  Cloudflare-CDN-Cache-Control: public, max-age=7200
+  Cache-Control: public, max-age=0, s-maxage=300, must-revalidate
+  CDN-Cache-Control: public, max-age=300, must-revalidate
+  Cloudflare-CDN-Cache-Control: public, max-age=300, must-revalidate
 
 /llms.txt
   Cache-Control: public, max-age=3600, s-maxage=7200

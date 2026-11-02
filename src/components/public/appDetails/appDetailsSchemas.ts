@@ -1,8 +1,9 @@
 import { normalizeSchemaCategory, getOptimizedImageUrl, stripHtml, cleanFaqQuestion, getDefaultOrigin } from '../../../seo/utils';
+import { normalizeNonWwwDomain } from '../../../lib/seoUtils';
 
 function resolveClientOrigin(): string {
   if (typeof window !== 'undefined' && window.location?.origin) {
-    return window.location.origin.replace(/\/+$/, '');
+    return normalizeNonWwwDomain(window.location.origin);
   }
   return getDefaultOrigin();
 }

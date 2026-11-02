@@ -9,6 +9,7 @@ import Meta from '../components/Meta';
 import { useData } from '../contexts/DataContextPublic';
 import { mockVideos as staticMockVideos } from '../lib/lightFallback';
 import { ArrowLeft, MessageSquare, Send, Calendar, ShieldAlert } from 'lucide-react';
+import { getCleanCanonicalUrl, normalizeNonWwwDomain } from '../lib/seoUtils';
 
 interface Comment {
   id: string;
@@ -149,9 +150,9 @@ export default function VideoDetailPage() {
     if (m && m[1]) return m[1];
     return urlStr.split('/').pop()?.split('?')[0] || '';
   }
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const origin = typeof window !== 'undefined' ? normalizeNonWwwDomain(window.location.origin) : '';
   const videoId = extractYoutubeId(videoItem.youtube_url);
-  const canonicalVideoUrl = videoItem.canonical_url || `${origin}/videos/${encodeURIComponent(videoItem.slug || videoItem.id)}`;
+  const canonicalVideoUrl = getCleanCanonicalUrl(videoItem.canonical_url, `/videos/${encodeURIComponent(videoItem.slug || videoItem.id)}`);
   const rawUploadDate = (videoItem as any).updated_at || videoItem.created_at || (videoItem as any).published_at || (videoItem as any).date || '2026-09-01T00:00:00.000Z';
   const parsedUploadDate = Date.parse(String(rawUploadDate));
   const uploadDateIso = !isNaN(parsedUploadDate) && parsedUploadDate > 0 ? new Date(parsedUploadDate).toISOString() : '2026-09-01T00:00:00.000Z';

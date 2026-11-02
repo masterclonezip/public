@@ -494,8 +494,8 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
 
   if (displaySimilarApps.length > 0) {
     recommendedAppsHtml = `
-      <aside data-nosnippet aria-labelledby="related-apps-heading" class="my-5 xs:my-6 px-0 text-left">
-        <div class="flex items-center justify-between gap-2 mb-3 px-1 xs:px-2 sm:px-4 md:px-6">
+      <aside data-nosnippet aria-labelledby="related-apps-heading" class="my-5 xs:my-6 px-1 xs:px-2 sm:px-4 md:px-6 text-left">
+        <div class="flex items-center justify-between gap-2 mb-3">
           <div class="flex items-center gap-2 min-w-0">
             <h2 id="related-apps-heading" class="text-base xs:text-lg sm:text-xl font-bold flex items-center gap-1.5 xs:gap-2 text-zinc-900 dark:text-zinc-100 truncate">
               <span>Similar Applications</span>
@@ -507,8 +507,8 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
             <svg class="w-3 h-3 xs:w-3.5 xs:h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
           </a>
         </div>
-        <div class="grid grid-rows-2 grid-flow-col gap-x-3 xxs:gap-x-4 xs:gap-x-5 gap-y-3 xxs:gap-y-3.5 xs:gap-y-4 overflow-x-auto pt-2.5 pb-2 snap-x snap-proximity [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-2 xs:-mx-4 px-2 xs:px-4 sm:mx-0 sm:px-0" style="-webkit-overflow-scrolling: touch;">
-          ${displaySimilarApps.map((sim) => {
+        <div class="grid grid-rows-2 grid-flow-col auto-cols-[calc((100%-1.5rem)/4)] xs:auto-cols-[calc((100%-2.25rem)/4)] sm:auto-cols-[calc((100%-5.25rem)/8)] gap-x-2 xs:gap-x-3 gap-y-3 xs:gap-y-3.5 overflow-x-auto pt-2.5 pb-2 snap-x snap-mandatory touch-pan-y overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" style="-webkit-overflow-scrolling: touch;">
+          ${displaySimilarApps.slice(0, 16).map((sim) => {
             const simName = getField(sim, 'name');
             const simSlug = getField(sim, 'slug');
             const simIcon = optimizeImageUrl(getField(sim, 'icon_url') || '', 96);
@@ -516,7 +516,7 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
             const simIsNew = checkAppIsNew(sim);
             const imgSrc = escapeHtml(simIcon);
             return `
-              <a href="/app/${encodeURIComponent(simSlug)}" class="flex flex-col items-center justify-start gap-1 xxs:gap-1.5 xs:gap-2 w-[68px] xxs:w-[76px] xs:w-[86px] sm:w-[98px] snap-start group shrink-0 active:scale-95 transition-transform duration-150 ease-out no-underline">
+              <a href="/app/${encodeURIComponent(simSlug)}" class="flex flex-col items-center justify-start gap-1 xxs:gap-1.5 xs:gap-2 w-full snap-start group shrink-0 active:scale-95 transition-transform duration-150 ease-out no-underline">
                 <div class="relative inline-block shrink-0">
                   <img src="${imgSrc}" alt="${escapeHtml(simName)}" width="86" height="86" decoding="async" fetchpriority="low" class="w-[58px] h-[58px] xxs:w-[66px] xxs:h-[66px] xs:w-[76px] xs:h-[76px] sm:w-[86px] sm:h-[86px] rounded-[24%] shadow-[0_2px_8px_rgba(0,0,0,0.08)] object-cover group-hover:scale-105 transition-transform duration-200 block pointer-events-none select-none" loading="lazy" />
                   ${simIsHot && simIsNew ? '<span class="absolute -top-1.5 -right-1.5 z-20 inline-flex items-center rounded-full overflow-hidden shadow-[0_2px_6px_rgba(0,0,0,0.25)] border border-white dark:border-zinc-900 font-black text-[7.5px] xxs:text-[8px] xs:text-[9px] uppercase tracking-wider leading-none select-none pointer-events-none"><span class="bg-[#d32f2f] text-white px-1 xs:px-1.5 py-0.5">HOT</span><span class="bg-[#008738] text-white px-1 xs:px-1.5 py-0.5">NEW</span></span>' : simIsHot ? '<span class="absolute -top-1.5 -right-1.5 z-20 bg-[#d32f2f] text-white font-black text-[7.5px] xxs:text-[8px] xs:text-[9px] px-1.5 py-0.5 rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.25)] border border-white dark:border-zinc-900 uppercase tracking-wider leading-none select-none pointer-events-none flex items-center justify-center">HOT</span>' : simIsNew ? '<span class="absolute -top-1.5 -right-1.5 z-20 bg-[#008738] text-white font-black text-[7.5px] xxs:text-[8px] xs:text-[9px] px-1.5 py-0.5 rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.25)] border border-white dark:border-zinc-900 uppercase tracking-wider leading-none select-none pointer-events-none flex items-center justify-center">NEW</span>' : ''}

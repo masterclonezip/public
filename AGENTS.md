@@ -23,7 +23,7 @@ This repository serves as the **Source of Truth** for **Platform** ([https://exa
 
 This monorepo automatically splits and synchronizes changes to two isolated external GitHub repositories on every push to `main`:
 
-1. **Dex Repository (Public Site)**: Public website repo (`www.example.com`). All admin components, backend authentication routes, vault keys, and internal scripts are **automatically removed** during sync to guarantee security.
+1. **Dex Repository (Public Site)**: Public website repo (`example.com`). All admin components, backend authentication routes, vault keys, and internal scripts are **automatically removed** during sync to guarantee security.
 2. **Masterworld Repository (Admin Control)**: Admin control repo. All user-facing public pages (`Home.tsx`, `AppDetails.tsx`), public UI components, and static assets in `/public/` are **automatically removed** during sync to keep the admin interface clean and isolated.
 
 ### Sync Rules for Adding Files

@@ -1,4 +1,4 @@
-import { ArrowRight, RefreshCw, Info, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, RefreshCw, Info } from 'lucide-react';
 import { useData } from '../contexts/DataContextPublic';
 import { useTurnstileVerification } from '../hooks/useTurnstileVerification';
 import { useClearanceDispatch } from '../hooks/useClearanceDispatch';
@@ -63,29 +63,12 @@ export default function ClearanceButton({
 
   return (
     <div className="w-full flex flex-col items-center gap-3.5 select-none">
-      {/* Clean native verification status card + isolated Turnstile container (never renders raw white "Troubleshoot" error iframes) */}
-      <div className="w-full min-h-[65px] flex items-center justify-center overflow-hidden rounded-xl relative">
+      {/* Visible Cloudflare Turnstile Widget Container (§5.5: appearance: 'always', ~65px reserved height upside above PROCEED button) */}
+      <div className="w-full min-h-[65px] flex items-center justify-center">
         <div
           ref={widgetRef}
-          className="sr-only pointer-events-none h-0 w-0 overflow-hidden opacity-0"
-          aria-hidden="true"
+          className="w-full min-h-[65px] flex items-center justify-center"
         />
-        <div className="w-full min-h-[65px] px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between shadow-xs">
-          <div className="flex items-center gap-3">
-            {isReady ? (
-              <CheckCircle2 className="w-6 h-6 text-emerald-500 shrink-0" />
-            ) : (
-              <span className="w-5 h-5 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin shrink-0" />
-            )}
-            <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-              {isReady ? 'Success!' : 'Verifying...'}
-            </span>
-          </div>
-          <div className="flex flex-col items-end text-[10px] font-bold tracking-wider uppercase text-zinc-400 dark:text-zinc-500">
-            <span>Verification</span>
-            <span className="text-[9px] font-normal normal-case text-zinc-400">Protected</span>
-          </div>
-        </div>
       </div>
 
       {/* Unavailable Package Notice (§5.7 G7 & §5.9) */}
