@@ -1,13 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
-    <loc>http://localhost:3000/</loc>
-    <lastmod>2026-09-01T00:00:00+00:00</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>1.0</priority>
+    <loc>https://admin.yonoappdex.com/app/slots-winner</loc>
+    <lastmod>2026-11-01T18:32:25+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
     <image:image>
-      <image:loc>http://localhost:3000/logo.png</image:loc>
-      <image:title>Official Brand Logo</image:title>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793553811/see8zebidhgqfnb1rz3l.png</image:loc>
+      <image:title>SLOTS WINNER</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://admin.yonoappdex.com/app/every-77</loc>
+    <lastmod>2026-11-01T17:44:41+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793546491/vtwuonharlo6opxo1nsm.webp</image:loc>
+      <image:title>EVER 777</image:title>
     </image:image>
   </url>
 </urlset>

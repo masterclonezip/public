@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
-  <ShortName>Search</ShortName>
+  <ShortName>YonoappDex</ShortName>
   <Description>Search applications</Description>
   <InputEncoding>UTF-8</InputEncoding>
-  <Url type="text/html" template="/?s={searchTerms}"/>
+  <Image width="16" height="16" type="image/png">https://res.cloudinary.com/potup3yi/image/upload/f_png,q_auto:best,w_16,h_16,c_pad,b_transparent/v1793499107/vvqemcm3gkjsko5m6unw.png</Image>
+  <Image width="32" height="32" type="image/png">https://res.cloudinary.com/potup3yi/image/upload/f_png,q_auto:best,w_32,h_32,c_pad,b_transparent/v1793499107/vvqemcm3gkjsko5m6unw.png</Image>
+  <Image width="48" height="48" type="image/png">https://res.cloudinary.com/potup3yi/image/upload/f_png,q_auto:best,w_48,h_48,c_pad,b_transparent/v1793499107/vvqemcm3gkjsko5m6unw.png</Image>
+  <Image width="512" height="512" type="image/png">https://res.cloudinary.com/potup3yi/image/upload/f_png,q_auto:best,w_512,h_512,c_pad,b_transparent/v1793499107/vvqemcm3gkjsko5m6unw.png</Image>
+  <Url type="text/html" template="https://admin.yonoappdex.com/?s={searchTerms}"/>
 </OpenSearchDescription>
