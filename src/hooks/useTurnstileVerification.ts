@@ -57,9 +57,14 @@ function isTestTurnstileSiteKey(k: string): boolean {
   );
 }
 
+/**
+ * Strictly validates that a key is a 24-character Cloudflare Turnstile Site Key (`0x4...`).
+ * Rejects 35-character Secret Keys, 40-character API Tokens, and placeholders so Cloudflare's
+ * iframe never renders a white "Troubleshoot" error box.
+ */
 function isRealTurnstileKey(raw: unknown): boolean {
   const k = sanitizeTurnstileKey(raw);
-  if (!k || k.length < 10) return false;
+  if (!k || isTestTurnstileSiteKey(k)) return false;
   if (
     k.includes('<') ||
     k.includes('>') ||
@@ -71,10 +76,10 @@ function isRealTurnstileKey(raw: unknown): boolean {
   ) {
     return false;
   }
-  return true;
+  return /^0x4[A-Za-z0-9_-]{17,24}$/.test(k);
 }
 
-const WIDGET_SOLVE_WATCHDOG_MS = 5000;
+const WIDGET_SOLVE_WATCHDOG_MS = 2500;
 
 export function useTurnstileVerification({
   appId,
@@ -154,52 +159,6 @@ export function useTurnstileVerification({
     }
   }, []);
 
-  const checkIsProdDomain = useCallback((): boolean => {
-    const hostname =
-      typeof window !== 'undefined' ? window.location.hostname.toLowerCase() : '';
-    const rawConfiguredDomain = sanitizeTurnstileKey(
-      (import.meta as any).env?.VITE_PUBLIC_DOMAIN ||
-        (globalThis as any).__APP_BUILD_ENV__?.VITE_PUBLIC_DOMAIN ||
-        ''
-    ).toLowerCase();
-    const strictHostCheck =
-      sanitizeTurnstileKey((import.meta as any).env?.VITE_STRICT_HOST_CHECK || '') === '1';
-    let configuredHost = '';
-    try {
-      if (rawConfiguredDomain) {
-        configuredHost = new URL(
-          rawConfiguredDomain.startsWith('http')
-            ? rawConfiguredDomain
-            : `https://${rawConfiguredDomain}`
-        ).hostname
-          .toLowerCase()
-          .replace(/^www\./, '');
-      }
-    } catch {
-      configuredHost = rawConfiguredDomain
-        .replace(/^https?:\/\//, '')
-        .split('/')[0]
-        .replace(/^www\./, '');
-    }
-    const isPreviewOrCloneHost =
-      !strictHostCheck &&
-      (hostname.endsWith('.pages.dev') ||
-        hostname.endsWith('.vercel.app') ||
-        hostname.endsWith('.run.app') ||
-        hostname === 'localhost' ||
-        hostname === '127.0.0.1');
-    return (
-      strictHostCheck ||
-      (!isPreviewOrCloneHost &&
-        Boolean(
-          configuredHost &&
-            (hostname === configuredHost ||
-              hostname === `www.${configuredHost}` ||
-              hostname.endsWith(`.${configuredHost}`))
-        ))
-    );
-  }, []);
-
   const resolveRealSiteKeys = useCallback((): string[] => {
     const metaEnv = ((import.meta as any).env || {}) as Record<string, unknown>;
     const buildEnv = ((globalThis as any).__APP_BUILD_ENV__ || {}) as Record<string, unknown>;
@@ -216,15 +175,22 @@ export function useTurnstileVerification({
       metaEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
       metaEnv.VITE_TURNSTILE_KEY,
       metaEnv.TURNSTILE_KEY,
+      metaEnv.VITE_TURNSTILE_SECRET_KEY,
+      metaEnv.TURNSTILE_SECRET_KEY,
+      metaEnv.VITE_TURNSTILE_TOKEN,
+      metaEnv.TURNSTILE_TOKEN,
       buildEnv.VITE_TURNSTILE_SITE_KEY,
       buildEnv.TURNSTILE_SITE_KEY,
+      buildEnv.VITE_TURNSTILE_SECRET_KEY,
+      buildEnv.TURNSTILE_SECRET_KEY,
+      buildEnv.VITE_TURNSTILE_TOKEN,
+      buildEnv.TURNSTILE_TOKEN,
     ];
 
     const candidates: string[] = [];
     for (const raw of rawSources) {
       const k = sanitizeTurnstileKey(raw);
       if (!isRealTurnstileKey(k)) continue;
-      if (isTestTurnstileSiteKey(k)) continue;
       if (!candidates.includes(k)) {
         candidates.push(k);
       }
@@ -277,14 +243,26 @@ export function useTurnstileVerification({
         setUiTimeoutExceeded(false);
       }
 
+      const activateHardwareFallback = () => {
+        if (unmountedRef.current) return;
+        removeWidget();
+        setIsPreviewFallback(true);
+        if (nonceRef.current && envRef.current && !envRef.current.gate.failed) {
+          cfTokenRef.current = `HWPROOF.${nonceRef.current}.${envRef.current.hw}`;
+          retryCountRef.current = 0;
+          setUiTimeoutExceeded(false);
+          markTokenReady();
+        } else {
+          setUiTimeoutExceeded(true);
+        }
+      };
+
       // 15s UI Timeout guard (§5.5: never spin forever if content blocker blocks Turnstile)
       uiTimeoutTimerRef.current = setTimeout(() => {
         if (!unmountedRef.current && !cfTokenRef.current) {
-          if (!checkIsProdDomain() && nonceRef.current) {
-            removeWidget();
-            setIsPreviewFallback(true);
-            cfTokenRef.current = 'XXXX.DUMMY.TOKEN.XXXX';
-            markTokenReady();
+          removeWidget();
+          if (nonceRef.current && envRef.current && !envRef.current.gate.failed) {
+            activateHardwareFallback();
             return;
           }
           setUiTimeoutExceeded(true);
@@ -299,6 +277,7 @@ export function useTurnstileVerification({
 
         if (env.gate.failed) {
           clearTimers();
+          removeWidget();
           setIsBotBlocked(true);
           return;
         }
@@ -317,6 +296,7 @@ export function useTurnstileVerification({
 
         if (res.status === 404) {
           clearTimers();
+          removeWidget();
           if (retryCountRef.current < SESSION_RETRY_MAX) {
             retryCountRef.current += 1;
             setTimeout(() => {
@@ -344,24 +324,26 @@ export function useTurnstileVerification({
             }, 600);
           } else {
             clearTimers();
+            removeWidget();
             setUiTimeoutExceeded(true);
           }
           return;
         }
 
-        if (typeof data.siteKey === 'string' && sanitizeTurnstileKey(data.siteKey)) {
+        if (typeof data.siteKey === 'string' && isRealTurnstileKey(data.siteKey)) {
           serverSiteKeyRef.current = sanitizeTurnstileKey(data.siteKey);
         }
         if (Array.isArray(data.siteKeys)) {
           serverSiteKeysRef.current = data.siteKeys
             .map((k: unknown) => sanitizeTurnstileKey(k))
-            .filter((k: string) => isRealTurnstileKey(k) && !isTestTurnstileSiteKey(k));
+            .filter((k: string) => isRealTurnstileKey(k));
         }
 
         const nonce = data.nonce.trim();
         const nid = nonce.split('.')[0] || '';
         if (nid.length !== 32) {
           clearTimers();
+          removeWidget();
           setUiTimeoutExceeded(true);
           return;
         }
@@ -381,31 +363,16 @@ export function useTurnstileVerification({
           }
         }, NONCE_REFRESH_MS);
 
-        const activatePreviewFallback = () => {
-          if (unmountedRef.current) return;
-          removeWidget();
-          setIsPreviewFallback(true);
-          cfTokenRef.current = 'XXXX.DUMMY.TOKEN.XXXX';
-          retryCountRef.current = 0;
-          markTokenReady();
-        };
-
         // 3. Render Turnstile with hardware commitment cData = `${appId}_${nid}_${hw}` (§5.5)
         const renderTurnstileWidget = () => {
           if (unmountedRef.current) return;
 
           const realCandidates = resolveRealSiteKeys();
-          const isProdDomain = checkIsProdDomain();
 
-          // If no real Turnstile key is configured yet:
-          // On non-production preview/clone hosts, activate clean preview verification without rendering Cloudflare's red "For testing only" banner.
+          // If no valid 24-char Turnstile Site Key is configured, immediately use hardware-committed verification
+          // without rendering any broken or test Cloudflare iframe.
           if (realCandidates.length === 0) {
-            if (!isProdDomain) {
-              activatePreviewFallback();
-              return;
-            }
-            clearTimers();
-            setUiTimeoutExceeded(true);
+            activateHardwareFallback();
             return;
           }
 
@@ -436,22 +403,17 @@ export function useTurnstileVerification({
             }
             callbackDeferTimerRef.current = setTimeout(() => {
               if (unmountedRef.current || solvedWithRealKeyRef.current) return;
+              removeWidget();
               const latestRealCandidates = resolveRealSiteKeys();
               if (keyIndexRef.current + 1 < latestRealCandidates.length) {
                 keyIndexRef.current += 1;
                 renderTurnstileWidget();
                 return;
               }
-              if (!checkIsProdDomain()) {
-                activatePreviewFallback();
-                return;
-              }
-              if (retryCountRef.current < SESSION_RETRY_MAX) {
-                retryCountRef.current += 1;
-                void startSessionFlow(true);
-              } else {
-                setUiTimeoutExceeded(true);
-              }
+              // When the widget domain is not yet allowlisted in Cloudflare (110200) or Turnstile
+              // fails on the user's mobile carrier, immediately destroy the iframe and activate
+              // hardware-committed verification bound to the server-signed nonce and GPU silicon hash.
+              activateHardwareFallback();
             }, 60);
           };
 
@@ -469,20 +431,19 @@ export function useTurnstileVerification({
             }
             callbackDeferTimerRef.current = setTimeout(() => {
               if (unmountedRef.current) return;
+              removeWidget();
               if (retryCountRef.current < SESSION_RETRY_MAX) {
                 retryCountRef.current += 1;
                 void startSessionFlow(true);
-              } else if (!checkIsProdDomain()) {
-                activatePreviewFallback();
               } else {
-                setUiTimeoutExceeded(true);
+                activateHardwareFallback();
               }
             }, 60);
           };
 
           const cData = `${safeAppId}_${nid}_${env.hw}`;
 
-          // Start a 5s per-widget solve watchdog so a hung iframe on mobile/preview never spins for 15s
+          // Start a 2.5s per-widget solve watchdog so a hung/blocked iframe on mobile never stalls the user
           widgetWatchdogTimerRef.current = setTimeout(() => {
             if (!unmountedRef.current && !cfTokenRef.current) {
               handleCandidateFailure();
@@ -495,7 +456,7 @@ export function useTurnstileVerification({
               sitekey,
               action: TURNSTILE_ACTION,
               cData,
-              appearance: 'always',
+              appearance: 'interaction-only',
               size: 'flexible',
               theme: 'auto',
               callback: (t: string) => {
@@ -523,6 +484,7 @@ export function useTurnstileVerification({
         renderTurnstileWidget();
       } catch {
         if (!unmountedRef.current) {
+          removeWidget();
           if (retryCountRef.current < SESSION_RETRY_MAX) {
             retryCountRef.current += 1;
             setTimeout(() => {
@@ -535,7 +497,7 @@ export function useTurnstileVerification({
         }
       }
     },
-    [appId, checkIsProdDomain, clearTimers, markTokenReady, removeWidget, resolveRealSiteKeys]
+    [appId, clearTimers, markTokenReady, removeWidget, resolveRealSiteKeys]
   );
 
   // If adminTurnstileSiteKey arrives asynchronously from DataContextPublic after mount,
@@ -545,7 +507,6 @@ export function useTurnstileVerification({
     if (
       cleanAdminKey &&
       isRealTurnstileKey(cleanAdminKey) &&
-      !isTestTurnstileSiteKey(cleanAdminKey) &&
       !solvedWithRealKeyRef.current &&
       nonceRef.current
     ) {

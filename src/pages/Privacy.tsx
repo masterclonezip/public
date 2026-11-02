@@ -36,11 +36,11 @@ export default function Privacy() {
   };
 
   return (
-    <div className="max-w-[1000px] mx-auto px-3 sm:px-6 md:px-8 py-8 sm:py-12 animate-fade-in pb-20 min-h-[70vh] text-left">
-      <div className="mb-6 sm:mb-8">
+    <div className="w-full max-w-5xl mx-auto px-1 xs:px-2 sm:px-4 py-3 sm:py-6 animate-fade-in pb-16 min-h-[70vh] text-left">
+      <div className="mb-3 sm:mb-5">
         <Link 
           to="/" 
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 hover:text-blue-600 transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Home
@@ -53,25 +53,22 @@ export default function Privacy() {
       />
 
       <div className="animate-fade-in">
-        <h1 className="text-2xl xs:text-3xl sm:text-5xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mb-4 sm:mb-6 border-b border-zinc-200 dark:border-zinc-800 pb-4">
+        <h1 className="text-xl xs:text-2xl sm:text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100 mb-2 sm:mb-3">
           Privacy Policy
         </h1>
 
-        <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mb-6 sm:mb-8">
-          <div><span className="font-semibold">Security Status:</span> Secured & Active</div>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 pb-3 sm:pb-4 mb-4 sm:mb-6 border-b border-zinc-200/80 dark:border-zinc-800/80">
+          <div><span className="font-semibold text-zinc-700 dark:text-zinc-300">Security Status:</span> Secured & Active</div>
           {mockSettings.support_email && (
-            <div><span className="font-semibold">Support Email:</span> {mockSettings.support_email}</div>
+            <div><span className="font-semibold text-zinc-700 dark:text-zinc-300">Support Email:</span> {mockSettings.support_email}</div>
           )}
         </div>
         
         <div
           onClick={handleHtmlClick}
-          className="bg-white dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-white/10 rounded-2xl sm:rounded-3xl p-4 xs:p-5 sm:p-8 md:p-10 shadow-xs overflow-hidden"
-        >
-          <div className="rich-html-boundary prose prose-zinc dark:prose-invert max-w-none text-sm sm:text-base text-zinc-700 dark:text-zinc-300 font-medium leading-relaxed">
-            <div dangerouslySetInnerHTML={{ __html: safeHtml(privacyContent) }} />
-          </div>
-        </div>
+          className="rich-html-boundary open-page-body prose prose-zinc dark:prose-invert max-w-none text-sm sm:text-base text-zinc-700 dark:text-zinc-300 font-medium leading-relaxed"
+          dangerouslySetInnerHTML={{ __html: safeHtml(privacyContent) }}
+        />
       </div>
     </div>
   );

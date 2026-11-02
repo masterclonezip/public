@@ -51,6 +51,27 @@ function isRealTurnstileKeyValue(k: unknown): k is string {
 }
 
 /**
+ * Cloudflare Turnstile Site Keys start with `0x4` and are 24 characters long (e.g. `0x4AAAAAAA...`).
+ * Secret Keys are 35 characters (`0x4...`) and Cloudflare API Tokens are 40 characters (not `0x4...`).
+ * Strict format validation prevents Secret Keys or API Tokens from ever being rendered as a widget sitekey.
+ */
+export function isValidTurnstileSiteKey(k: unknown): k is string {
+  const clean = sanitizeKey(k);
+  if (!isRealTurnstileKeyValue(clean) || isTestTurnstileKey(clean)) return false;
+  return /^0x4[A-Za-z0-9_-]{17,24}$/.test(clean);
+}
+
+/**
+ * Cloudflare Turnstile Secret Keys start with `0x4` and are 35 characters long.
+ */
+export function isValidTurnstileSecretKey(k: unknown): k is string {
+  const clean = sanitizeKey(k);
+  if (!isRealTurnstileKeyValue(clean)) return false;
+  if (isTestTurnstileKey(clean)) return true;
+  return /^0x4[A-Za-z0-9_-]{25,42}$/.test(clean);
+}
+
+/**
  * Validates that a resolved URL is an external http(s) destination and never
  * points back to the configured public domain, /moreinfo, or /gateway (loop guard per §5.8).
  */
@@ -439,19 +460,14 @@ async function resolveFromT3FirestoreRest(
   return null;
 }
 
-/**
- * Resolves all candidate public Turnstile site keys across environment variables and Admin Settings.
- * Real production keys (0x4...) always take precedence over any test keys (1x000...).
- */
-export function getCandidateTurnstileSiteKeys(
+function collectAllTurnstileEnvValues(
   env?: Record<string, string | undefined>
-): string[] {
+): unknown[] {
   const procEnv =
     typeof process !== 'undefined' && process.env
       ? (process.env as Record<string, string | undefined>)
       : {};
-  const settingsSiteKey = (bundledStaticData as any)?.settings?.turnstile_site_key;
-  const rawCandidates = [
+  return [
     env?.VITE_TURNSTILE_SITE_KEY,
     env?.TURNSTILE_SITE_KEY,
     env?.CF_TURNSTILE_SITE_KEY,
@@ -461,6 +477,18 @@ export function getCandidateTurnstileSiteKeys(
     env?.VITE_TURNSTILE_KEY,
     env?.TURNSTILE_KEY,
     env?.CLOUDFLARE_TURNSTILE_KEY,
+    env?.TURNSTILE_SECRET_KEY,
+    env?.VITE_TURNSTILE_SECRET_KEY,
+    env?.CF_TURNSTILE_SECRET_KEY,
+    env?.CLOUDFLARE_TURNSTILE_SECRET_KEY,
+    env?.TURNSTILE_SECRET,
+    env?.VITE_TURNSTILE_SECRET,
+    env?.CF_TURNSTILE_SECRET,
+    env?.CLOUDFLARE_TURNSTILE_SECRET,
+    env?.TURNSTILE_TOKEN,
+    env?.VITE_TURNSTILE_TOKEN,
+    env?.CF_TURNSTILE_TOKEN,
+    env?.CLOUDFLARE_TURNSTILE_TOKEN,
     procEnv.VITE_TURNSTILE_SITE_KEY,
     procEnv.TURNSTILE_SITE_KEY,
     procEnv.CF_TURNSTILE_SITE_KEY,
@@ -470,12 +498,38 @@ export function getCandidateTurnstileSiteKeys(
     procEnv.VITE_TURNSTILE_KEY,
     procEnv.TURNSTILE_KEY,
     procEnv.CLOUDFLARE_TURNSTILE_KEY,
+    procEnv.TURNSTILE_SECRET_KEY,
+    procEnv.VITE_TURNSTILE_SECRET_KEY,
+    procEnv.CF_TURNSTILE_SECRET_KEY,
+    procEnv.CLOUDFLARE_TURNSTILE_SECRET_KEY,
+    procEnv.TURNSTILE_SECRET,
+    procEnv.VITE_TURNSTILE_SECRET,
+    procEnv.CF_TURNSTILE_SECRET,
+    procEnv.CLOUDFLARE_TURNSTILE_SECRET,
+    procEnv.TURNSTILE_TOKEN,
+    procEnv.VITE_TURNSTILE_TOKEN,
+    procEnv.CF_TURNSTILE_TOKEN,
+    procEnv.CLOUDFLARE_TURNSTILE_TOKEN,
+  ];
+}
+
+/**
+ * Resolves all candidate public Turnstile site keys across environment variables and Admin Settings.
+ * Strictly validates the 24-character `0x4...` Site Key format so 35-character Secret Keys or 40-character
+ * API Tokens are never sent to the browser, even if Site Key and Secret Key env vars were swapped.
+ */
+export function getCandidateTurnstileSiteKeys(
+  env?: Record<string, string | undefined>
+): string[] {
+  const settingsSiteKey = (bundledStaticData as any)?.settings?.turnstile_site_key;
+  const rawCandidates = [
+    ...collectAllTurnstileEnvValues(env),
     settingsSiteKey,
   ];
   const realKeys: string[] = [];
   for (const c of rawCandidates) {
     const clean = sanitizeKey(c);
-    if (isRealTurnstileKeyValue(clean) && !isTestTurnstileKey(clean)) {
+    if (isValidTurnstileSiteKey(clean)) {
       if (!realKeys.includes(clean)) {
         realKeys.push(clean);
       }
@@ -498,7 +552,7 @@ export function getPublicTurnstileSiteKey(
 
 /**
  * Resolves all candidate Cloudflare Turnstile secret keys across:
- * 1. Environment variables (`TURNSTILE_SECRET_KEY`, `VITE_TURNSTILE_SECRET_KEY`, `CF_TURNSTILE_SECRET_KEY`, `TURNSTILE_TOKEN`, etc.)
+ * 1. Environment variables (auto-classified by 35-char `0x4...` Secret Key format across all Turnstile env vars)
  * 2. Sealed `ENCRYPTED_TURNSTILE_SECRET` in `src/lib/secureVault.ts` (zero-Firebase static edge resolution)
  * 3. Admin Settings `turnstile_secret_key` (from local or bundled `staticData.json`)
  *
@@ -508,16 +562,12 @@ export function getPublicTurnstileSiteKey(
 export async function getCandidateTurnstileSecrets(
   env?: Record<string, string | undefined>
 ): Promise<string[]> {
-  const procEnv =
-    typeof process !== 'undefined' && process.env
-      ? (process.env as Record<string, string | undefined>)
-      : {};
   const realSecrets: string[] = [];
   const testSecrets: string[] = [];
 
   const addSecret = (s: unknown) => {
     const clean = sanitizeKey(s);
-    if (!isRealTurnstileKeyValue(clean)) return;
+    if (!isValidTurnstileSecretKey(clean)) return;
     if (isTestTurnstileKey(clean)) {
       if (!testSecrets.includes(clean)) testSecrets.push(clean);
     } else {
@@ -526,33 +576,7 @@ export async function getCandidateTurnstileSecrets(
   };
 
   // 1. Always check runtime environment variables FIRST so any dashboard update is active immediately
-  const envCandidates = [
-    env?.TURNSTILE_SECRET_KEY,
-    env?.VITE_TURNSTILE_SECRET_KEY,
-    env?.CF_TURNSTILE_SECRET_KEY,
-    env?.CLOUDFLARE_TURNSTILE_SECRET_KEY,
-    env?.TURNSTILE_SECRET,
-    env?.VITE_TURNSTILE_SECRET,
-    env?.CF_TURNSTILE_SECRET,
-    env?.CLOUDFLARE_TURNSTILE_SECRET,
-    env?.TURNSTILE_TOKEN,
-    env?.VITE_TURNSTILE_TOKEN,
-    env?.CF_TURNSTILE_TOKEN,
-    env?.CLOUDFLARE_TURNSTILE_TOKEN,
-    procEnv.TURNSTILE_SECRET_KEY,
-    procEnv.VITE_TURNSTILE_SECRET_KEY,
-    procEnv.CF_TURNSTILE_SECRET_KEY,
-    procEnv.CLOUDFLARE_TURNSTILE_SECRET_KEY,
-    procEnv.TURNSTILE_SECRET,
-    procEnv.VITE_TURNSTILE_SECRET,
-    procEnv.CF_TURNSTILE_SECRET,
-    procEnv.CLOUDFLARE_TURNSTILE_SECRET,
-    procEnv.TURNSTILE_TOKEN,
-    procEnv.VITE_TURNSTILE_TOKEN,
-    procEnv.CF_TURNSTILE_TOKEN,
-    procEnv.CLOUDFLARE_TURNSTILE_TOKEN,
-  ];
-  for (const c of envCandidates) {
+  for (const c of collectAllTurnstileEnvValues(env)) {
     addSecret(c);
   }
 
@@ -571,7 +595,7 @@ export async function getCandidateTurnstileSecrets(
     if (ENCRYPTED_TURNSTILE_SECRET && typeof ENCRYPTED_TURNSTILE_SECRET === 'string') {
       const decSecret = await decryptVaultValue(ENCRYPTED_TURNSTILE_SECRET, env);
       const cleanDec = sanitizeKey(decSecret);
-      if (cleanDec && isRealTurnstileKeyValue(cleanDec) && !isTestTurnstileKey(cleanDec)) {
+      if (cleanDec && isValidTurnstileSecretKey(cleanDec) && !isTestTurnstileKey(cleanDec)) {
         cachedTurnstileSecretFromStore = {
           secret: cleanDec,
           expiresAt: Date.now() + 3_600_000,
@@ -587,7 +611,7 @@ export async function getCandidateTurnstileSecrets(
   try {
     const parsed = await loadStaticDataSnapshot();
     const sec = sanitizeKey(parsed?.settings?.turnstile_secret_key);
-    if (sec && isRealTurnstileKeyValue(sec) && !isTestTurnstileKey(sec)) {
+    if (sec && isValidTurnstileSecretKey(sec) && !isTestTurnstileKey(sec)) {
       cachedTurnstileSecretFromStore = {
         secret: sec,
         expiresAt: Date.now() + 3_600_000,

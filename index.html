@@ -12,14 +12,27 @@
     <script>
       (function() {
         try {
-          var stored = localStorage.getItem('theme');
-          var isDark = stored === 'dark' || (!stored && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-          if (isDark) {
-            document.documentElement.classList.add('dark');
-            document.documentElement.setAttribute('data-theme', 'dark');
-          } else {
-            document.documentElement.classList.remove('dark');
-            document.documentElement.setAttribute('data-theme', 'light');
+          var applyTheme = function() {
+            var stored = localStorage.getItem('theme');
+            var isDark = stored === 'dark' || (!stored && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            if (isDark) {
+              document.documentElement.classList.add('dark');
+              document.documentElement.classList.remove('light');
+              document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+              document.documentElement.classList.remove('dark');
+              if (stored === 'light') document.documentElement.classList.add('light');
+              document.documentElement.setAttribute('data-theme', 'light');
+            }
+          };
+          applyTheme();
+          if (window.matchMedia) {
+            var mq = window.matchMedia('(prefers-color-scheme: dark)');
+            if (mq.addEventListener) {
+              mq.addEventListener('change', applyTheme);
+            } else if (mq.addListener) {
+              mq.addListener(applyTheme);
+            }
           }
         } catch (_) {}
       })();

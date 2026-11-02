@@ -6,6 +6,22 @@ import zlib from 'zlib';
 import { injectSeoTags, fetchStoreData, cleanRootContainer } from '../src/seoHelper';
 import { generateAllSitemaps } from '../src/lib/sitemapGenerator';
 import { formatPageTitle } from '../src/lib/seoUtils';
+import { safeEncrypt, safeDecrypt, getAesSecret } from '../src/lib/cryptoUtils';
+
+function decodeCandidateUrl(raw: unknown): string {
+  if (!raw || typeof raw !== 'string') return '';
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    if (trimmed.includes('com.example')) return '';
+    return trimmed;
+  }
+  const dec = safeDecrypt(trimmed);
+  if (dec && (dec.startsWith('http://') || dec.startsWith('https://')) && !dec.includes('com.example')) {
+    return dec.trim();
+  }
+  return '';
+}
 
 function sanitizePublicApp(app: any): any {
   if (!app || typeof app !== 'object') return app;
@@ -60,8 +76,19 @@ async function syncStaticDataAndSitemaps() {
   const host = (process.env.PUBLIC_DOMAIN || process.env.VITE_PUBLIC_DOMAIN || 'http://localhost:3000').replace(/\/+$/, '');
   const publicPath = path.resolve(process.cwd(), 'public');
   const staticJsonPath = path.join(process.cwd(), 'src/lib/staticData.json');
+  const secureVaultPath = path.join(process.cwd(), 'src/lib/secureVault.ts');
 
-  let data = await fetchStoreData() || { apps: [], news: [], blogs: [], videos: [], settings: {} };
+  let existingEncryptedLinks = '';
+  try {
+    if (fs.existsSync(staticJsonPath)) {
+      const existingRaw = JSON.parse(fs.readFileSync(staticJsonPath, 'utf8'));
+      if (typeof existingRaw?.encrypted_links === 'string') {
+        existingEncryptedLinks = existingRaw.encrypted_links;
+      }
+    }
+  } catch {}
+
+  let data: any = await fetchStoreData() || { apps: [], news: [], blogs: [], videos: [], settings: {} };
   if (!data.apps || data.apps.length === 0) {
     try {
       if (fs.existsSync(staticJsonPath)) {
@@ -70,12 +97,84 @@ async function syncStaticDataAndSitemaps() {
           apps: rawStatic.apps || rawStatic.mockApps || [],
           news: rawStatic.news || rawStatic.mockNews || [],
           videos: rawStatic.videos || rawStatic.mockVideos || [],
-          settings: rawStatic.settings || rawStatic.mockSettings || {}
+          settings: rawStatic.settings || rawStatic.mockSettings || {},
+          encrypted_links: rawStatic.encrypted_links || ''
         };
       }
     } catch (e) {
       console.warn('Fallback staticData load error:', e);
     }
+  }
+
+  // Seal all destination links from live apps & secureLinks into AES vault map BEFORE stripping publicApps
+  const vaultMap: Record<string, string> = {};
+  if (existingEncryptedLinks) {
+    const decOld = safeDecrypt(existingEncryptedLinks);
+    if (decOld) {
+      try {
+        const parsedOld = JSON.parse(decOld);
+        if (parsedOld && typeof parsedOld === 'object' && !Array.isArray(parsedOld)) {
+          Object.assign(vaultMap, parsedOld);
+        }
+      } catch {}
+    }
+  }
+
+  if (Array.isArray(data.secureLinks)) {
+    for (const item of data.secureLinks) {
+      if (!item || typeof item !== 'object') continue;
+      const idStr = String(item.id ?? '').trim();
+      const slugStr = String(item.slug ?? '').trim();
+      const resolved =
+        decodeCandidateUrl(item.more_information_url) ||
+        decodeCandidateUrl(item.download_url) ||
+        decodeCandidateUrl(item.link) ||
+        decodeCandidateUrl(item.encrypted_link) ||
+        decodeCandidateUrl(item.url);
+      if (resolved) {
+        if (idStr) vaultMap[idStr] = resolved;
+        if (slugStr) vaultMap[slugStr] = resolved;
+      }
+    }
+  } else if (data.secureLinks && typeof data.secureLinks === 'object') {
+    for (const [k, v] of Object.entries(data.secureLinks)) {
+      const resolved = decodeCandidateUrl(v);
+      if (resolved) vaultMap[k] = resolved;
+    }
+  }
+
+  for (const app of (data.apps || [])) {
+    if (!app || typeof app !== 'object') continue;
+    const idStr = String(app.id ?? '').trim();
+    const slugStr = String(app.slug ?? '').trim();
+    const resolved =
+      decodeCandidateUrl(app.more_information_url) ||
+      decodeCandidateUrl(app.download_url) ||
+      decodeCandidateUrl(app.encrypted_link) ||
+      decodeCandidateUrl(app.encrypted_download_url) ||
+      decodeCandidateUrl(app.url);
+    if (resolved) {
+      if (idStr) vaultMap[idStr] = resolved;
+      if (slugStr) vaultMap[slugStr] = resolved;
+    }
+  }
+
+  const sealedEncryptedLinks =
+    Object.keys(vaultMap).length > 0
+      ? safeEncrypt(JSON.stringify(vaultMap), getAesSecret())
+      : existingEncryptedLinks;
+
+  if (Object.keys(vaultMap).length > 0 && fs.existsSync(secureVaultPath)) {
+    try {
+      const vaultSrc = fs.readFileSync(secureVaultPath, 'utf8');
+      const updatedVaultSrc = vaultSrc.replace(
+        /export const ENCRYPTED_LINKS = "[^"]*";/,
+        `export const ENCRYPTED_LINKS = ${JSON.stringify(sealedEncryptedLinks)};`
+      );
+      if (updatedVaultSrc !== vaultSrc) {
+        fs.writeFileSync(secureVaultPath, updatedVaultSrc, 'utf8');
+      }
+    } catch {}
   }
 
   const publicApps = (data.apps || [])
@@ -89,16 +188,19 @@ async function syncStaticDataAndSitemaps() {
   delete publicSettings.turnstile_secret_key;
 
   if (publicApps.length > 0 || publicNews.length > 0) {
-    const publicPayload = {
+    const publicPayload: Record<string, any> = {
       apps: publicApps,
       settings: publicSettings,
       news: publicNews,
       videos: data.videos || [],
       reviews: data.reviews || []
     };
+    if (sealedEncryptedLinks) {
+      publicPayload.encrypted_links = sealedEncryptedLinks;
+    }
     try {
       fs.writeFileSync(staticJsonPath, JSON.stringify(publicPayload), 'utf8');
-      console.log(`Synced live Firestore data into src/lib/staticData.json (${publicApps.length} apps, ${publicNews.length} news items).`);
+      console.log(`Synced live Firestore data into src/lib/staticData.json (${publicApps.length} apps, ${publicNews.length} news items, ${Object.keys(vaultMap).length} vault keys).`);
     } catch (e) {
       console.warn('Failed writing staticData.json:', e);
     }

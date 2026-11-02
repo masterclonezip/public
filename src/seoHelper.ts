@@ -118,7 +118,8 @@ async function doFetchStoreData() {
     settings: mergedSettings,
     news: Array.isArray(liveData?.news) ? liveData.news : (freshStatic.news || freshStatic.mockNews || []),
     videos: Array.isArray(liveData?.videos) ? liveData.videos : (freshStatic.videos || freshStatic.mockVideos || []),
-    developers: mergedSettings.developers || []
+    developers: mergedSettings.developers || [],
+    secureLinks: liveData?.secureLinks || null
   };
   
   cachedData = data;

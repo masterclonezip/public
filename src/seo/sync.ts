@@ -195,11 +195,12 @@ export async function syncFromFirestore(): Promise<any> {
         }
       }
 
-      const [pubSettingsRes, rawSettingsRes, newsRes, videosRes] = await Promise.all([
+      const [pubSettingsRes, rawSettingsRes, newsRes, videosRes, secLinksRes] = await Promise.all([
         fetch(`${baseUrl}/public_settings${apiKeyParam}`).then(r => r.ok ? r.json() : null).catch(() => null),
         fetch(`${baseUrl}/settings${apiKeyParam}`).then(r => r.ok ? r.json() : null).catch(() => null),
         fetch(`${baseUrl}/news${apiKeyParam}`).then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`${baseUrl}/videos${apiKeyParam}`).then(r => r.ok ? r.json() : null).catch(() => null)
+        fetch(`${baseUrl}/videos${apiKeyParam}`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${baseUrl}/secure_links${apiKeyParam}`).then(r => r.ok ? r.json() : null).catch(() => null)
       ]);
 
       const settingsDoc = pubSettingsRes?.fields ? pubSettingsRes : (rawSettingsRes?.fields ? rawSettingsRes : null);
@@ -224,6 +225,9 @@ export async function syncFromFirestore(): Promise<any> {
       const videosParsed = videosRes?.fields ? parseFirestoreDoc(videosRes.fields) : null;
       const videos = Array.isArray(videosParsed?.items) ? videosParsed.items : fallbackData.videos;
 
+      const secLinksParsed = secLinksRes?.fields ? parseFirestoreDoc(secLinksRes.fields) : null;
+      const secureLinks = secLinksParsed?.items || secLinksParsed?.links || secLinksParsed || null;
+
       const fromFirestore = Boolean(metaExists || anyChunkFound);
       const mergedApps = fromFirestore
         ? remoteApps
@@ -234,6 +238,7 @@ export async function syncFromFirestore(): Promise<any> {
         settings,
         news,
         videos,
+        secureLinks,
         reviews: fallbackData.reviews || [],
         fromFirestore
       };

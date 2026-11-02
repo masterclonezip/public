@@ -39,7 +39,7 @@ export default function AppAboutSection({ app, isFetching }: AppAboutSectionProp
 
   // Shared rich HTML typography class string for clean, professional rendering with bold blue highlights
   const richHtmlContentStyle = `
-    rich-html-boundary w-full text-xs xs:text-sm sm:text-base text-zinc-700 dark:text-zinc-300 leading-relaxed
+    rich-html-boundary open-page-body w-full text-xs xs:text-sm sm:text-base text-zinc-700 dark:text-zinc-300 leading-relaxed
     [&_strong]:text-blue-600 dark:[&_strong]:text-blue-400 [&_strong]:font-semibold
     [&_b]:text-blue-600 dark:[&_b]:text-blue-400 [&_b]:font-semibold
     [&_p]:mb-3 [&_p]:leading-relaxed [&_p]:text-zinc-700 dark:[&_p]:text-zinc-300
@@ -57,11 +57,11 @@ export default function AppAboutSection({ app, isFetching }: AppAboutSectionProp
   const defaultDescription = `<p>Comprehensive application profile and details for <strong>${app.name}</strong>.</p>`;
 
   return (
-    <section aria-labelledby="app-overview-heading" className="w-full my-3 px-0 sm:px-2 text-left">
-      <div className="bg-slate-50/90 dark:bg-zinc-900/80 border border-black/5 dark:border-white/5 rounded-xl sm:rounded-2xl overflow-hidden transition-all duration-300 shadow-xs">
+    <section aria-labelledby="app-overview-heading" className="w-full my-3 px-1 xs:px-2 sm:px-4 md:px-6 text-left">
+      <div className="py-4 sm:py-6 border-t border-black/5 dark:border-white/5">
         
         {/* Header Bar */}
-        <div className="w-full p-3 xs:p-3.5 sm:p-5 flex items-center justify-between text-left select-none group border-b border-black/5 dark:border-white/5">
+        <div className="w-full pb-3 xs:pb-3.5 sm:pb-4 mb-3 xs:mb-4 sm:mb-5 flex items-center justify-between text-left select-none group border-b border-black/5 dark:border-white/5">
           <div className="flex items-center gap-2 xs:gap-2.5 sm:gap-3 flex-1 pr-2 sm:pr-3">
             <div className="w-7 h-7 xs:w-8 xs:h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
               <FileText className="w-3.5 h-3.5 xs:w-4 xs:h-4 sm:w-5 sm:h-5" />
@@ -78,10 +78,10 @@ export default function AppAboutSection({ app, isFetching }: AppAboutSectionProp
         </div>
 
         {/* Content Body */}
-        <div onClick={handleHtmlClick} className="p-3 xs:p-3.5 sm:p-6 space-y-5 xs:space-y-6 sm:space-y-8 bg-white/50 dark:bg-zinc-950/40">
+        <div onClick={handleHtmlClick} className="space-y-4 xs:space-y-5 sm:space-y-6">
             
             {app.custom_admin_box_html && (
-              <div className="bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/40 rounded-xl p-3.5 sm:p-5 shadow-xs">
+              <div className="bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/40 rounded-xl p-3 sm:p-4 shadow-xs">
                 {app.custom_admin_box_heading && (
                   <h3 className="text-sm sm:text-base font-bold mb-2 text-amber-900 dark:text-amber-200">
                     {app.custom_admin_box_heading}
@@ -115,7 +115,7 @@ export default function AppAboutSection({ app, isFetching }: AppAboutSectionProp
             {app.features_html &&
               app.features_html.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim().toLowerCase() !==
               (app.description_html || '').replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim().toLowerCase() && (
-              <div className="pt-5 sm:pt-6 border-t border-black/5 dark:border-white/5">
+              <div className="pt-4 sm:pt-5 border-t border-black/5 dark:border-white/5">
                 <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 sm:mb-3">
                   Key App Features
                 </h3>
@@ -128,11 +128,11 @@ export default function AppAboutSection({ app, isFetching }: AppAboutSectionProp
             
             {/* Release Notes */}
             {app.release_notes && (
-              <div className="pt-5 sm:pt-6 border-t border-black/5 dark:border-white/5">
+              <div className="pt-4 sm:pt-5 border-t border-black/5 dark:border-white/5">
                 <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 sm:mb-3">
                   What's New in Version {app.version || 'Latest'}
                 </h3>
-                <div className="bg-slate-50 dark:bg-zinc-900 rounded-xl p-3.5 sm:p-4 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap border border-black/5 dark:border-white/5">
+                <div className="bg-slate-50 dark:bg-zinc-900 rounded-xl p-3 sm:p-4 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap border border-black/5 dark:border-white/5">
                   {app.release_notes}
                 </div>
               </div>

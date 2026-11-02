@@ -310,72 +310,87 @@ body {
   width: 100% !important;
 }
 
-/* Modern Fully Fluid Responsive Layouts & Overrides for Custom Box/Description HTML */
+/* Modern Fully Fluid Open-Page Layouts for Custom HTML & Template Sections (No Outer Body Box, Only Inner SVG Cards) */
 .rs-567-wrapper,
 .rs-jackpot-wrapper,
 .rs-portal-wrapper,
 .rs-abc-wrapper,
 .rs-club-wrapper,
 .rs-resp-wrapper,
-.rs-custom-wrapper {
+.rs-custom-wrapper,
+.rs-567-glass-card,
+.rs-jackpot-glass-card,
+.rs-portal-glass-card,
+.rs-abc-glass-card,
+.rs-club-glass-card,
+.rs-resp-glass-card,
+.rs-custom-glass-card,
+.rs-567-description,
+.rs-jackpot-description,
+.rs-abc-description,
+.rs-portal-description,
+.rs-club-description,
+.rs-resp-description {
   width: 100% !important;
   max-width: 100% !important;
-  margin: 16px 0 !important;
-  border-radius: 20px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   box-sizing: border-box !important;
 }
 
-/* Optimize paddings on desktop & laptop (min-width: 769px) for a much wider, full-screen display zone */
-@media (min-width: 769px) {
-  .rs-567-wrapper,
-  .rs-jackpot-wrapper,
-  .rs-portal-wrapper,
-  .rs-abc-wrapper,
-  .rs-club-wrapper,
-  .rs-resp-wrapper,
-  .rs-custom-wrapper {
-    padding: 10px !important; /* Extremely thin outer gap */
-    border-radius: 20px !important;
-  }
-  
-  .rs-567-glass-card,
-  .rs-jackpot-glass-card,
-  .rs-portal-glass-card,
-  .rs-abc-glass-card,
-  .rs-club-glass-card,
-  .rs-resp-glass-card,
-  .rs-custom-glass-card {
-    padding: 24px 28px !important; /* Spacious but tight inner spacing */
-    border-radius: 16px !important;
-  }
+.rs-567-description,
+.rs-jackpot-description,
+.rs-abc-description,
+.rs-portal-description,
+.rs-club-description,
+.rs-resp-description {
+  margin-bottom: 14px !important;
+  line-height: 1.65 !important;
 }
 
-/* Smartphone & Tablet Full View (max-width: 768px) - Absolutely no space wasted, 100% optimized */
+/* Strip any outer full-body wrapper div inside open-page-body or rich-html-boundary so there is never an outer box or dual background */
+.open-page-body > div:only-child:not(:has(> svg)),
+.open-page-body > section:only-child:not(:has(> svg)),
+.open-page-body > article:only-child:not(:has(> svg)),
+.open-page-body > style + div:last-child:not(:has(> svg)),
+.open-page-body > style + section:last-child:not(:has(> svg)),
+.open-page-body > style + article:last-child:not(:has(> svg)),
+.open-page-body > div:only-child:not(:has(> svg)) > div:only-child:not(:has(> svg)),
+.open-page-body > style + div:last-child:not(:has(> svg)) > div:only-child:not(:has(> svg)) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  border-radius: 0 !important;
+}
+
+/* Preserve clean styling on inner SVG feature boxes and grid cards */
+.rs-567-glass-box,
+.rs-jackpot-glass-box,
+.rs-abc-glass-box,
+.rs-portal-glass-box,
+.rs-club-glass-box,
+.rs-resp-glass-box {
+  padding: 16px 18px !important;
+  border-radius: 14px !important;
+  box-sizing: border-box !important;
+}
+
+/* Smartphone & Tablet Full View (max-width: 768px) - Zero wasted horizontal/vertical space */
 @media (max-width: 768px) {
-  .rs-567-wrapper,
-  .rs-jackpot-wrapper,
-  .rs-portal-wrapper,
-  .rs-abc-wrapper,
-  .rs-club-wrapper,
-  .rs-resp-wrapper,
-  .rs-custom-wrapper {
-    margin: 8px 0 !important;
-    padding: 4px !important; /* Minimal outer colored frame border */
-    border-radius: 14px !important;
-  }
-
-  .rs-567-glass-card,
-  .rs-jackpot-glass-card,
-  .rs-portal-glass-card,
-  .rs-abc-glass-card,
-  .rs-club-glass-card,
-  .rs-resp-glass-card,
-  .rs-custom-glass-card {
-    padding: 12px 10px !important; /* Perfect inner spacing so text is near edge */
-    border-radius: 10px !important;
-    box-shadow: none !important;
-  }
-
   /* Force multi-column layouts into robust readable single-col flows */
   .rs-567-bonus-container, 
   .rs-567-grid,
@@ -392,15 +407,15 @@ body {
     gap: 10px !important;
   }
 
-  /* Make nested inner boxes occupy a comfortable spacing line-by-line */
+  /* Make nested inner SVG boxes occupy a comfortable compact spacing line-by-line */
   .rs-567-glass-box,
   .rs-jackpot-glass-box,
   .rs-abc-glass-box,
   .rs-portal-glass-box,
   .rs-club-glass-box,
   .rs-resp-glass-box {
-    padding: 14px 12px !important;
-    border-radius: 10px !important;
+    padding: 12px 12px !important;
+    border-radius: 12px !important;
     margin-bottom: 4px !important;
   }
 
@@ -411,9 +426,9 @@ body {
   .rs-portal-header h2,
   .rs-club-header h2,
   .rs-resp-header h2 {
-    font-size: 24px !important;
-    letter-spacing: -0.5px !important;
-    line-height: 1.2 !important;
+    font-size: 22px !important;
+    letter-spacing: -0.4px !important;
+    line-height: 1.25 !important;
   }
 
   .rs-567-description,
@@ -422,11 +437,9 @@ body {
   .rs-portal-description,
   .rs-club-description,
   .rs-resp-description {
-    padding: 12px !important;
-    border-radius: 10px !important;
     line-height: 1.6 !important;
     font-size: 14px !important;
-    margin-bottom: 16px !important;
+    margin-bottom: 12px !important;
   }
 
   .rs-567-keywords,
@@ -1289,27 +1302,61 @@ body {
   color: #d4d4d8 !important;
 }
 
-.dark .rich-html-boundary [style*="background:#fff"],
-.dark .rich-html-boundary [style*="background: #fff"],
-.dark .rich-html-boundary [style*="background-color:#fff"],
-.dark .rich-html-boundary [style*="background-color: #fff"],
-.dark .rich-html-boundary [style*="background: white"],
-.dark .rich-html-boundary [style*="background-color: white"],
-.dark .rich-html-boundary [style*="background:#f"],
-.dark .rich-html-boundary [style*="background: #f"],
-.dark .rich-html-boundary [style*="background-color:#f"],
-.dark .rich-html-boundary [style*="background-color: #f"],
-.dark .prose [style*="background:#fff"],
-.dark .prose [style*="background: #fff"],
-.dark .prose [style*="background-color:#fff"],
-.dark .prose [style*="background-color: #fff"],
-.dark .prose [style*="background:#f"],
-.dark .prose [style*="background: #f"],
-.dark .prose [style*="background-color:#f"],
-.dark .prose [style*="background-color: #f"] {
-  background-color: rgba(24, 24, 27, 0.85) !important;
+/* Override dark inline text colors in dark mode so human readers & crawlers never face low contrast */
+.dark .rich-html-boundary [style*="color:#0"],
+.dark .rich-html-boundary [style*="color: #0"],
+.dark .rich-html-boundary [style*="color:#1"],
+.dark .rich-html-boundary [style*="color: #1"],
+.dark .rich-html-boundary [style*="color:#2"],
+.dark .rich-html-boundary [style*="color: #2"],
+.dark .rich-html-boundary [style*="color:#3"],
+.dark .rich-html-boundary [style*="color: #3"],
+.dark .rich-html-boundary [style*="color:#4"],
+.dark .rich-html-boundary [style*="color: #4"],
+.dark .rich-html-boundary [style*="color:black"],
+.dark .rich-html-boundary [style*="color: black"],
+.dark .prose [style*="color:#0"],
+.dark .prose [style*="color: #0"],
+.dark .prose [style*="color:#1"],
+.dark .prose [style*="color: #1"],
+.dark .prose [style*="color:#2"],
+.dark .prose [style*="color: #2"],
+.dark .prose [style*="color:#3"],
+.dark .prose [style*="color: #3"],
+.dark .prose [style*="color:#4"],
+.dark .prose [style*="color: #4"] {
   color: #e4e4e7 !important;
-  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Adapt inner feature/SVG cards with inline light backgrounds in dark mode without turning root wrappers into a sub-background box */
+.dark .rich-html-boundary :not(:only-child)[style*="background:#fff"],
+.dark .rich-html-boundary :not(:only-child)[style*="background: #fff"],
+.dark .rich-html-boundary :not(:only-child)[style*="background-color:#fff"],
+.dark .rich-html-boundary :not(:only-child)[style*="background-color: #fff"],
+.dark .rich-html-boundary :not(:only-child)[style*="background: white"],
+.dark .rich-html-boundary :not(:only-child)[style*="background-color: white"],
+.dark .rich-html-boundary :not(:only-child)[style*="background:#f"],
+.dark .rich-html-boundary :not(:only-child)[style*="background: #f"],
+.dark .rich-html-boundary :not(:only-child)[style*="background-color:#f"],
+.dark .rich-html-boundary :not(:only-child)[style*="background-color: #f"],
+.dark .prose :not(:only-child)[style*="background:#fff"],
+.dark .prose :not(:only-child)[style*="background: #fff"],
+.dark .prose :not(:only-child)[style*="background-color:#fff"],
+.dark .prose :not(:only-child)[style*="background-color: #fff"],
+.dark .prose :not(:only-child)[style*="background:#f"],
+.dark .prose :not(:only-child)[style*="background: #f"],
+.dark .prose :not(:only-child)[style*="background-color:#f"],
+.dark .prose :not(:only-child)[style*="background-color: #f"],
+.dark .rs-567-glass-box,
+.dark .rs-jackpot-glass-box,
+.dark .rs-abc-glass-box,
+.dark .rs-portal-glass-box,
+.dark .rs-club-glass-box,
+.dark .rs-resp-glass-box {
+  background: rgba(24, 24, 27, 0.65) !important;
+  background-color: rgba(24, 24, 27, 0.65) !important;
+  color: #e4e4e7 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -1348,6 +1395,18 @@ body {
   :root:not(.light) .rich-html-boundary a:not([class*="btn"]):not([class*="button"]),
   :root:not(.light) .prose a:not([class*="btn"]):not([class*="button"]) {
     color: #60a5fa !important;
+  }
+  :root:not(.light) .rich-html-boundary [style*="color:#0"],
+  :root:not(.light) .rich-html-boundary [style*="color: #0"],
+  :root:not(.light) .rich-html-boundary [style*="color:#1"],
+  :root:not(.light) .rich-html-boundary [style*="color: #1"],
+  :root:not(.light) .rich-html-boundary [style*="color:#2"],
+  :root:not(.light) .rich-html-boundary [style*="color: #2"],
+  :root:not(.light) .rich-html-boundary [style*="color:#3"],
+  :root:not(.light) .rich-html-boundary [style*="color: #3"],
+  :root:not(.light) .rich-html-boundary [style*="color:#4"],
+  :root:not(.light) .rich-html-boundary [style*="color: #4"] {
+    color: #e4e4e7 !important;
   }
 }
 
