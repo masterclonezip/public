@@ -769,17 +769,12 @@ export async function onRequest(context) {
       } catch (_) {}
     }
 
-    const resolvedSiteKey = getEnvOnlyTurnstileSiteKey(env) || getPublicTurnstileSiteKey(env);
+    const resolvedSiteKey = getEnvOnlyTurnstileSiteKey(env);
     const publicSettings = { ...settings };
     delete publicSettings.turnstile_secret_key;
     delete publicSettings._rest_admin_bypass;
     if (resolvedSiteKey && isValidTurnstileSiteKey(resolvedSiteKey)) {
       publicSettings.turnstile_site_key = resolvedSiteKey;
-    } else if (
-      publicSettings.turnstile_site_key &&
-      isValidTurnstileSiteKey(publicSettings.turnstile_site_key)
-    ) {
-      publicSettings.turnstile_site_key = String(publicSettings.turnstile_site_key).trim();
     } else {
       delete publicSettings.turnstile_site_key;
     }

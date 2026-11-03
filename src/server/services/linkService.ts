@@ -248,22 +248,6 @@ async function loadT1Vault(
 }
 
 async function loadStaticDataSnapshot(): Promise<Record<string, any> | null> {
-  try {
-    if (typeof process !== 'undefined' && typeof process.cwd === 'function') {
-      const fsMod = await import('fs').catch(() => null);
-      const pathMod = await import('path').catch(() => null);
-      if (fsMod && pathMod) {
-        const backupPath = pathMod.join(process.cwd(), 'src', 'lib', 'staticData.json');
-        if (fsMod.existsSync(backupPath)) {
-          const raw = fsMod.readFileSync(backupPath, 'utf-8');
-          const parsed = JSON.parse(raw);
-          if (parsed && typeof parsed === 'object') return parsed;
-        }
-      }
-    }
-  } catch {
-    // Fall through to bundledStaticData on Cloudflare Workers/Pages
-  }
   if (bundledStaticData && typeof bundledStaticData === 'object') {
     return bundledStaticData as Record<string, any>;
   }
@@ -277,26 +261,6 @@ async function resolveFromT2Backup(
   try {
     const data = await loadStaticDataSnapshot();
     if (!data) return null;
-
-    if (
-      data?.settings?.turnstile_secret_key &&
-      typeof data.settings.turnstile_secret_key === 'string'
-    ) {
-      cachedTurnstileSecretFromStore = {
-        secret: data.settings.turnstile_secret_key.trim(),
-        expiresAt: Date.now() + 300_000,
-      };
-    }
-    if (
-      data?.settings?.turnstile_site_key &&
-      typeof data.settings.turnstile_site_key === 'string' &&
-      isValidTurnstileSiteKey(data.settings.turnstile_site_key)
-    ) {
-      cachedTurnstileSiteKeyFromStore = {
-        siteKey: sanitizeKey(data.settings.turnstile_site_key),
-        expiresAt: Date.now() + 300_000,
-      };
-    }
 
     // 1. Check encrypted_links inside staticData.json if present
     if (data?.encrypted_links && typeof data.encrypted_links === 'string') {
@@ -424,54 +388,6 @@ function fromFirestoreRestVal(v: any): any {
     return out;
   }
   return null;
-}
-
-async function fetchTurnstileKeysFromFirestoreRest(
-  env?: Record<string, string | undefined>
-): Promise<{ siteKey?: string; secretKey?: string } | null> {
-  const cfg = getFirestoreRestConfig(env);
-  if (!cfg) return null;
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 1800);
-  try {
-    const [settingsRes, pubSettingsRes] = await Promise.all([
-      fetch(`${cfg.baseUrl}/settings${cfg.keyParam}`, { signal: controller.signal }).catch(() => null),
-      fetch(`${cfg.baseUrl}/public_settings${cfg.keyParam}`, { signal: controller.signal }).catch(() => null),
-    ]);
-    let siteKey = '';
-    let secretKey = '';
-
-    for (const r of [settingsRes, pubSettingsRes]) {
-      if (r && r.ok) {
-        const j = await r.json().catch(() => null);
-        if (j?.fields) {
-          const d = fromFirestoreRestVal({ mapValue: { fields: j.fields } }) || {};
-          const sk = sanitizeKey(d.turnstile_site_key);
-          const sec = sanitizeKey(d.turnstile_secret_key);
-          if (!siteKey && isValidTurnstileSiteKey(sk)) {
-            siteKey = sk;
-            cachedTurnstileSiteKeyFromStore = {
-              siteKey: sk,
-              expiresAt: Date.now() + 600_000,
-            };
-          }
-          if (!secretKey && isValidTurnstileSecretKey(sec) && !isTestTurnstileKey(sec)) {
-            secretKey = sec;
-            cachedTurnstileSecretFromStore = {
-              secret: sec,
-              expiresAt: Date.now() + 600_000,
-            };
-          }
-        }
-      }
-    }
-    return { siteKey, secretKey };
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 /**
@@ -615,14 +531,14 @@ function collectAllTurnstileEnvValues(
   ];
   if (env && typeof env === 'object') {
     for (const v of Object.values(env)) {
-      if (typeof v === 'string' && v.trim().replace(/^["'`]+|["'`]+$/g, '').startsWith('0x4')) {
+      if (typeof v === 'string' && sanitizeKey(v).startsWith('0x4')) {
         explicit.push(v);
       }
     }
   }
   if (procEnv && typeof procEnv === 'object') {
     for (const v of Object.values(procEnv)) {
-      if (typeof v === 'string' && v.trim().replace(/^["'`]+|["'`]+$/g, '').startsWith('0x4')) {
+      if (typeof v === 'string' && sanitizeKey(v).startsWith('0x4')) {
         explicit.push(v);
       }
     }
@@ -631,8 +547,8 @@ function collectAllTurnstileEnvValues(
 }
 
 /**
- * Resolves the primary public Turnstile site key strictly from environment variables (ignoring staticData.json).
- * Used to ensure environment variable keys always override any stale key stored in database/static settings.
+ * Resolves the primary public Turnstile site key strictly from environment variables (ignoring Firestore and staticData.json).
+ * Guarantees that deleted/stale keys in shared Firestore or staticData.json never leak into a deployment.
  */
 export function getEnvOnlyTurnstileSiteKey(
   env?: Record<string, string | undefined>
@@ -647,25 +563,14 @@ export function getEnvOnlyTurnstileSiteKey(
 }
 
 /**
- * Resolves all candidate public Turnstile site keys across environment variables and Admin Settings.
- * Strictly validates the 24-character `0x4...` Site Key format so 35-character Secret Keys or 40-character
- * API Tokens are never sent to the browser, even if Site Key and Secret Key env vars were swapped.
+ * Resolves all candidate public Turnstile site keys strictly from deployment Environment Variables.
+ * Never reads Firestore `store_data/settings` or `staticData.json` so deleted/other-domain keys cannot contaminate the widget.
  */
 export function getCandidateTurnstileSiteKeys(
   env?: Record<string, string | undefined>
 ): string[] {
-  const cachedStoreSiteKey =
-    cachedTurnstileSiteKeyFromStore && Date.now() < cachedTurnstileSiteKeyFromStore.expiresAt
-      ? cachedTurnstileSiteKeyFromStore.siteKey
-      : '';
-  const settingsSiteKey = (bundledStaticData as any)?.settings?.turnstile_site_key;
-  const rawCandidates = [
-    ...collectAllTurnstileEnvValues(env),
-    cachedStoreSiteKey,
-    settingsSiteKey,
-  ];
   const realKeys: string[] = [];
-  for (const c of rawCandidates) {
+  for (const c of collectAllTurnstileEnvValues(env)) {
     const clean = sanitizeKey(c);
     if (isValidTurnstileSiteKey(clean) && !realKeys.includes(clean)) {
       realKeys.push(clean);
@@ -675,41 +580,16 @@ export function getCandidateTurnstileSiteKeys(
 }
 
 /**
- * Async variant that resolves Turnstile site keys with Environment Variables FIRST,
- * followed by Firestore `store_data/settings` & `public_settings` as a fallback candidate.
+ * Async variant that resolves Turnstile site keys strictly from deployment Environment Variables.
  */
 export async function getCandidateTurnstileSiteKeysAsync(
   env?: Record<string, string | undefined>
 ): Promise<string[]> {
-  const envOnlyKey = getEnvOnlyTurnstileSiteKey(env);
-  const syncKeys = getCandidateTurnstileSiteKeys(env);
-  const ordered: string[] = [];
-
-  if (envOnlyKey) {
-    ordered.push(envOnlyKey);
-  }
-  for (const k of syncKeys) {
-    if (!ordered.includes(k)) ordered.push(k);
-  }
-
-  if (
-    !cachedTurnstileSiteKeyFromStore ||
-    Date.now() >= cachedTurnstileSiteKeyFromStore.expiresAt
-  ) {
-    const fsKeys = await fetchTurnstileKeysFromFirestoreRest(env);
-    if (fsKeys?.siteKey && isValidTurnstileSiteKey(fsKeys.siteKey)) {
-      if (!ordered.includes(fsKeys.siteKey)) {
-        ordered.push(fsKeys.siteKey);
-      }
-    }
-  }
-  return ordered;
+  return getCandidateTurnstileSiteKeys(env);
 }
 
 /**
- * Resolves the primary public Turnstile site key from runtime environment variables or bundled/local staticData.json
- * so `/api/v1/app/session-init` can supply it to clients even when `VITE_TURNSTILE_SITE_KEY` was added
- * in Cloudflare Pages / Vercel environment settings after build time.
+ * Resolves the primary public Turnstile site key strictly from runtime environment variables.
  */
 export function getPublicTurnstileSiteKey(
   env?: Record<string, string | undefined>
@@ -719,10 +599,8 @@ export function getPublicTurnstileSiteKey(
 }
 
 /**
- * Resolves all candidate Cloudflare Turnstile secret keys across:
- * 1. Environment variables (auto-classified by 35-char `0x4...` Secret Key format across all Turnstile env vars)
- * 2. Sealed `ENCRYPTED_TURNSTILE_SECRET` in `src/lib/secureVault.ts` (zero-Firebase static edge resolution)
- * 3. Admin Settings `turnstile_secret_key` (from local or bundled `staticData.json`, or cached/live Firestore `store_data/settings`)
+ * Resolves all candidate Cloudflare Turnstile secret keys strictly from Environment Variables
+ * (with sealed ENCRYPTED_TURNSTILE_SECRET as fallback only if no environment variable secret is configured).
  */
 export async function getCandidateTurnstileSecrets(
   env?: Record<string, string | undefined>
@@ -740,65 +618,27 @@ export async function getCandidateTurnstileSecrets(
     }
   };
 
-  // 1. Always check runtime environment variables FIRST so any dashboard update is #1 priority
+  // 1. Strictly check runtime environment variables FIRST
   for (const c of collectAllTurnstileEnvValues(env)) {
     addSecret(c);
   }
 
-  // 2. Check in-memory cached secret from store/vault
-  if (
-    cachedTurnstileSecretFromStore &&
-    cachedTurnstileSecretFromStore.secret &&
-    Date.now() < cachedTurnstileSecretFromStore.expiresAt
-  ) {
-    addSecret(cachedTurnstileSecretFromStore.secret);
+  // If environment variables provided a real secret key, return immediately so stale vault/Firestore secrets are never used
+  if (realSecrets.length > 0) {
+    return [...realSecrets, ...testSecrets];
   }
 
-  // 3. Decrypt sealed ENCRYPTED_TURNSTILE_SECRET from src/lib/secureVault.ts (works on Cloudflare Edge & Node with 0 I/O)
+  // 2. Fallback to sealed ENCRYPTED_TURNSTILE_SECRET only when env var is not set
   try {
     if (ENCRYPTED_TURNSTILE_SECRET && typeof ENCRYPTED_TURNSTILE_SECRET === 'string') {
       const decSecret = await decryptVaultValue(ENCRYPTED_TURNSTILE_SECRET, env);
       const cleanDec = sanitizeKey(decSecret);
       if (cleanDec && isValidTurnstileSecretKey(cleanDec) && !isTestTurnstileKey(cleanDec)) {
-        if (!cachedTurnstileSecretFromStore) {
-          cachedTurnstileSecretFromStore = {
-            secret: cleanDec,
-            expiresAt: Date.now() + 3_600_000,
-          };
-        }
         addSecret(cleanDec);
       }
     }
   } catch {
-    // Ignore decryption error and continue to local backup / env var
-  }
-
-  // 4. Try reading from local or bundled staticData.json
-  try {
-    const parsed = await loadStaticDataSnapshot();
-    const sec = sanitizeKey(parsed?.settings?.turnstile_secret_key);
-    if (sec && isValidTurnstileSecretKey(sec) && !isTestTurnstileKey(sec)) {
-      if (!cachedTurnstileSecretFromStore) {
-        cachedTurnstileSecretFromStore = {
-          secret: sec,
-          expiresAt: Date.now() + 3_600_000,
-        };
-      }
-      addSecret(sec);
-    }
-  } catch {
-    // Ignore local fs errors on Edge
-  }
-
-  // 5. Also check Firestore REST (store_data/settings) if not yet cached in memory
-  if (
-    !cachedTurnstileSecretFromStore ||
-    Date.now() >= cachedTurnstileSecretFromStore.expiresAt
-  ) {
-    const fsKeys = await fetchTurnstileKeysFromFirestoreRest(env);
-    if (fsKeys?.secretKey) {
-      addSecret(fsKeys.secretKey);
-    }
+    // Ignore decryption error
   }
 
   return [...realSecrets, ...testSecrets];

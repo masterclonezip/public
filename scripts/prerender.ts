@@ -232,6 +232,26 @@ async function syncStaticDataAndSitemaps() {
 
   const publicSettings = { ...(data.settings || {}) };
   delete publicSettings.turnstile_secret_key;
+  const envSiteKey = [
+    process.env.VITE_TURNSTILE_SITE_KEY,
+    process.env.TURNSTILE_SITE_KEY,
+    process.env.CF_TURNSTILE_SITE_KEY,
+    process.env.CLOUDFLARE_TURNSTILE_SITE_KEY,
+  ]
+    .map((k) =>
+      String(k || '')
+        .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '')
+        .trim()
+        .replace(/^[A-Za-z0-9_]+\s*=\s*/, '')
+        .replace(/^["'`]+|["'`]+$/g, '')
+        .trim()
+    )
+    .find((k) => /^0x4[A-Za-z0-9_-]{16,25}$/.test(k));
+  if (envSiteKey) {
+    publicSettings.turnstile_site_key = envSiteKey;
+  } else {
+    delete publicSettings.turnstile_site_key;
+  }
 
   if (publicApps.length > 0 || publicNews.length > 0) {
     const publicPayload: Record<string, any> = {

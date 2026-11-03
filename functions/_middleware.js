@@ -93,6 +93,54 @@ export async function onRequest(context) {
     headers.set('Cloudflare-CDN-Cache-Control', 'no-store, private');
     headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
     headers.set('Referrer-Policy', 'no-referrer');
+
+    // Inject live Cloudflare Pages runtime Turnstile Site Key directly into /moreinfo HTML at the Edge
+    // so even when the site is compiled into static code or env vars are marked Encrypted/Secret,
+    // the browser receives the exact 24-character 0x4... Site Key at 0ms on page load.
+    const envObj = context.env || {};
+    const rawEdgeCandidates = [
+      envObj.VITE_TURNSTILE_SITE_KEY,
+      envObj.TURNSTILE_SITE_KEY,
+      envObj.CF_TURNSTILE_SITE_KEY,
+      envObj.CLOUDFLARE_TURNSTILE_SITE_KEY,
+      envObj.PUBLIC_TURNSTILE_SITE_KEY,
+      envObj.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+      envObj.VITE_TURNSTILE_KEY,
+      envObj.TURNSTILE_KEY,
+      ...Object.values(envObj),
+    ];
+    let edgeSiteKey = '';
+    for (const raw of rawEdgeCandidates) {
+      if (typeof raw !== 'string') continue;
+      const cleaned = raw
+        .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '')
+        .trim()
+        .replace(/^[A-Za-z0-9_]+\s*=\s*/, '')
+        .replace(/^["'`]+|["'`]+$/g, '')
+        .trim();
+      const m = cleaned.match(/^(0x4[A-Za-z0-9_-]{16,25})$/);
+      if (m) {
+        edgeSiteKey = m[1];
+        break;
+      }
+    }
+
+    const gwContentType = (gatewayRes.headers.get('content-type') || '').toLowerCase();
+    if (edgeSiteKey && gwContentType.includes('text/html')) {
+      const htmlText = await gatewayRes.text();
+      const edgeScript = `<script>window.__CF_EDGE_TURNSTILE_SITE_KEY__=${JSON.stringify(edgeSiteKey)};</script>`;
+      const injectedHtml = htmlText.includes('</head>')
+        ? htmlText.replace('</head>', `${edgeScript}</head>`)
+        : `${edgeScript}${htmlText}`;
+      headers.delete('content-length');
+      headers.delete('etag');
+      return new Response(injectedHtml, {
+        status: gatewayRes.ok ? 200 : gatewayRes.status,
+        statusText: gatewayRes.ok ? 'OK' : gatewayRes.statusText,
+        headers
+      });
+    }
+
     return new Response(gatewayRes.body, {
       status: gatewayRes.ok ? 200 : gatewayRes.status,
       statusText: gatewayRes.ok ? 'OK' : gatewayRes.statusText,

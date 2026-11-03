@@ -246,6 +246,7 @@ export function sanitizePublicSettings(settings: any): any {
   if (!settings || typeof settings !== 'object') return {};
   const copy = JSON.parse(JSON.stringify(settings));
   delete copy.turnstile_secret_key;
+  delete copy.turnstile_site_key;
   delete copy.admin_password;
   delete copy.admin_totp_secret;
   delete copy.cloudinary_api_secret;

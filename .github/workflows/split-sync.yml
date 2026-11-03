@@ -235,8 +235,58 @@ jobs:
               cd "${REPO_NAME}_repo"
               git config --local --unset-all http.https://github.com/.extraheader 2>/dev/null || true
               git checkout -B "$TARGET_BRANCH" 2>/dev/null || true
+
+              # If syncing to public repo and source staticData.json has an empty apps array, preserve target repo's existing synced catalog & vault
+              mkdir -p /tmp/public_catalog_preserve
+              rm -rf /tmp/public_catalog_preserve/*
+              if [ "$TYPE" = "public" ] && [ -f "src/lib/staticData.json" ]; then
+                if grep -q '"apps":\s*\[\s*\]' "$SOURCE_DIR/src/lib/staticData.json" 2>/dev/null && ! grep -q '"apps":\s*\[\s*\]' "src/lib/staticData.json" 2>/dev/null; then
+                  echo "Preserving populated public catalog data from target public repo..."
+                  cp -f src/lib/staticData.json /tmp/public_catalog_preserve/staticData.json 2>/dev/null || true
+                  cp -f src/lib/staticData.ts /tmp/public_catalog_preserve/staticData.ts 2>/dev/null || true
+                  cp -f src/lib/secureVault.ts /tmp/public_catalog_preserve/secureVault.ts 2>/dev/null || true
+                  cp -f src/lib/communityCatalogStats.json /tmp/public_catalog_preserve/communityCatalogStats.json 2>/dev/null || true
+                  cp -f src/lib/communityStaticReviews.json /tmp/public_catalog_preserve/communityStaticReviews.json 2>/dev/null || true
+                fi
+              fi
+
               # Mirror workspace files
               rsync -rv $RSYNC_EXCLUDES --delete "$SOURCE_DIR/" .
+
+              if [ "$TYPE" = "public" ] && [ -f "/tmp/public_catalog_preserve/staticData.json" ]; then
+                cp -f /tmp/public_catalog_preserve/staticData.json src/lib/staticData.json 2>/dev/null || true
+                [ -f "/tmp/public_catalog_preserve/staticData.ts" ] && cp -f /tmp/public_catalog_preserve/staticData.ts src/lib/staticData.ts 2>/dev/null || true
+                [ -f "/tmp/public_catalog_preserve/secureVault.ts" ] && cp -f /tmp/public_catalog_preserve/secureVault.ts src/lib/secureVault.ts 2>/dev/null || true
+                [ -f "/tmp/public_catalog_preserve/communityCatalogStats.json" ] && cp -f /tmp/public_catalog_preserve/communityCatalogStats.json src/lib/communityCatalogStats.json 2>/dev/null || true
+                [ -f "/tmp/public_catalog_preserve/communityStaticReviews.json" ] && cp -f /tmp/public_catalog_preserve/communityStaticReviews.json src/lib/communityStaticReviews.json 2>/dev/null || true
+              fi
+
+              # Always strip any stale/deleted turnstile_site_key or turnstile_secret_key from staticData.json and staticData.ts in public repo
+              if [ "$TYPE" = "public" ]; then
+                node -e '
+                  const fs = require("fs");
+                  for (const p of ["src/lib/staticData.json", "public-api/staticData.json"]) {
+                    if (fs.existsSync(p)) {
+                      try {
+                        const j = JSON.parse(fs.readFileSync(p, "utf8"));
+                        if (j && j.settings) {
+                          delete j.settings.turnstile_site_key;
+                          delete j.settings.turnstile_secret_key;
+                          fs.writeFileSync(p, JSON.stringify(j), "utf8");
+                        }
+                      } catch {}
+                    }
+                  }
+                  if (fs.existsSync("src/lib/staticData.ts")) {
+                    try {
+                      let s = fs.readFileSync("src/lib/staticData.ts", "utf8");
+                      s = s.replace(/"turnstile_site_key"\s*:\s*"[^"]*"\s*,?/g, "");
+                      s = s.replace(/"turnstile_secret_key"\s*:\s*"[^"]*"\s*,?/g, "");
+                      fs.writeFileSync("src/lib/staticData.ts", s, "utf8");
+                    } catch {}
+                  }
+                ' 2>/dev/null || true
+              fi
             else
               mkdir -p "${REPO_NAME}_repo"
               cd "${REPO_NAME}_repo"

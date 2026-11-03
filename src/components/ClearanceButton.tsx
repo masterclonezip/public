@@ -64,7 +64,13 @@ export default function ClearanceButton({
   return (
     <div className="w-full flex flex-col items-center gap-3.5 select-none">
       {/* Visible Cloudflare Turnstile Widget Container (§5.5: appearance: 'always', ~65px reserved height upside above PROCEED button) */}
-      <div className="w-full min-h-[65px] flex items-center justify-center">
+      <div
+        className={
+          unavailableMessage || needsManualRetry || (uiTimeoutExceeded && !isReady)
+            ? 'hidden'
+            : 'w-full min-h-[65px] flex items-center justify-center'
+        }
+      >
         <div
           ref={widgetRef}
           className="w-full min-h-[65px] flex items-center justify-center"

@@ -601,8 +601,17 @@ export default defineConfig(({mode}) => {
   ];
   const turnstileSiteKey =
     rawTurnstileCandidates
-      .map((k) => String(k || '').trim().replace(/^["'`]+|["'`]+$/g, '').trim())
-      .find((k) => /^0x4[A-Za-z0-9_-]{17,24}$/.test(k)) || '';
+      .map((k) => {
+        const s = String(k || '')
+          .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '')
+          .trim()
+          .replace(/^[A-Za-z0-9_]+\s*=\s*/, '')
+          .replace(/^["'`]+|["'`]+$/g, '')
+          .trim();
+        const m = s.match(/(0x4[A-Za-z0-9_-]{16,25})/);
+        return m ? m[1] : '';
+      })
+      .find((k) => /^0x4[A-Za-z0-9_-]{16,25}$/.test(k)) || '';
 
   const resolvedBuildEnv: Record<string, string> = {
     VITE_ADMIN_PATH: pickEnv('VITE_ADMIN_PATH', 'ADMIN_PATH') || 'masterworld',

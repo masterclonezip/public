@@ -165,8 +165,6 @@ function sanitizeSettingsForPublicClient(settings: any): any {
   const envSiteKey = getEnvOnlyTurnstileSiteKey();
   if (envSiteKey) {
     copy.turnstile_site_key = envSiteKey;
-  } else if (copy.turnstile_site_key && isValidTurnstileSiteKey(String(copy.turnstile_site_key).trim())) {
-    copy.turnstile_site_key = String(copy.turnstile_site_key).trim();
   } else {
     delete copy.turnstile_site_key;
   }

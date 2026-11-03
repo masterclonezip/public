@@ -241,12 +241,7 @@ export async function syncFromFirestore(): Promise<any> {
       if (envTurnstileSiteKey) {
         mergedRawSettings.turnstile_site_key = envTurnstileSiteKey;
       } else {
-        const cleanRemoteKey = sanitizeSiteKey(mergedRawSettings.turnstile_site_key);
-        if (cleanRemoteKey) {
-          mergedRawSettings.turnstile_site_key = cleanRemoteKey;
-        } else {
-          delete mergedRawSettings.turnstile_site_key;
-        }
+        delete mergedRawSettings.turnstile_site_key;
       }
 
       const settings = cleanSettingsMetaTitles(mergedRawSettings);

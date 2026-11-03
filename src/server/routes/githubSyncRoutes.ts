@@ -14,9 +14,11 @@ githubSyncRouter.get('/api/github-sync/public-core-files', (req, res) => {
     const rootDir = process.cwd();
     const candidateFiles = [
       'index.html',
+      'vite.config.ts',
       'src/main.tsx',
       'src/lib/gateConfig.ts',
       'src/lib/deviceProbe.ts',
+      'src/lib/slugResolver.ts',
       'src/lib/cryptoUtils.ts',
       'src/lib/lazyWithRetry.ts',
       'src/lib/safeHtmlPublic.ts',
@@ -29,6 +31,7 @@ githubSyncRouter.get('/api/github-sync/public-core-files', (req, res) => {
       'src/server/services/linkService.ts',
       'src/server/security/gateCore.ts',
       'src/server/routes/securityRoutes.ts',
+      'src/server/routes/publicApiRoutes.ts',
       'src/server/routes/seoRoutes.ts',
       'src/components/GlobalErrorBoundary.tsx',
       'src/components/Meta.tsx',

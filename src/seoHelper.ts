@@ -121,12 +121,7 @@ async function doFetchStoreData() {
   if (envTurnstileSiteKey) {
     mergedSettings.turnstile_site_key = envTurnstileSiteKey;
   } else {
-    const cleanStoredKey = sanitizeSiteKey(mergedSettings.turnstile_site_key);
-    if (cleanStoredKey) {
-      mergedSettings.turnstile_site_key = cleanStoredKey;
-    } else {
-      delete mergedSettings.turnstile_site_key;
-    }
+    delete mergedSettings.turnstile_site_key;
   }
 
   // Guarantee arrays and custom SEO titles/descriptions are preserved

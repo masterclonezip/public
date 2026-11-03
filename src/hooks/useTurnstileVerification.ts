@@ -174,10 +174,16 @@ export function useTurnstileVerification({
   const resolveCandidateSiteKeys = useCallback((): string[] => {
     const metaEnv = ((import.meta as any).env || {}) as Record<string, unknown>;
     const buildEnv = ((globalThis as any).__APP_BUILD_ENV__ || {}) as Record<string, unknown>;
+    const edgeInjectedKey =
+      typeof window !== 'undefined'
+        ? (window as any).__CF_EDGE_TURNSTILE_SITE_KEY__
+        : undefined;
 
-    // 1. Prioritize live server runtime keys (from /api/v1/app/session-init & /api/v1/public/runtime-config)
-    // FIRST, followed by build-time VITE_TURNSTILE_SITE_KEY, followed by Admin Settings key.
+    // 1. Prioritize Cloudflare Edge injected runtime key (__CF_EDGE_TURNSTILE_SITE_KEY__) and live server runtime keys
+    // (from /api/v1/app/session-init & /api/v1/public/runtime-config) FIRST, followed by build-time VITE_TURNSTILE_SITE_KEY.
+    // Never fall back to Firestore/staticData settings.turnstile_site_key so a deleted widget key from a shared DB can never leak in.
     const rawSources: unknown[] = [
+      edgeInjectedKey,
       serverSiteKeyRef.current,
       ...serverSiteKeysRef.current,
       metaEnv.VITE_TURNSTILE_SITE_KEY,
@@ -192,7 +198,6 @@ export function useTurnstileVerification({
       buildEnv.TURNSTILE_SITE_KEY,
       ...Object.values(metaEnv),
       ...Object.values(buildEnv),
-      adminSiteKeyRef.current,
     ];
 
     const candidates: string[] = [];
@@ -470,26 +475,6 @@ export function useTurnstileVerification({
     },
     [appId, clearTimers, markTokenReady, removeWidget, resolveCandidateSiteKeys]
   );
-
-  // If adminTurnstileSiteKey arrives asynchronously from DataContextPublic after mount,
-  // only re-run if no server/env key was already resolved, we haven't already solved, and the key hasn't failed.
-  useEffect(() => {
-    const cleanAdminKey = sanitizeTurnstileKey(adminTurnstileSiteKey);
-    if (
-      cleanAdminKey &&
-      isRealTurnstileKey(cleanAdminKey) &&
-      !serverSiteKeyRef.current &&
-      !failedSiteKeysRef.current.has(cleanAdminKey) &&
-      !solvedWithRealKeyRef.current &&
-      !cfTokenRef.current &&
-      (!activeSiteKeyRef.current || isTestTurnstileSiteKey(activeSiteKeyRef.current)) &&
-      nonceRef.current
-    ) {
-      keyIndexRef.current = 0;
-      retryCountRef.current = 0;
-      void startSessionFlow(true);
-    }
-  }, [adminTurnstileSiteKey, startSessionFlow]);
 
   // Initial mount + visibilitychange (hidden -> visible) & pageshow (persisted) re-verification (§5.9)
   useEffect(() => {

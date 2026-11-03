@@ -46,6 +46,11 @@ import rawServerCryptoTs from '../server/crypto.ts?raw';
 import rawAppActionButtonsTsx from '../components/public/AppActionButtons.tsx?raw';
 import rawNewsRelatedAppBoxTsx from '../components/public/newsDetails/NewsRelatedAppBox.tsx?raw';
 import rawNewsRendererTs from '../seo/renderers/newsRenderer.ts?raw';
+import rawSeoSyncTs from '../seo/sync.ts?raw';
+import rawSlugResolverTs from '../lib/slugResolver.ts?raw';
+import rawPublicApiRoutesTs from '../server/routes/publicApiRoutes.ts?raw';
+import rawSecurityRoutesTs from '../server/routes/securityRoutes.ts?raw';
+import rawViteConfigTs from '../../vite.config.ts?raw';
 
 const BUNDLED_PUBLIC_CORE_FILES: Record<string, string> = {
   'functions/_middleware.js': rawMiddlewareJs,
@@ -53,12 +58,15 @@ const BUNDLED_PUBLIC_CORE_FILES: Record<string, string> = {
   'public/_headers': rawHeadersFile,
   'public/_redirects': rawRedirectsFile,
   'vercel.json': rawVercelJson,
+  'vite.config.ts': rawViteConfigTs,
   'scripts/prerender.ts': rawPrerenderTs,
   'src/lib/sitemapGenerator.ts': rawSitemapGeneratorTs,
   'src/lib/seoUtils.ts': rawSeoUtilsTs,
+  'src/lib/slugResolver.ts': rawSlugResolverTs,
   'src/lib/cryptoUtils.ts': rawCryptoUtilsTs,
   'src/server/crypto.ts': rawServerCryptoTs,
   'src/seoHelper.ts': rawSeoHelperTs,
+  'src/seo/sync.ts': rawSeoSyncTs,
   'src/seo/utils.ts': rawSeoSubUtilsTs,
   'src/seo/preRenderEngine.ts': rawPreRenderEngineTs,
   'src/seo/schemaBuilder.ts': rawSchemaBuilderTs,
@@ -67,6 +75,8 @@ const BUNDLED_PUBLIC_CORE_FILES: Record<string, string> = {
   'src/seo/renderers/newsRenderer.ts': rawNewsRendererTs,
   'src/seo/initialDataOptimizer.ts': rawInitialDataOptimizerTs,
   'src/server/routes/seoRoutes.ts': rawSeoRoutesTs,
+  'src/server/routes/publicApiRoutes.ts': rawPublicApiRoutesTs,
+  'src/server/routes/securityRoutes.ts': rawSecurityRoutesTs,
   'src/components/Meta.tsx': rawMetaTsx,
   'src/components/FallbackRouteMatcher.tsx': rawFallbackRouteMatcherTsx,
   'src/components/public/AppActionButtons.tsx': rawAppActionButtonsTsx,
@@ -608,6 +618,8 @@ export function useGitHubSync(
     }
 
     const finalSettings = ensureDefaultSettings(targetSettings);
+    delete (finalSettings as any).turnstile_site_key;
+    delete (finalSettings as any).turnstile_secret_key;
     const updatedCode = generateStaticDataFileCode(publicApps, finalSettings, publicNews, targetVideos);
 
     // Server backup retains AES-encrypted link fields for backend resolution
@@ -729,21 +741,6 @@ export function useGitHubSync(
             if (vaultData.encryptedTurnstileSecret) {
               encryptedTurnstileSecret = vaultData.encryptedTurnstileSecret;
             }
-            if (
-              vaultData.turnstileSiteKey &&
-              typeof vaultData.turnstileSiteKey === 'string' &&
-              vaultData.turnstileSiteKey.trim()
-            ) {
-              finalSettings.turnstile_site_key = vaultData.turnstileSiteKey.trim();
-              activeUpdatedCode = generateStaticDataFileCode(publicApps, finalSettings, publicNews, targetVideos);
-              activeStaticJsonCode = JSON.stringify({
-                apps: cleanPublicStaticApps,
-                settings: sanitizePublicSettings(finalSettings),
-                news: publicNews,
-                videos: targetVideos,
-                reviews: []
-              });
-            }
           }
         } catch (_) {}
 
@@ -764,16 +761,6 @@ export function useGitHubSync(
             if (slug) vaultMap[slug] = plainUrl;
           });
           vaultCiphertext = safeEncrypt(JSON.stringify(vaultMap), AES_SECRET);
-        }
-
-        if (
-          !encryptedTurnstileSecret &&
-          finalSettings?.turnstile_secret_key &&
-          typeof finalSettings.turnstile_secret_key === 'string' &&
-          finalSettings.turnstile_secret_key.trim()
-        ) {
-          const AES_SECRET = getAesSecret();
-          encryptedTurnstileSecret = safeEncrypt(finalSettings.turnstile_secret_key.trim(), AES_SECRET);
         }
 
         if (vaultCiphertext) {
