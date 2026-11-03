@@ -5,22 +5,8 @@ Disallow: /api/
 Disallow: /admin/
 Disallow: /login/
 Disallow: /masterworld/
-Disallow: /s/
-Disallow: /s/*
-Disallow: /dl/
-Disallow: /dl/*
-Disallow: /out/
-Disallow: /out/*
-Disallow: /download/
-Disallow: /download/*
-Disallow: /gateway/
-Disallow: /gateway/*
-Disallow: /info/
-Disallow: /info/*
 Disallow: /moreinfo/
 Disallow: /moreinfo/*
-Disallow: /moredetail/
-Disallow: /moredetail/*
 Disallow: /safety
 Disallow: /safety-status
 
@@ -31,16 +17,8 @@ Disallow: /api/
 Disallow: /admin/
 Disallow: /login/
 Disallow: /masterworld/
-Disallow: /download/
-Disallow: /download/*
-Disallow: /gateway/
-Disallow: /gateway/*
-Disallow: /info/
-Disallow: /info/*
 Disallow: /moreinfo/
 Disallow: /moreinfo/*
-Disallow: /moredetail/
-Disallow: /moredetail/*
 
 User-agent: Bingbot
 Allow: /
@@ -49,16 +27,8 @@ Disallow: /api/
 Disallow: /admin/
 Disallow: /login/
 Disallow: /masterworld/
-Disallow: /download/
-Disallow: /download/*
-Disallow: /gateway/
-Disallow: /gateway/*
-Disallow: /info/
-Disallow: /info/*
 Disallow: /moreinfo/
 Disallow: /moreinfo/*
-Disallow: /moredetail/
-Disallow: /moredetail/*
 
 User-agent: Applebot
 Allow: /
@@ -67,16 +37,8 @@ Disallow: /api/
 Disallow: /admin/
 Disallow: /login/
 Disallow: /masterworld/
-Disallow: /download/
-Disallow: /download/*
-Disallow: /gateway/
-Disallow: /gateway/*
-Disallow: /info/
-Disallow: /info/*
 Disallow: /moreinfo/
 Disallow: /moreinfo/*
-Disallow: /moredetail/
-Disallow: /moredetail/*
 
 User-agent: DuckDuckBot
 Allow: /
@@ -85,16 +47,8 @@ Disallow: /api/
 Disallow: /admin/
 Disallow: /login/
 Disallow: /masterworld/
-Disallow: /download/
-Disallow: /download/*
-Disallow: /gateway/
-Disallow: /gateway/*
-Disallow: /info/
-Disallow: /info/*
 Disallow: /moreinfo/
 Disallow: /moreinfo/*
-Disallow: /moredetail/
-Disallow: /moredetail/*
 
 User-agent: Baiduspider
 Allow: /
@@ -103,16 +57,8 @@ Disallow: /api/
 Disallow: /admin/
 Disallow: /login/
 Disallow: /masterworld/
-Disallow: /download/
-Disallow: /download/*
-Disallow: /gateway/
-Disallow: /gateway/*
-Disallow: /info/
-Disallow: /info/*
 Disallow: /moreinfo/
 Disallow: /moreinfo/*
-Disallow: /moredetail/
-Disallow: /moredetail/*
 
 User-agent: YandexBot
 Allow: /
@@ -121,16 +67,8 @@ Disallow: /api/
 Disallow: /admin/
 Disallow: /login/
 Disallow: /masterworld/
-Disallow: /download/
-Disallow: /download/*
-Disallow: /gateway/
-Disallow: /gateway/*
-Disallow: /info/
-Disallow: /info/*
 Disallow: /moreinfo/
 Disallow: /moreinfo/*
-Disallow: /moredetail/
-Disallow: /moredetail/*
 
 User-agent: SemrushBot
 Allow: /
@@ -139,16 +77,8 @@ Disallow: /api/
 Disallow: /admin/
 Disallow: /login/
 Disallow: /masterworld/
-Disallow: /download/
-Disallow: /download/*
-Disallow: /gateway/
-Disallow: /gateway/*
-Disallow: /info/
-Disallow: /info/*
 Disallow: /moreinfo/
 Disallow: /moreinfo/*
-Disallow: /moredetail/
-Disallow: /moredetail/*
 
 User-agent: AhrefsBot
 Allow: /
@@ -157,16 +87,8 @@ Disallow: /api/
 Disallow: /admin/
 Disallow: /login/
 Disallow: /masterworld/
-Disallow: /download/
-Disallow: /download/*
-Disallow: /gateway/
-Disallow: /gateway/*
-Disallow: /info/
-Disallow: /info/*
 Disallow: /moreinfo/
 Disallow: /moreinfo/*
-Disallow: /moredetail/
-Disallow: /moredetail/*
 
 User-agent: GPTBot
 Allow: /
@@ -175,16 +97,8 @@ Disallow: /api/
 Disallow: /admin/
 Disallow: /login/
 Disallow: /masterworld/
-Disallow: /download/
-Disallow: /download/*
-Disallow: /gateway/
-Disallow: /gateway/*
-Disallow: /info/
-Disallow: /info/*
 Disallow: /moreinfo/
 Disallow: /moreinfo/*
-Disallow: /moredetail/
-Disallow: /moredetail/*
 
 User-agent: ClaudeBot
 Allow: /
@@ -193,16 +107,8 @@ Disallow: /api/
 Disallow: /admin/
 Disallow: /login/
 Disallow: /masterworld/
-Disallow: /download/
-Disallow: /download/*
-Disallow: /gateway/
-Disallow: /gateway/*
-Disallow: /info/
-Disallow: /info/*
 Disallow: /moreinfo/
 Disallow: /moreinfo/*
-Disallow: /moredetail/
-Disallow: /moredetail/*
 
 User-agent: PerplexityBot
 Allow: /
@@ -211,16 +117,8 @@ Disallow: /api/
 Disallow: /admin/
 Disallow: /login/
 Disallow: /masterworld/
-Disallow: /download/
-Disallow: /download/*
-Disallow: /gateway/
-Disallow: /gateway/*
-Disallow: /info/
-Disallow: /info/*
 Disallow: /moreinfo/
 Disallow: /moreinfo/*
-Disallow: /moredetail/
-Disallow: /moredetail/*
 
 Sitemap: /sitemap.xml
 Sitemap: /sitemap-apps.xml

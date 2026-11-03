@@ -14,13 +14,13 @@ export const NONCE_BURN_TTL_S = 150 as const;
 export const CLIENT_TAP_HOLD_MS = 1000 as const;
 export const DWELL_HARD_BELOW_MS = 150 as const;
 export const MIN_SERVER_DWELL_MS = 500 as const;
-export const DWELL_NV0_MIN_MS = 1000 as const;
+export const DWELL_NV0_MIN_MS = 900 as const;
 
-export const TOUCH_MIN_MS = 12 as const;
+export const TOUCH_MIN_MS = 4 as const;
 export const TOUCH_MAX_MS = 2000 as const;
 export const TOUCH_REQUIRED_EVENTS = ['ts', 'te', 'ck'] as const;
 
-export const INIT_RATE_DEVICE = { limit: 15, windowS: 60 } as const;
+export const INIT_RATE_DEVICE = { limit: 25, windowS: 60 } as const;
 export const INIT_RATE_NET = { limit: 120, windowS: 60 } as const;
 
 export const CLEARANCE_BURST = {
@@ -51,7 +51,7 @@ export const SOFT_STRIKES_NET = {
 } as const;
 
 export const SITEVERIFY_TIMEOUT_MS = 4000 as const;
-export const TURNSTILE_UI_TIMEOUT_MS = 15000 as const;
+export const TURNSTILE_UI_TIMEOUT_MS = 30000 as const;
 export const SESSION_RETRY_MAX = 2 as const;
 export const REQUEST_BODY_MAX_BYTES = 8192 as const;
 export const HARD_PAD_MS = [60, 120] as const;

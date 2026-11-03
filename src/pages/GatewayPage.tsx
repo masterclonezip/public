@@ -18,6 +18,7 @@ export default function GatewayPage() {
     loading,
     updateAppDetail,
     mergeCatalogApps,
+    fetchSettings,
   } = useData();
   const { slug: routeSlug, '*': splat } = useParams();
   const location = useLocation();
@@ -25,7 +26,7 @@ export default function GatewayPage() {
 
   const decodedSplat = splat ? decodeURIComponent(splat) : '';
   const splatStripped = decodedSplat
-    .replace(/^\/(?:moreinfo|info|gateway|download)\//, '/')
+    .replace(/^\/moreinfo\//, '/')
     .replace(/^\/|\/$/g, '');
   const slug = routeSlug || splatStripped;
   const cleanSlugKey = slug?.toLowerCase().trim() || '';
@@ -44,6 +45,12 @@ export default function GatewayPage() {
   const syncAttemptedRef = useRef<Record<string, boolean>>({});
   const activeSlugRef = useRef<string>(cleanSlugKey);
   activeSlugRef.current = cleanSlugKey;
+
+  useEffect(() => {
+    if (!mockSettings?.turnstile_site_key && typeof fetchSettings === 'function') {
+      fetchSettings();
+    }
+  }, [mockSettings?.turnstile_site_key, fetchSettings]);
 
   useEffect(() => {
     window.scrollTo(0, 0);

@@ -175,49 +175,6 @@
   X-Robots-Tag: noindex, nofollow, noarchive, nosnippet
   Referrer-Policy: no-referrer
 
-/gateway/*
-  Cache-Control: no-store, no-cache, must-revalidate, private, max-age=0
-  CDN-Cache-Control: no-store, private
-  Cloudflare-CDN-Cache-Control: no-store, private
-  X-Robots-Tag: noindex, nofollow, noarchive, nosnippet
-  Referrer-Policy: no-referrer
-
-/download/*
-  Cache-Control: no-store, no-cache, must-revalidate, private, max-age=0
-  CDN-Cache-Control: no-store, private
-  Cloudflare-CDN-Cache-Control: no-store, private
-  X-Robots-Tag: noindex, nofollow, noarchive, nosnippet
-  Referrer-Policy: no-referrer
-
-/info/*
-  Cache-Control: no-store, no-cache, must-revalidate, private, max-age=0
-  CDN-Cache-Control: no-store, private
-  Cloudflare-CDN-Cache-Control: no-store, private
-  X-Robots-Tag: noindex, nofollow, noarchive, nosnippet
-  Referrer-Policy: no-referrer
-
-/moredetail/*
-  Cache-Control: no-store, no-cache, must-revalidate, private, max-age=0
-  CDN-Cache-Control: no-store, private
-  Cloudflare-CDN-Cache-Control: no-store, private
-  X-Robots-Tag: noindex, nofollow, noarchive, nosnippet
-  Referrer-Policy: no-referrer
-
-/s/*
-  Cache-Control: no-store, no-cache, must-revalidate, private, max-age=0
-  X-Robots-Tag: noindex, nofollow, noarchive, nosnippet
-  Referrer-Policy: no-referrer
-
-/dl/*
-  Cache-Control: no-store, no-cache, must-revalidate, private, max-age=0
-  X-Robots-Tag: noindex, nofollow, noarchive, nosnippet
-  Referrer-Policy: no-referrer
-
-/out/*
-  Cache-Control: no-store, no-cache, must-revalidate, private, max-age=0
-  X-Robots-Tag: noindex, nofollow, noarchive, nosnippet
-  Referrer-Policy: no-referrer
-
 /admin/*
   Cache-Control: no-store, no-cache, must-revalidate, private, max-age=0
   X-Robots-Tag: noindex, nofollow, noarchive, nosnippet

@@ -345,7 +345,7 @@ export async function onRequest(context) {
     const resolvedSiteKey = getPublicTurnstileSiteKey(env);
     const mergedSettings = { ...(staticData?.settings || {}) };
     delete mergedSettings.turnstile_secret_key;
-    if (!mergedSettings.turnstile_site_key && resolvedSiteKey) {
+    if (resolvedSiteKey) {
       mergedSettings.turnstile_site_key = resolvedSiteKey;
     }
     return new Response(JSON.stringify({ ...staticData, settings: mergedSettings }), {
@@ -361,7 +361,7 @@ export async function onRequest(context) {
     const resolvedSiteKey = getPublicTurnstileSiteKey(env);
     const mergedSettings = { ...(staticData?.settings || {}) };
     delete mergedSettings.turnstile_secret_key;
-    if (!mergedSettings.turnstile_site_key && resolvedSiteKey) {
+    if (resolvedSiteKey) {
       mergedSettings.turnstile_site_key = resolvedSiteKey;
     }
     return new Response(JSON.stringify({ status: 'OK', settings: mergedSettings }), {

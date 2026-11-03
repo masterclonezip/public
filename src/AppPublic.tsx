@@ -270,10 +270,6 @@ function AppContent() {
               <Route path="/app/:slug/*" element={<AppDetails />} />
               <Route path="/moreinfo/:slug" element={<GatewayPage />} />
               <Route path="/moreinfo/:slug/*" element={<GatewayPage />} />
-              <Route path="/gateway/:slug" element={<GatewayPage />} />
-              <Route path="/info/:slug" element={<GatewayPage />} />
-              <Route path="/moredetail/:slug" element={<GatewayPage />} />
-              <Route path="/download/:slug" element={<GatewayPage />} />
               <Route path="/news/:slug" element={<NewsDetailPage />} />
               <Route path="/blogs/:slug" element={<Navigate to="/" replace />} />
               <Route path="/blog/:slug" element={<Navigate to="/" replace />} />

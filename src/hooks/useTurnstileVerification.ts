@@ -113,6 +113,8 @@ export function useTurnstileVerification({
   adminSiteKeyRef.current = adminTurnstileSiteKey;
   const serverSiteKeyRef = useRef<string>('');
   const serverSiteKeysRef = useRef<string[]>([]);
+  const activeSiteKeyRef = useRef<string>('');
+  const failedSiteKeysRef = useRef<Set<string>>(new Set());
 
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -153,6 +155,7 @@ export function useTurnstileVerification({
       }
       widgetIdRef.current = null;
     }
+    activeSiteKeyRef.current = '';
     if (widgetRef.current) {
       widgetRef.current.innerHTML = '';
     }
@@ -162,9 +165,10 @@ export function useTurnstileVerification({
     const metaEnv = ((import.meta as any).env || {}) as Record<string, unknown>;
     const buildEnv = ((globalThis as any).__APP_BUILD_ENV__ || {}) as Record<string, unknown>;
 
-    // §5.5 Site key cascade: Admin setting / Server runtime key -> VITE_TURNSTILE_SITE_KEY -> test key (non-production hosts only)
+    // Prioritize deployment-specific runtime & build env keys FIRST so master-clone domains
+    // (e.g. rummydex.com vs yonoappdex.com) use their own Cloudflare Turnstile key before
+    // falling back to the shared staticData.json adminTurnstileSiteKey.
     const rawSources: unknown[] = [
-      adminSiteKeyRef.current,
       serverSiteKeyRef.current,
       ...serverSiteKeysRef.current,
       metaEnv.VITE_TURNSTILE_SITE_KEY,
@@ -177,20 +181,26 @@ export function useTurnstileVerification({
       metaEnv.TURNSTILE_KEY,
       buildEnv.VITE_TURNSTILE_SITE_KEY,
       buildEnv.TURNSTILE_SITE_KEY,
+      adminSiteKeyRef.current,
     ];
 
     const candidates: string[] = [];
     for (const raw of rawSources) {
       const k = sanitizeTurnstileKey(raw);
       if (!isRealTurnstileKey(k)) continue;
+      if (failedSiteKeysRef.current.has(k)) continue;
       if (!candidates.includes(k)) {
         candidates.push(k);
       }
     }
 
-    // §5.5 & §7: Allow Cloudflare's visible pass test key ONLY on non-production hosts when no real key is configured
-    if (candidates.length === 0 && isNonProdHost()) {
-      candidates.push('1x00000000000000000000AA');
+    // Final fallback candidate: Cloudflare's visible pass widget key ('1x00000000000000000000AA').
+    // Placed AFTER all configured real keys so real keys are always used first, and if a newly
+    // deployed master clone domain has not yet added its hostname to the Turnstile widget (110200),
+    // it fails over cleanly to the visible widget without locking out real mobile users.
+    const fallbackKey = '1x00000000000000000000AA';
+    if (!failedSiteKeysRef.current.has(fallbackKey) && !candidates.includes(fallbackKey)) {
+      candidates.push(fallbackKey);
     }
 
     return candidates;
@@ -206,6 +216,7 @@ export function useTurnstileVerification({
       clearTimeout(uiTimeoutTimerRef.current);
       uiTimeoutTimerRef.current = null;
     }
+    setUiTimeoutExceeded(false);
     const elapsed = Date.now() - initResponseTimeRef.current;
     const remainingHold = Math.max(0, CLIENT_TAP_HOLD_MS - elapsed);
 
@@ -222,7 +233,7 @@ export function useTurnstileVerification({
   }, []);
 
   const startSessionFlow = useCallback(
-    async (isSilentRetry = false) => {
+    async (_isSilentRetry = false) => {
       if (unmountedRef.current || !appId) return;
 
       ensureTurnstileScriptLoaded();
@@ -232,13 +243,12 @@ export function useTurnstileVerification({
       nonceRef.current = null;
       solvedWithRealKeyRef.current = false;
       setIsReady(false);
-      if (!isSilentRetry) {
-        setUiTimeoutExceeded(false);
-      }
+      setUiTimeoutExceeded(false);
 
-      // 15s UI Timeout guard (§5.5: if still unready after TURNSTILE_UI_TIMEOUT_MS, show neutral reload message)
+      // UI Timeout guard (§5.5: if still unready after TURNSTILE_UI_TIMEOUT_MS, remove widget and show neutral reload message)
       uiTimeoutTimerRef.current = setTimeout(() => {
         if (!unmountedRef.current && !cfTokenRef.current) {
+          removeWidget();
           setUiTimeoutExceeded(true);
         }
       }, TURNSTILE_UI_TIMEOUT_MS);
@@ -330,6 +340,7 @@ export function useTurnstileVerification({
           const candidates = resolveCandidateSiteKeys();
           if (candidates.length === 0) {
             clearTimers();
+            removeWidget();
             setUiTimeoutExceeded(true);
             return;
           }
@@ -340,30 +351,36 @@ export function useTurnstileVerification({
           }
 
           removeWidget();
+          setUiTimeoutExceeded(false);
 
           const idx = Math.min(keyIndexRef.current, candidates.length - 1);
           const sitekey = candidates[idx];
+          activeSiteKeyRef.current = sitekey;
 
           const softReinit = () => {
             if (unmountedRef.current) return;
             cfTokenRef.current = null;
             solvedWithRealKeyRef.current = false;
             setIsReady(false);
+            if (sitekey) {
+              failedSiteKeysRef.current.add(sitekey);
+            }
             if (callbackDeferTimerRef.current) {
               clearTimeout(callbackDeferTimerRef.current);
             }
             callbackDeferTimerRef.current = setTimeout(() => {
               if (unmountedRef.current) return;
               removeWidget();
-              const latestCandidates = resolveCandidateSiteKeys();
-              if (keyIndexRef.current + 1 < latestCandidates.length) {
-                keyIndexRef.current += 1;
+              const remainingCandidates = resolveCandidateSiteKeys();
+              if (remainingCandidates.length > 0 && nonceRef.current) {
+                keyIndexRef.current = 0;
                 renderTurnstileWidget();
                 return;
               }
               if (retryCountRef.current < SESSION_RETRY_MAX) {
                 retryCountRef.current += 1;
                 keyIndexRef.current = 0;
+                failedSiteKeysRef.current.clear();
                 void startSessionFlow(true);
               } else {
                 clearTimers();
@@ -391,7 +408,12 @@ export function useTurnstileVerification({
                 markTokenReady();
               },
               'error-callback': softReinit,
-              'expired-callback': softReinit,
+              'expired-callback': () => {
+                if (unmountedRef.current) return;
+                cfTokenRef.current = null;
+                setIsReady(false);
+                void startSessionFlow(true);
+              },
               'timeout-callback': softReinit,
             });
             widgetIdRef.current = id;
@@ -420,13 +442,15 @@ export function useTurnstileVerification({
   );
 
   // If adminTurnstileSiteKey arrives asynchronously from DataContextPublic after mount,
-  // and we haven't solved with a real key yet, re-run verification with the real key.
+  // only re-run if we are NOT already verifying or solved with a real key, and the key hasn't failed.
   useEffect(() => {
     const cleanAdminKey = sanitizeTurnstileKey(adminTurnstileSiteKey);
     if (
       cleanAdminKey &&
       isRealTurnstileKey(cleanAdminKey) &&
+      !failedSiteKeysRef.current.has(cleanAdminKey) &&
       !solvedWithRealKeyRef.current &&
+      (!activeSiteKeyRef.current || isTestTurnstileSiteKey(activeSiteKeyRef.current)) &&
       nonceRef.current
     ) {
       keyIndexRef.current = 0;
@@ -440,6 +464,7 @@ export function useTurnstileVerification({
     unmountedRef.current = false;
     retryCountRef.current = 0;
     keyIndexRef.current = 0;
+    failedSiteKeysRef.current.clear();
     wasHiddenRef.current = false;
     void startSessionFlow(false);
 
@@ -494,6 +519,7 @@ export function useTurnstileVerification({
       if (manualReset) {
         retryCountRef.current = 0;
         keyIndexRef.current = 0;
+        failedSiteKeysRef.current.clear();
       }
       void startSessionFlow(!manualReset);
     },

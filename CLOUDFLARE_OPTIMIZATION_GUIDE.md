@@ -122,8 +122,6 @@ Prevents caching of sensitive admin routes, Turnstile anti-bot clearance session
    (http.request.uri.path wildcard "/admin*") or 
    (http.request.uri.path wildcard "/masterworld*") or 
    (http.request.uri.path wildcard "/moreinfo*") or 
-   (http.request.uri.path wildcard "/gateway*") or 
-   (http.request.uri.path wildcard "/download*") or 
    (http.request.uri.path wildcard "/api*") or
    (http.request.uri.path wildcard "/safety*")
    ```
@@ -229,7 +227,7 @@ Cloudflare Pages reads `public/_headers` at build time to enforce exact cache bo
 - `/assets/*`: `Cache-Control: public, max-age=31536000, immutable`
 - `/app/*`, `/news*`, `/videos*`, `/category/*`: `s-maxage=3600, stale-while-revalidate=86400`
 - `*.xml`, `/robots.txt`: `s-maxage=60, must-revalidate`
-- `/moreinfo/*`, `/gateway/*`, `/admin/*`: `no-store, no-cache, must-revalidate, private, max-age=0`
+- `/moreinfo/*`, `/admin/*`: `no-store, no-cache, must-revalidate, private, max-age=0`
 
 ### 2. `functions/_middleware.js` (Edge Middleware Fallback)
 If requests reach the Cloudflare Pages server directly without passing through the dashboard redirect rule, `functions/_middleware.js` acts as an edge safety net:

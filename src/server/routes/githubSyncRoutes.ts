@@ -71,6 +71,8 @@ githubSyncRouter.get('/api/github-sync/public-core-files', (req, res) => {
       'src/hooks/useReviews.ts',
       'src/hooks/useTurnstileVerification.ts',
       'src/hooks/useClearanceDispatch.ts',
+      'src/AppPublic.tsx',
+      'src/components/FallbackRouteMatcher.tsx',
       'src/pages/Home.tsx',
       'src/pages/NewsDetailPage.tsx',
       'src/pages/NewsPage.tsx',

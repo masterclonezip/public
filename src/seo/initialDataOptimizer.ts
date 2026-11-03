@@ -13,12 +13,7 @@ export function optimizeInitialDataForRoute(
   if (!data) return {};
 
   const isAppDetailPage = cleanPathLower.startsWith('/app/');
-  const isGatewayPage =
-    cleanPathLower.startsWith('/moreinfo/') ||
-    cleanPathLower.startsWith('/gateway/') ||
-    cleanPathLower.startsWith('/info/') ||
-    cleanPathLower.startsWith('/moredetail/') ||
-    cleanPathLower.startsWith('/download/');
+  const isGatewayPage = cleanPathLower.startsWith('/moreinfo/');
   const isNewsDetailPage = cleanPathLower.startsWith('/news/') && cleanPathLower !== '/news';
   const isNewsIndexPage = cleanPathLower === '/news';
   const isHomePage = cleanPathLower === '/' || cleanPathLower === '';

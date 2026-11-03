@@ -310,10 +310,6 @@ async function startServer() {
           const normPath = filePath.replace(/\\/g, '/').toLowerCase();
           const isNoIndexStatic =
             normPath.includes('/moreinfo/') ||
-            normPath.includes('/gateway/') ||
-            normPath.includes('/download/') ||
-            normPath.includes('/info/') ||
-            normPath.includes('/moredetail/') ||
             normPath.includes('/admin/') ||
             normPath.includes('/safety');
           if (isNoIndexStatic) {
@@ -366,15 +362,8 @@ async function startServer() {
     const rawPath = req.originalUrl.split('?')[0];
     const pathLower = rawPath.toLowerCase();
 
-    // 1. Bot & Crawler Shield: Block web crawlers, spiders, and scrapers from accessing sensitive gateway / moreinfo paths
-    const isGatewayPath = pathLower.startsWith('/moreinfo/') ||
-      pathLower.startsWith('/info/') ||
-      pathLower.startsWith('/gateway/') ||
-      pathLower.startsWith('/download/') ||
-      pathLower.startsWith('/moredetail/') ||
-      pathLower.startsWith('/s/') ||
-      pathLower.startsWith('/dl/') ||
-      pathLower.startsWith('/out/');
+    // 1. Bot & Crawler Shield: Block web crawlers, spiders, and scrapers from accessing /moreinfo paths
+    const isGatewayPath = pathLower === '/moreinfo' || pathLower.startsWith('/moreinfo/');
 
     const userAgent = req.headers['user-agent'] || '';
     const isBotCrawler = /googlebot|bingbot|slurp|duckduckbot|baiduspider|yandexbot|sogou|exabot|facebot|facebookexternalhit|ia_archiver|semrushbot|ahrefsbot|mj12bot|dotbot|bytespider|applebot|gptbot|chatgpt-user|claudebot|perplexitybot|ccbot|petalbot|criteobot|\bbot\b|crawler|spider|scraper|headlesschrome/i.test(userAgent);
@@ -464,13 +453,6 @@ async function startServer() {
       'safety',
       'safety-status',
       'moreinfo',
-      'info',
-      'gateway',
-      'download',
-      'moredetail',
-      's',
-      'dl',
-      'out',
       'category',
       'categories',
       'sitemap.xml',
@@ -516,7 +498,7 @@ async function startServer() {
       !pathLower.startsWith('/app/') &&
       !pathLower.startsWith('/category/') &&
       !pathLower.startsWith('/categories/') &&
-      !pathLower.startsWith('/s/') &&
+      !pathLower.startsWith('/moreinfo/') &&
       !pathLower.startsWith('/news/') &&
       !pathLower.startsWith('/videos/') &&
       !pathLower.startsWith('/admin')
@@ -662,9 +644,9 @@ async function startServer() {
       const canonicalUrl = typeof seoResult === 'object' && seoResult ? seoResult.canonicalUrl : undefined;
 
       // Real 404 response for missing slugs to eliminate Googlebot Soft 404 violations
-      // Exclude /moreinfo, /gateway routes so client SPA can hydrate and auto-sync newly added apps
+      // Exclude /moreinfo routes so client SPA can hydrate and auto-sync newly added apps
       const reqPath = (req.originalUrl || '').split('?')[0].split('#')[0];
-      const isGatewayRoute = reqPath.startsWith('/moreinfo') || reqPath.startsWith('/gateway') || reqPath.startsWith('/info/');
+      const isGatewayRoute = reqPath.startsWith('/moreinfo');
 
       if (isNotFound && !isGatewayRoute) {
         const notFoundHtml = `<!doctype html>
@@ -719,16 +701,8 @@ async function startServer() {
         }
       }
       const isDisallowedRoute = isNotFound ||
-        reqUrlLower.startsWith('/s/') ||
-        reqUrlLower.startsWith('/dl/') ||
-        reqUrlLower.startsWith('/out/') ||
-        reqUrlLower.startsWith('/download/') ||
-        reqUrlLower.startsWith('/gateway/') ||
-        reqUrlLower.startsWith('/gateway') ||
-        reqUrlLower.startsWith('/info/') ||
         reqUrlLower.startsWith('/moreinfo/') ||
         reqUrlLower.startsWith('/moreinfo') ||
-        reqUrlLower.startsWith('/moredetail/') ||
         reqUrlLower.startsWith('/admin') ||
         reqUrlLower.startsWith('/login') ||
         reqUrlLower.startsWith('/masterworld') ||

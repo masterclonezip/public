@@ -98,7 +98,7 @@ export function isValidDestinationUrl(rawUrl: unknown): rawUrl is string {
       }
     }
     const pathname = parsed.pathname.toLowerCase();
-    if (pathname.startsWith('/moreinfo') || pathname.startsWith('/gateway')) {
+    if (pathname.startsWith('/moreinfo')) {
       return false;
     }
     return true;

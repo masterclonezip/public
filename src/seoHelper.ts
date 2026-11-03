@@ -313,19 +313,6 @@ export async function injectSeoTags(template: string, urlPath: string, hostUrl?:
     title = `Admin Panel`;
     description = `Admin Control Dashboard`;
     pageType = 'static';
-  } else if (cleanPathLower.startsWith('/s/')) {
-    const slug = cleanPath.split('/s/')[1];
-    const app = apps.find((a: any) => getField(a, 'slug').toLowerCase() === slug);
-    if (app) {
-      title = `Download ${getField(app, 'name')}`;
-      description = `Secure download link for ${getField(app, 'name')}.`;
-      customCanonicalUrl = getField(app, 'canonical_url');
-      pageType = 'app';
-      targetApp = app;
-    } else {
-      isNotFound = true;
-      pageType = '404';
-    }
   } else if (cleanPathLower === '/news') {
     title = getField(settings, 'news_meta_title') || `News & Updates`;
     description = getField(settings, 'news_meta_description') || `The latest news, reports, and platform updates.`;
@@ -445,7 +432,7 @@ export async function injectSeoTags(template: string, urlPath: string, hostUrl?:
       title = getField(settings, 'safety_meta_title') || `Platform Safety & Integrity Status`;
       description = getField(settings, 'safety_meta_description') || `Live verification, integrity hash checks, and safety ratings for catalog applications.`;
     }
-  } else if (cleanPathLower.startsWith('/info/') || cleanPathLower.startsWith('/moreinfo/') || cleanPathLower.startsWith('/moredetail/') || cleanPathLower.startsWith('/gateway/') || cleanPathLower.startsWith('/download/')) {
+  } else if (cleanPathLower.startsWith('/moreinfo/')) {
     const parts = cleanPathLower.split('/');
     const slug = parts[parts.length - 1];
     const app = resolveAppSlug(slug, apps);

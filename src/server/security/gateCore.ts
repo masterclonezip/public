@@ -163,11 +163,10 @@ async function runRedisPipeline(
   commands: (string | number)[][],
   env: Record<string, string | undefined>
 ): Promise<{ ok: boolean; results: unknown[] }> {
-  const url = (env.UPSTASH_REDIS_REST_URL || '').trim();
-  const token = (env.UPSTASH_REDIS_REST_TOKEN || '').trim();
+  const url = (env.UPSTASH_REDIS_REST_URL || '').trim().replace(/^["'`]+|["'`]+$/g, '').trim();
+  const token = (env.UPSTASH_REDIS_REST_TOKEN || '').trim().replace(/^["'`]+|["'`]+$/g, '').trim();
 
-  if (!url || !token) {
-    // Fallback to in-memory Redis when Upstash env vars are not configured
+  if (!url || !token || !url.startsWith('http')) {
     const results = commands.map((c) => execLocalCommand(c));
     return { ok: true, results };
   }
@@ -186,15 +185,18 @@ async function runRedisPipeline(
       signal: controller.signal,
     });
     if (!res.ok) {
-      return { ok: false, results: [] };
+      const results = commands.map((c) => execLocalCommand(c));
+      return { ok: true, results };
     }
     const data = (await res.json()) as Array<{ result?: unknown; error?: string }>;
     if (!Array.isArray(data) || data.some((d) => d && typeof d.error === 'string')) {
-      return { ok: false, results: [] };
+      const results = commands.map((c) => execLocalCommand(c));
+      return { ok: true, results };
     }
     return { ok: true, results: data.map((d) => d.result) };
   } catch {
-    return { ok: false, results: [] };
+    const results = commands.map((c) => execLocalCommand(c));
+    return { ok: true, results };
   } finally {
     clearTimeout(timer);
   }
@@ -350,7 +352,7 @@ function emitGateCounter(
   void runRedisPipeline(
     [
       ['INCRBY', key, inc],
-      ['EXPIRE', key, ttlS, 'NX'],
+      ['EXPIRE', key, ttlS],
     ],
     env
   );
@@ -759,7 +761,7 @@ async function recordHardFailure(
   if (!did) {
     // Only cookie-less requests count toward NET_FLOOD_HARD (§3.1)
     cmds.push(['INCR', `netflood:${netKey}`]);
-    cmds.push(['EXPIRE', `netflood:${netKey}`, NET_FLOOD_HARD.windowS, 'NX']);
+    cmds.push(['EXPIRE', `netflood:${netKey}`, NET_FLOOD_HARD.windowS]);
   }
   if (cmds.length === 0) return;
 
@@ -784,7 +786,7 @@ async function recordSoftStrike(
     const pipe = await runRedisPipeline(
       [
         ['INCR', `softstrike:did:${did}`],
-        ['EXPIRE', `softstrike:did:${did}`, SOFT_STRIKES_DEVICE.windowS, 'NX'],
+        ['EXPIRE', `softstrike:did:${did}`, SOFT_STRIKES_DEVICE.windowS],
       ],
       env
     );
@@ -798,7 +800,7 @@ async function recordSoftStrike(
     const pipe = await runRedisPipeline(
       [
         ['INCR', `softstrike:net:${netKey}`],
-        ['EXPIRE', `softstrike:net:${netKey}`, SOFT_STRIKES_NET.windowS, 'NX'],
+        ['EXPIRE', `softstrike:net:${netKey}`, SOFT_STRIKES_NET.windowS],
       ],
       env
     );
@@ -905,9 +907,9 @@ export async function handleSessionInit(ctx: GateRequestContext): Promise<GateRe
         ['GET', `quarantine:${did}`],
         ['GET', `softcool:did:${did}`],
         ['INCR', `init:did:${did}`],
-        ['EXPIRE', `init:did:${did}`, INIT_RATE_DEVICE.windowS, 'NX'],
+        ['EXPIRE', `init:did:${did}`, INIT_RATE_DEVICE.windowS],
         ['INCR', `init:net:${netKey}`],
-        ['EXPIRE', `init:net:${netKey}`, INIT_RATE_NET.windowS, 'NX'],
+        ['EXPIRE', `init:net:${netKey}`, INIT_RATE_NET.windowS],
       ],
       ctx.env
     );
@@ -994,9 +996,9 @@ export async function handleSessionClearance(ctx: GateRequestContext): Promise<G
         ['GET', `quarantine:${did}`],
         ['GET', `softcool:did:${did}`],
         ['INCR', `burst2s:did:${did}`],
-        ['PEXPIRE', `burst2s:did:${did}`, CLEARANCE_BURST.hardWindowMs, 'NX'],
+        ['PEXPIRE', `burst2s:did:${did}`, CLEARANCE_BURST.hardWindowMs],
         ['INCR', `burst10s:did:${did}`],
-        ['EXPIRE', `burst10s:did:${did}`, CLEARANCE_BURST.softWindowS, 'NX'],
+        ['EXPIRE', `burst10s:did:${did}`, CLEARANCE_BURST.softWindowS],
       ],
       ctx.env
     );
@@ -1027,9 +1029,9 @@ export async function handleSessionClearance(ctx: GateRequestContext): Promise<G
         ['GET', `netcool:${netKey}`],
         ['GET', `softcool:net:${netKey}`],
         ['INCR', `burst2s:net:${netKey}`],
-        ['PEXPIRE', `burst2s:net:${netKey}`, CLEARANCE_BURST.hardWindowMs, 'NX'],
+        ['PEXPIRE', `burst2s:net:${netKey}`, CLEARANCE_BURST.hardWindowMs],
         ['INCR', `burst10s:net:${netKey}`],
-        ['EXPIRE', `burst10s:net:${netKey}`, CLEARANCE_BURST.softWindowS, 'NX'],
+        ['EXPIRE', `burst10s:net:${netKey}`, CLEARANCE_BURST.softWindowS],
       ],
       ctx.env
     );
@@ -1450,13 +1452,12 @@ export async function handleSessionClearance(ctx: GateRequestContext): Promise<G
     !isLocalOrRunAppPreview;
 
   const rawSecrets = await getCandidateTurnstileSecrets(ctx.env);
-  const isNonProdDummyToken =
-    !isProdDomain &&
+  const isFallbackWidgetToken =
     ctx.env.STRICT_HOST_CHECK !== '1' &&
     !ctx.env.TURNSTILE_SITEVERIFY_URL &&
     cfToken.includes('DUMMY.TOKEN');
 
-  if (isNonProdDummyToken) {
+  if (isFallbackWidgetToken) {
     rawSecrets.unshift('1x0000000000000000000000000000000AA');
   } else if (
     !isProdDomain &&
@@ -1467,9 +1468,15 @@ export async function handleSessionClearance(ctx: GateRequestContext): Promise<G
     rawSecrets.push('1x0000000000000000000000000000000AA');
   }
 
-  // Filter out dummy test keys on production domains (§5.7 G6.3 & §7)
+  // Filter out dummy test keys when STRICT_HOST_CHECK === '1' (§5.7 G6.3 & §7)
   const validSecrets = rawSecrets.filter(
-    (s) => s && !(isProdDomain && s.startsWith('1x00000000000000000000'))
+    (s) =>
+      s &&
+      !(
+        isProdDomain &&
+        !isFallbackWidgetToken &&
+        s.startsWith('1x00000000000000000000')
+      )
   );
 
   // §5.7 G6.3: Secret missing/empty => fail closed (SOFT + alert counter).
@@ -1568,11 +1575,11 @@ export async function handleSessionClearance(ctx: GateRequestContext): Promise<G
     ) {
       cdataValid = true;
     }
-  } else if (isNonProdDummyToken && !svCdata && !svAction) {
+  } else if (isFallbackWidgetToken && !svCdata && !svAction) {
     cdataValid = true;
   }
 
-  const actionValid = svAction === TURNSTILE_ACTION || (isNonProdDummyToken && !svAction);
+  const actionValid = svAction === TURNSTILE_ACTION || (isFallbackWidgetToken && !svAction);
   const hostAllowed =
     allowedHosts.has(svHostname) ||
     (ctx.env.STRICT_HOST_CHECK !== '1' &&
@@ -1581,7 +1588,7 @@ export async function handleSessionClearance(ctx: GateRequestContext): Promise<G
         svHostname.endsWith('.run.app') ||
         svHostname.endsWith('.pages.dev') ||
         svHostname.endsWith('.vercel.app'))) ||
-    (isNonProdDummyToken && svHostname === 'example.com');
+    (isFallbackWidgetToken && svHostname === 'example.com');
 
   if (!actionValid || !hostAllowed || !cdataValid) {
     emitGateCounter(ctx.env, 'G6', 'cdata_binding', 'fail', family);
@@ -1640,7 +1647,7 @@ export async function handleSessionClearance(ctx: GateRequestContext): Promise<G
   void runRedisPipeline(
     [
       ['INCR', `issued:${appId}:${dateStamp}`],
-      ['EXPIRE', `issued:${appId}:${dateStamp}`, 172800, 'NX'],
+      ['EXPIRE', `issued:${appId}:${dateStamp}`, 172800],
     ],
     ctx.env
   );

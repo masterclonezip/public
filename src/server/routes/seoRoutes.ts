@@ -223,16 +223,8 @@ Disallow: /api/
 Disallow: /admin/
 Disallow: /login/
 Disallow: /masterworld/
-Disallow: /download/
-Disallow: /download/*
-Disallow: /gateway/
-Disallow: /gateway/*
-Disallow: /info/
-Disallow: /info/*
 Disallow: /moreinfo/
-Disallow: /moreinfo/*
-Disallow: /moredetail/
-Disallow: /moredetail/*`;
+Disallow: /moreinfo/*`;
 
   const agentBlocks = namedAgents
     .map((ua) => `User-agent: ${ua}\n${blockRules}`)
@@ -246,22 +238,8 @@ Disallow: /api/
 Disallow: /admin/
 Disallow: /login/
 Disallow: /masterworld/
-Disallow: /s/
-Disallow: /s/*
-Disallow: /dl/
-Disallow: /dl/*
-Disallow: /out/
-Disallow: /out/*
-Disallow: /download/
-Disallow: /download/*
-Disallow: /gateway/
-Disallow: /gateway/*
-Disallow: /info/
-Disallow: /info/*
 Disallow: /moreinfo/
 Disallow: /moreinfo/*
-Disallow: /moredetail/
-Disallow: /moredetail/*
 Disallow: /safety
 Disallow: /safety-status
 

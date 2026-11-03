@@ -27,6 +27,21 @@ export async function onRequest(context) {
     return response;
   }
 
+  // Enforce strict no-store and noindex on /moreinfo gateway routes at the edge
+  if (pathname.toLowerCase().startsWith('/moreinfo')) {
+    const headers = new Headers(response.headers);
+    headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, private, max-age=0');
+    headers.set('CDN-Cache-Control', 'no-store, private');
+    headers.set('Cloudflare-CDN-Cache-Control', 'no-store, private');
+    headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
+    headers.set('Referrer-Policy', 'no-referrer');
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers
+    });
+  }
+
   const bareHost = rawHost.replace(/^(?:www\.|admin\.|masterworld\.)+/i, '');
   const isLocal =
     bareHost === 'localhost' ||

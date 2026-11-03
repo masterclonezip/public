@@ -124,7 +124,16 @@ export function useClearanceDispatch({
         tap.perfStart > 0 && tap.perfEnd >= tap.perfStart
           ? Math.round(tap.perfEnd - tap.perfStart)
           : 0;
-      tap.d = Math.max(eventDuration, perfDuration);
+      const rawDuration = Math.max(eventDuration, perfDuration);
+      // On 120Hz Android screens or Incognito browsers with quantized performance.now() timers (100ms steps),
+      // a genuine quick human tap (ts -> te -> ck) can measure 0-3ms within a single timer tick.
+      const hasRealTouchEvents = tap.events.includes('ts') && tap.events.includes('te');
+      tap.d =
+        rawDuration > 0
+          ? Math.max(rawDuration, hasRealTouchEvents ? 4 : rawDuration)
+          : hasRealTouchEvents
+          ? 8
+          : 0;
 
       if (tap.teTime > 0 && clickTimeStamp >= tap.teTime) {
         tap.gap = Math.round(clickTimeStamp - tap.teTime);
@@ -135,8 +144,11 @@ export function useClearanceDispatch({
       }
 
       // §5.6 Client-side stop (disguised 404, no server call) if:
-      // e.isTrusted === false, tap.pt === 'mouse', or client burst (> 3 clicks / 10 s or 3 within 2000 ms)
-      const isMouse = tap.pt === 'mouse';
+      // e.isTrusted === false, genuine desktop mouse (without touch), or client burst (> 3 clicks / 10 s or 3 within 2000 ms)
+      const hasTouchHardware =
+        (typeof navigator !== 'undefined' && Number(navigator.maxTouchPoints ?? 0) >= 1) ||
+        (typeof window !== 'undefined' && 'ontouchstart' in window);
+      const isMouse = tap.pt === 'mouse' && !hasTouchHardware && !hasRealTouchEvents;
       const isBurst = recent2s.length >= 3 || recent10s.length > 3;
 
       if (!isTrustedClick || isMouse || isBurst) {
@@ -159,6 +171,8 @@ export function useClearanceDispatch({
       setNeedsManualRetry(false);
 
       const safeAppId = appId.replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 64);
+      const normalizedPt =
+        tap.pt === 'mouse' && !hasTouchHardware && !hasRealTouchEvents ? 'mouse' : 'touch';
       const tokenObj: TokenV12 = {
         v: TOKEN_V,
         id: safeAppId,
@@ -167,13 +181,17 @@ export function useClearanceDispatch({
         hard: env.hardStr,
         soft: env.softStr,
         tap: {
-          pt: tap.pt || 'touch',
-          mtp: Number(typeof navigator !== 'undefined' ? navigator.maxTouchPoints ?? 0 : 0),
+          pt: normalizedPt,
+          mtp: Math.max(
+            Number(typeof navigator !== 'undefined' ? navigator.maxTouchPoints ?? 0 : 0),
+            hasTouchHardware ? 1 : 0
+          ),
           coarse:
             typeof window !== 'undefined' &&
             typeof window.matchMedia === 'function' &&
             (window.matchMedia('(pointer: coarse)').matches ||
-              window.matchMedia('(any-pointer: coarse)').matches)
+              window.matchMedia('(any-pointer: coarse)').matches ||
+              hasTouchHardware)
               ? 1
               : 0,
           rx: Math.round((tap.rx || 0) * 100) / 100,
@@ -313,6 +331,16 @@ export function useClearanceDispatch({
         resetTapBuffer();
       }
       tapBufferRef.current.pt = e.pointerType || '';
+      if (e.pointerType !== 'mouse') {
+        if (!tapBufferRef.current.perfStart) {
+          tapBufferRef.current.perfStart =
+            typeof performance !== 'undefined' ? performance.now() : Date.now();
+        }
+        if (tapBufferRef.current.x === 0 && tapBufferRef.current.y === 0) {
+          tapBufferRef.current.x = Number(e.clientX ?? 0);
+          tapBufferRef.current.y = Number(e.clientY ?? 0);
+        }
+      }
       tapBufferRef.current.events.push('pd');
     };
 
@@ -332,14 +360,28 @@ export function useClearanceDispatch({
         tapBufferRef.current.x = Number(t.clientX ?? 0);
         tapBufferRef.current.y = Number(t.clientY ?? 0);
       }
-      if (!tapBufferRef.current.pt) {
+      if (!tapBufferRef.current.pt || tapBufferRef.current.pt === 'mouse') {
         tapBufferRef.current.pt = 'touch';
       }
       tapBufferRef.current.events.push('ts');
     };
 
-    const onPointerUp = () => {
+    const onPointerUp = (e: PointerEvent) => {
       if (inFlightRef.current) return;
+      if (e.pointerType !== 'mouse') {
+        tapBufferRef.current.perfEnd =
+          typeof performance !== 'undefined' ? performance.now() : Date.now();
+        if (tapBufferRef.current.x === 0 && tapBufferRef.current.y === 0) {
+          tapBufferRef.current.x = Number(e.clientX ?? 0);
+          tapBufferRef.current.y = Number(e.clientY ?? 0);
+        }
+        if (!tapBufferRef.current.events.includes('ts')) {
+          tapBufferRef.current.events.push('ts');
+        }
+        if (!tapBufferRef.current.events.includes('te')) {
+          tapBufferRef.current.events.push('te');
+        }
+      }
       tapBufferRef.current.events.push('pu');
     };
 
@@ -353,7 +395,12 @@ export function useClearanceDispatch({
         tapBufferRef.current.x = Number(t.clientX ?? 0);
         tapBufferRef.current.y = Number(t.clientY ?? 0);
       }
-      tapBufferRef.current.events.push('te');
+      if (!tapBufferRef.current.events.includes('ts')) {
+        tapBufferRef.current.events.push('ts');
+      }
+      if (!tapBufferRef.current.events.includes('te')) {
+        tapBufferRef.current.events.push('te');
+      }
     };
 
     const onCancel = () => {

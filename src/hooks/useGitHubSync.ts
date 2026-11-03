@@ -32,29 +32,46 @@ import rawUseTurnstileTs from './useTurnstileVerification.ts?raw';
 import rawUseClearanceDispatchTs from './useClearanceDispatch.ts?raw';
 import rawGateConfigTs from '../lib/gateConfig.ts?raw';
 import rawGateCoreTs from '../server/security/gateCore.ts?raw';
+import rawLinkServiceTs from '../server/services/linkService.ts?raw';
+import rawDeviceProbeTs from '../lib/deviceProbe.ts?raw';
+import rawGatewayPageTsx from '../pages/GatewayPage.tsx?raw';
+import rawAppPublicTsx from '../AppPublic.tsx?raw';
+import rawFallbackRouteMatcherTsx from '../components/FallbackRouteMatcher.tsx?raw';
+import rawPreRenderEngineTs from '../seo/preRenderEngine.ts?raw';
+import rawCatchallJs from '../../functions/api/[[catchall]].js?raw';
+import rawVercelJson from '../../vercel.json?raw';
 
 const BUNDLED_PUBLIC_CORE_FILES: Record<string, string> = {
   'functions/_middleware.js': rawMiddlewareJs,
+  'functions/api/[[catchall]].js': rawCatchallJs,
   'public/_headers': rawHeadersFile,
+  'vercel.json': rawVercelJson,
   'scripts/prerender.ts': rawPrerenderTs,
   'src/lib/sitemapGenerator.ts': rawSitemapGeneratorTs,
   'src/lib/seoUtils.ts': rawSeoUtilsTs,
   'src/seoHelper.ts': rawSeoHelperTs,
   'src/seo/utils.ts': rawSeoSubUtilsTs,
+  'src/seo/preRenderEngine.ts': rawPreRenderEngineTs,
   'src/seo/schemaBuilder.ts': rawSchemaBuilderTs,
   'src/seo/metaBuilder.ts': rawMetaBuilderTs,
   'src/seo/renderers/appDetailsRenderer.ts': rawAppDetailsRendererTs,
   'src/seo/initialDataOptimizer.ts': rawInitialDataOptimizerTs,
   'src/server/routes/seoRoutes.ts': rawSeoRoutesTs,
   'src/components/Meta.tsx': rawMetaTsx,
+  'src/components/FallbackRouteMatcher.tsx': rawFallbackRouteMatcherTsx,
   'src/components/public/appDetails/AppSimilarCarousel.tsx': rawAppSimilarCarouselTsx,
   'src/pages/AppDetails.tsx': rawAppDetailsPageTsx,
+  'src/pages/GatewayPage.tsx': rawGatewayPageTsx,
+  'src/AppPublic.tsx': rawAppPublicTsx,
+  'src/App.tsx': rawAppPublicTsx,
   'src/contexts/DataContextPublic.tsx': rawDataContextPublicTsx,
   'src/components/ClearanceButton.tsx': rawClearanceButtonTsx,
   'src/hooks/useTurnstileVerification.ts': rawUseTurnstileTs,
   'src/hooks/useClearanceDispatch.ts': rawUseClearanceDispatchTs,
   'src/lib/gateConfig.ts': rawGateConfigTs,
-  'src/server/security/gateCore.ts': rawGateCoreTs
+  'src/lib/deviceProbe.ts': rawDeviceProbeTs,
+  'src/server/security/gateCore.ts': rawGateCoreTs,
+  'src/server/services/linkService.ts': rawLinkServiceTs
 };
 
 export function useGitHubSync(
@@ -851,7 +868,7 @@ export function useGitHubSync(
         const sitemapLines = publicDomain
           ? `\nSitemap: ${publicDomain}/sitemap.xml\nSitemap: ${publicDomain}/sitemap-news.xml\nSitemap: ${publicDomain}/sitemap-apps.xml\nSitemap: ${publicDomain}/sitemap-static.xml\nSitemap: ${publicDomain}/sitemap-videos.xml\nSitemap: ${publicDomain}/sitemap-developers.xml\n`
           : '';
-        const robotsContent = `User-agent: *\nAllow: /\nAllow: /api/v1/public/\nDisallow: /api/\nDisallow: /admin/\nDisallow: /login/\nDisallow: /masterworld/\nDisallow: /s/\nDisallow: /s/*\nDisallow: /dl/\nDisallow: /dl/*\nDisallow: /out/\nDisallow: /out/*\nDisallow: /download/\nDisallow: /download/*\nDisallow: /gateway/\nDisallow: /gateway/*\nDisallow: /moreinfo/\nDisallow: /moreinfo/*\nDisallow: /info/\nDisallow: /info/*\nDisallow: /moredetail/\nDisallow: /moredetail/*\n${sitemapLines}`;
+        const robotsContent = `User-agent: *\nAllow: /\nAllow: /api/v1/public/\nDisallow: /api/\nDisallow: /admin/\nDisallow: /login/\nDisallow: /masterworld/\nDisallow: /moreinfo/\nDisallow: /moreinfo/*\n${sitemapLines}`;
         primaryBatchFiles.push({
           path: 'public/robots.txt',
           content: robotsContent

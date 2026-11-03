@@ -149,17 +149,12 @@ export async function getPagePreRender(urlPath: string, data: any): Promise<stri
     bodyHtml = renderers.renderDevelopersList(developers, settings);
   } else if (cleanPathLower === '/faq' || cleanPathLower === '/faqs') {
     bodyHtml = renderers.renderFaqPage(settings);
-  } else if (cleanPathLower.startsWith('/info/') || cleanPathLower.startsWith('/moreinfo/') || cleanPathLower.startsWith('/moredetail/') || cleanPathLower.startsWith('/gateway/') || cleanPathLower.startsWith('/download/')) {
+  } else if (cleanPathLower.startsWith('/moreinfo/')) {
     const parts = cleanPathLower.split('/');
     const slug = parts[parts.length - 1];
     bodyHtml = renderers.renderGateway(slug, settings, apps);
   } else if (cleanPathLower.startsWith('/app/')) {
     const slug = cleanPathLower.replace(/^\/app\//, '/').replace(/^\/|\/$/g, '');
-    const matchedApp = resolveAppSlug(slug, apps) || apps.find((a: any) => getField(a, 'slug')?.toLowerCase() === slug.toLowerCase());
-    const seoFeed = matchedApp ? getLocalFallbackReviewsForApp(getField(matchedApp, 'id'), getField(matchedApp, 'slug')) : { reviews: [], stats: null };
-    bodyHtml = renderers.renderAppDetails(slug, apps, settings, seoFeed.reviews, seoFeed.stats, news);
-  } else if (cleanPathLower.startsWith('/s/')) {
-    const slug = cleanPath.split('/s/')[1];
     const matchedApp = resolveAppSlug(slug, apps) || apps.find((a: any) => getField(a, 'slug')?.toLowerCase() === slug.toLowerCase());
     const seoFeed = matchedApp ? getLocalFallbackReviewsForApp(getField(matchedApp, 'id'), getField(matchedApp, 'slug')) : { reviews: [], stats: null };
     bodyHtml = renderers.renderAppDetails(slug, apps, settings, seoFeed.reviews, seoFeed.stats, news);

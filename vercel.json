@@ -15,7 +15,7 @@
       "destination": "/api/index"
     },
     {
-      "source": "/(moreinfo|gateway|info|moredetail|download)/(.*)",
+      "source": "/moreinfo/(.*)",
       "destination": "/"
     },
     {
@@ -109,7 +109,7 @@
       ]
     },
     {
-      "source": "/(moreinfo|gateway|download|info|moredetail|s|dl|out|admin|login|masterworld|safety|safety-status)(.*)",
+      "source": "/(moreinfo|admin|login|masterworld|safety|safety-status)(.*)",
       "headers": [
         {
           "key": "Cache-Control",
