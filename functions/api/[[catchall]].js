@@ -3,7 +3,13 @@ import { HARD_RESPONSE_STATUS, HARD_RESPONSE_BODY } from '../../src/lib/gateConf
 import { resolveAppSlug } from '../../src/lib/slugResolver';
 import { encryptAesGcmV2, decryptVaultValue } from '../../src/server/crypto';
 import { safeEncrypt, safeDecrypt, getAesSecret } from '../../src/lib/cryptoUtils';
-import { setRamVaultLink, isValidDestinationUrl, getPublicTurnstileSiteKey } from '../../src/server/services/linkService';
+import {
+  setRamVaultLink,
+  isValidDestinationUrl,
+  getPublicTurnstileSiteKey,
+  getEnvOnlyTurnstileSiteKey,
+  isValidTurnstileSiteKey,
+} from '../../src/server/services/linkService';
 import staticData from '../../src/lib/staticData.json';
 
 async function sha256Hex(str) {
@@ -436,8 +442,9 @@ export async function onRequest(context) {
         cloudinary: {
           cloudName: env?.CLOUDINARY_CLOUD_NAME || env?.VITE_CLOUDINARY_CLOUD_NAME || '',
         },
+        turnstileSiteKey: getEnvOnlyTurnstileSiteKey(env) || getPublicTurnstileSiteKey(env),
         turnstile: {
-          siteKey: getPublicTurnstileSiteKey(env),
+          siteKey: getEnvOnlyTurnstileSiteKey(env) || getPublicTurnstileSiteKey(env),
         },
       }),
       {
@@ -762,12 +769,19 @@ export async function onRequest(context) {
       } catch (_) {}
     }
 
-    const resolvedSiteKey = getPublicTurnstileSiteKey(env);
+    const resolvedSiteKey = getEnvOnlyTurnstileSiteKey(env) || getPublicTurnstileSiteKey(env);
     const publicSettings = { ...settings };
     delete publicSettings.turnstile_secret_key;
     delete publicSettings._rest_admin_bypass;
-    if (resolvedSiteKey) {
+    if (resolvedSiteKey && isValidTurnstileSiteKey(resolvedSiteKey)) {
       publicSettings.turnstile_site_key = resolvedSiteKey;
+    } else if (
+      publicSettings.turnstile_site_key &&
+      isValidTurnstileSiteKey(publicSettings.turnstile_site_key)
+    ) {
+      publicSettings.turnstile_site_key = String(publicSettings.turnstile_site_key).trim();
+    } else {
+      delete publicSettings.turnstile_site_key;
     }
 
     const snapshot = {

@@ -194,26 +194,70 @@ Navigate to **Speed** > **Optimization** (and **Caching** > **Configuration**):
 
 ---
 
-## 7. Security, Bot Defense & Turnstile Integration
+## 7. Security, Bot Defense, Disguised 404 & Turnstile Integration
 
-Navigate to **Security** in the sidebar:
+Navigate to **Security** and **Turnstile** in the Cloudflare sidebar:
 
-### A. Turnstile Anti-Bot Verification (Free Unlimited CAPTCHA Alternative)
-The platform uses Cloudflare Turnstile to protect the `/moreinfo` download clearance gateway and prevent fake review flooding.
+### A. Turnstile Anti-Bot Verification & Environment Variable Rules (CRITICAL)
+The platform uses Cloudflare Turnstile to protect the isolated `/moreinfo/:slug` verification portal while guaranteeing a 100% domain-agnostic Master Clone architecture.
 
-1. Go to **Turnstile** in the main Cloudflare sidebar.
-2. Click **Add Site**:
-   - **Site name**: `Catalog Portal Clearance`
-   - **Domain**: Your production domain (e.g., `example.com`).
-   - **Widget Mode**: **Managed** (or Non-interactive).
-3. Copy the keys and add them to your environment:
-   - **Site Key** ➔ `VITE_TURNSTILE_SITE_KEY` (in `.env` and Cloudflare Pages variables).
-   - **Secret Key** ➔ `TURNSTILE_SECRET_KEY` (in `.env` and Cloudflare Pages encrypted variables).
+1. **Create Widget in Cloudflare Dashboard**:
+   - Go to **Turnstile** in the main Cloudflare sidebar -> Click **Add widget**.
+   - **Widget name**: Any descriptive name (e.g., `Mobile Verification Portal`).
+   - **Hostname Management (VERY IMPORTANT)**:
+     - Add **ONLY the bare domain** (e.g., `example.com`).
+     - **NEVER** include `https://`, `http://`, or paths like `/moreinfo` in the hostname list.
+     - Optional: Add `pages.dev` if you also test on `*.pages.dev` preview URLs.
+   - **Widget Mode**: **Managed** (recommended).
+   - **Pre-clearance**: **OFF** (leave toggled off).
+2. **Copy Keys Using "Click to copy" (Never Type Manually)**:
+   - **Site Key (`24 characters`, starts with `0x4...`)**: Used by the frontend widget.
+   - **Secret Key (`35 characters`, starts with `0x4...`)**: Used by the backend `siteverify` validator.
+   - ⚠️ **Warning**: Never use screenshot OCR or manual typing for keys (characters like `1` vs `l` or `0` vs `O` will corrupt the key and trigger `"Invalid sitekey"`). Always tap **"Click to copy"** in Cloudflare Dashboard.
+3. **Add Environment Variables in Cloudflare Pages**:
+   Go to **Workers & Pages** -> **[Your Project]** -> **Settings** -> **Variables and Secrets** and add for **BOTH Production and Preview**:
 
-### B. Security & Bot Settings
-- **Bots** > **Bot Fight Mode**: **ON**.
-  *(Mitigates malicious scrapers and automated bot attacks. Cloudflare automatically exempts verified search engine crawlers such as Googlebot, Bingbot, and Applebot).*
-- **Security** > **Settings** > **Security Level**: `Medium` (or `Essentially Off` for friction-free public browsing).
+   | Variable Name | Value Format | Type in Cloudflare Pages | Purpose |
+   | :--- | :--- | :--- | :--- |
+   | `VITE_TURNSTILE_SITE_KEY` | `0x4...` (**24 chars**) | **Plaintext** *(Required at build & runtime)* | Primary public Turnstile Site Key |
+   | `TURNSTILE_SITE_KEY` | `0x4...` (**24 chars**) | **Plaintext** | Instant Edge runtime Site Key alias |
+   | `TURNSTILE_SECRET_KEY` | `0x4...` (**35 chars**) | **Secret / Encrypted** (or Plaintext) | Server-side `siteverify` Secret Key |
+
+4. **How the Two-Step Turnstile Handshake Works (`Client Widget -> Server /siteverify`)**:
+   - **Step 1 — Client-Side Challenge (`useTurnstileVerification.ts` + `ClearanceButton.tsx`)**:
+     - When a visitor opens `/moreinfo/:slug` on a real mobile phone, the frontend calls `POST /api/v1/app/session-init` to receive a signed single-use nonce and the live runtime `siteKey` (`siteKeys[]`).
+     - The frontend sanitizes any accidental quotes, invisible whitespace, or `KEY=` prefixes and renders the authentic Cloudflare Turnstile widget (`window.turnstile.render`) with `action: 'mobile_clearance'` and `cData: "${appId}_${nonceId}_${hw}"` (binding the challenge token directly to the device's ARM/iOS hardware fingerprint).
+     - When the visitor passes the challenge, Cloudflare issues a temporary clearance token (`cfToken`) and enables the **PROCEED** button.
+     - If an environment variable has a stale key, `softReinit()` immediately removes the error box (`removeWidget()`) and rotates to the next valid candidate `0x4...` Site Key without looping on a broken key.
+   - **Step 2 — Mandatory Server-Side Validation (`gateCore.ts` Gate G6 -> `challenges.cloudflare.com/turnstile/v0/siteverify`)**:
+     - When the user taps **PROCEED**, the frontend sends `{ token, cf }` to `POST /api/v1/app/session-clearance`.
+     - After passing Gates G1–G5 and atomically burning the single-use nonce in Redis (`SET nonce:<nid> 1 EX 150 NX`), Gate G6 **always executes a server-to-server `POST https://challenges.cloudflare.com/turnstile/v0/siteverify`** using your private `TURNSTILE_SECRET_KEY` and `response: cf`.
+     - Gate G6 strictly verifies `svData.success === true`, `svData.action === 'mobile_clearance'`, hostname match, and `svData.cdata === "${appId}_${nid}_${hw}"` before Gate G7 decrypts the destination URL in RAM. Because every clearance call hits Cloudflare's `/siteverify` API with no client-side bypass, Cloudflare Turnstile Analytics records 100% of your server-side validations and clears the *"Siteverify isn't being called"* warning.
+
+### B. Bot Detection & Clean Disguised 404 Architecture (`/moreinfo/:slug`)
+The `/moreinfo/:slug` verification portal is strictly isolated for **genuine mobile phone users only** (e.g., Android & iOS phones on Reliance Jio, Airtel, Vi, BSNL, and regional broadband Wi-Fi). All bots, web crawlers, desktop computers, mobile browsers in **"Desktop site" mode**, and cloud/datacenter servers receive a **clean, indistinguishable `404 — Page Not Found`** response with zero hint of how or why the 404 was triggered:
+
+1. **Layer 1 — Cloudflare WAF Custom Rule (Edge 404 Block Before Functions Run)**:
+   - Navigate to **Security** > **WAF** > **Custom rules** > **Create rule**:
+   - **Rule Name**: `Strict Mobile-Only 404 Gate for MoreInfo & Session APIs`
+   - **Expression**:
+     ```text
+     (starts_with(http.request.uri.path, "/moreinfo") or starts_with(http.request.uri.path, "/api/v1/app/session-")) and (not (http.user_agent contains "Android" or http.user_agent contains "iPhone" or http.user_agent contains "iPad" or http.user_agent contains "iPod") or http.user_agent contains "Windows" or http.user_agent contains "Macintosh" or http.user_agent contains "X11" or http.user_agent contains "CrOS" or http.user_agent contains "bot" or http.user_agent contains "spider" or http.user_agent contains "crawl" or http.user_agent contains "HeadlessChrome" or http.user_agent contains "Playwright" or http.user_agent contains "Puppeteer")
+     ```
+   - **Action**: **Block** -> **Custom response**:
+     - **Response code**: `404`
+     - **Content-Type**: `application/json` (or `text/plain`)
+     - **Response body**: `{"error":"Not Found","status":404}`
+2. **Layer 2 — Cloudflare Edge Middleware (`functions/_middleware.js`)**:
+   - Automatically intercepts `/moreinfo/*` at the edge and returns an instant HTTP `404 Not Found` (`X-Robots-Tag: noindex, nofollow, noarchive, nosnippet`, `Cache-Control: no-store`) for any crawler, headless agent, `Sec-CH-UA-Mobile: ?0`, or desktop OS token (`Windows`, `Macintosh`, `X11`, `Linux x86_64`, `CrOS`).
+3. **Layer 3 — Synchronous Client Hardware & Desktop-Mode Probe (`deviceProbe.ts` & `GatewayPage.tsx`)**:
+   - On initial render (0ms, before the verification card mounts) and on window resize (if a user toggles **"Desktop site"** in mobile Chrome/Safari), `inspectClientMobileGate()` checks for desktop UA tokens, `navigator.userAgentData.mobile === false`, desktop viewport scaling (`window.innerWidth >= 768` on a mobile screen), non-touch hardware, WebDriver/CDP automation (`wb=1`, `hl=1`), and desktop/software GPUs (`SwiftShader`, `llvmpipe`, `RTX`, `GeForce`, desktop `Intel`/`Radeon`). Any match renders the clean `404 — Page Not Found` page.
+4. **Layer 4 — Server 7-Gate Cryptographic Pipeline (`gateCore.ts`)**:
+   - Enforces Gate G1 (Mobile UA, Client Hints, Cloud/Datacenter ASN `HOSTING_ASNS` 404 block with `NEVER_BLOCK_ASNS` protection for Indian mobile carriers), Gate G2 (Per-device cookie burst & quarantine), Gate G3 (HMAC nonce + `>= 1000ms` human dwell), Gate G4 (ARM/iOS & Mobile GPU silicon truth), Gate G5 (Physical capacitive touch `ts -> te -> ck` biomechanics), Gate G6 (Single-use atomic nonce burn + Turnstile verification), and Gate G7 (In-memory AES-256 link decryption). Every hard failure returns an identical padded HTTP `404` JSON response.
+
+### C. Additional Cloudflare Security Settings
+- **Bots** > **Bot Fight Mode**: **ON** *(Cloudflare automatically exempts verified search engine crawlers like Googlebot on public `/app/*` and `/news/*` pages while `/moreinfo/*` remains 100% unindexed and blocked)*.
+- **Security** > **Settings** > **Security Level**: `Medium` (or `Essentially Off` for friction-free public catalog browsing).
 - **Security** > **Settings** > **Browser Integrity Check**: **ON**.
 
 ---

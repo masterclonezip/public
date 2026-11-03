@@ -1345,116 +1345,158 @@ export async function handleSessionClearance(ctx: GateRequestContext): Promise<G
     return paddedHard404Response();
   }
 
-  // 2. Turnstile siteverify (§5.7 G6)
+  // 2. Turnstile siteverify (§5.7 G6 — Mandatory server-side verification with Cloudflare)
   const rawHost = (ctx.headers['x-forwarded-host'] || ctx.headers['host'] || '')
     .split(',')[0]
     .trim()
     .toLowerCase()
     .split(':')[0];
 
-  const rawSecrets = await getCandidateTurnstileSecrets(ctx.env);
-  const validSecrets = rawSecrets.filter(
-    (s) => s && !s.startsWith('1x00000000000000000000')
-  );
+  const isNonProdHost =
+    rawHost === 'localhost' ||
+    rawHost === '127.0.0.1' ||
+    rawHost === '[::1]' ||
+    rawHost.endsWith('.run.app');
 
-  // If the client used the fallback Turnstile widget token (e.g. when the admin's sitekey had a domain
-  // ownership mismatch 110200 or wasn't configured yet) OR no Turnstile secret key is configured yet,
-  // we rely on the already-verified G1 + G2 + G3 (HMAC nonce + >=1000ms human dwell + wb=0/hl=0/dk=0)
-  // + G4 (mobile GPU/hardware truth) + G5 (physical touch gesture) + G6.1 (single-use burned nonce)
-  // so genuine mobile users still receive their link instead of a 404 Error.
+  // Reject synthetic/dummy tokens on production domains
   if (
-    cfToken.includes('DUMMY.TOKEN') ||
     cfToken.startsWith('HW_VERIFIED_MOBILE.') ||
-    validSecrets.length === 0
+    (!isNonProdHost && cfToken.includes('DUMMY.TOKEN'))
   ) {
-    emitGateCounter(ctx.env, 'G6', 'hw_touch_verified_fallback', 'pass', family);
-  } else {
-    const svEndpoint =
-      ctx.env.TURNSTILE_SITEVERIFY_URL ||
-      'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+    emitGateCounter(ctx.env, 'G6', 'synthetic_token_rejected', 'fail', family);
+    await recordHardFailure(did, netKey, ctx.env, false);
+    return paddedHard404Response();
+  }
 
-    let svData: {
-      success?: boolean;
-      action?: string;
-      hostname?: string;
-      cdata?: string;
-      'error-codes'?: string[];
-    } | null = null;
-    let sawSoftTokenError = false;
-    let sawNetworkOr5xxError = false;
+  const rawSecrets = await getCandidateTurnstileSecrets(ctx.env);
+  const secretsToTry = isNonProdHost
+    ? rawSecrets
+    : rawSecrets.filter((s) => s && !s.startsWith('1x00000000000000000000'));
 
-    for (let i = 0; i < validSecrets.length; i++) {
-      const candidateSecret = validSecrets[i];
-      const svController = new AbortController();
-      const svTimer = setTimeout(() => svController.abort(), SITEVERIFY_TIMEOUT_MS);
-      try {
-        const svRes = await fetch(svEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            secret: candidateSecret,
-            response: cfToken,
-            remoteip: ctx.ip,
-          }),
-          signal: svController.signal,
-        });
-        if (svRes.status >= 500) {
-          sawNetworkOr5xxError = true;
-          continue;
-        }
-        svData = (await svRes.json()) as typeof svData;
-        if (svData?.success === true) {
-          break;
-        }
-        const codes = Array.isArray(svData?.['error-codes']) ? svData!['error-codes']! : [];
-        if (
-          codes.includes('timeout-or-duplicate') ||
-          codes.includes('internal-error')
-        ) {
-          sawSoftTokenError = true;
-        }
-      } catch {
+  // Secret missing/empty => fail closed (SOFT + alert counter per §5.7 G6.3; never skip siteverify)
+  if (secretsToTry.length === 0) {
+    emitGateCounter(ctx.env, 'G6', 'secret_missing', 'fail', family);
+    return softRetryResponse({ setCookie: setCookieHeader });
+  }
+
+  const svEndpoint =
+    ctx.env.TURNSTILE_SITEVERIFY_URL ||
+    'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+
+  let svData: {
+    success?: boolean;
+    action?: string;
+    hostname?: string;
+    cdata?: string;
+    'error-codes'?: string[];
+  } | null = null;
+  let sawSoftTokenError = false;
+  let sawNetworkOr5xxError = false;
+  let sawSecretConfigError = false;
+
+  for (let i = 0; i < secretsToTry.length; i++) {
+    const candidateSecret = secretsToTry[i];
+    const svController = new AbortController();
+    const svTimer = setTimeout(() => svController.abort(), SITEVERIFY_TIMEOUT_MS);
+    try {
+      const svRes = await fetch(svEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          secret: candidateSecret,
+          response: cfToken,
+          remoteip: ctx.ip,
+        }),
+        signal: svController.signal,
+      });
+      if (svRes.status >= 500) {
         sawNetworkOr5xxError = true;
-      } finally {
-        clearTimeout(svTimer);
+        continue;
       }
-    }
-
-    if (!svData || svData.success !== true) {
-      if (sawSoftTokenError) {
-        emitGateCounter(ctx.env, 'G6', 'siteverify_soft_err', 'fail', family);
-        return softRetryResponse({ setCookie: setCookieHeader });
+      svData = (await svRes.json()) as typeof svData;
+      if (svData?.success === true) {
+        break;
       }
-      if (sawNetworkOr5xxError) {
-        emitGateCounter(ctx.env, 'G6', 'siteverify_network_fallback', 'pass', family);
-      } else {
-        // Secret key in env/settings does not match the site key that rendered the widget on this clone domain.
-        // Because G1-G5 + G6.1 (HMAC nonce, dwell >= 1000ms, mobile GPU truth, physical touch, single-use nonce burn)
-        // have all passed, allow the verified mobile user through while emitting a diagnostic counter.
-        emitGateCounter(ctx.env, 'G6', 'siteverify_secret_mismatch_fallback', 'pass', family);
+      const codes = Array.isArray(svData?.['error-codes']) ? svData!['error-codes']! : [];
+      if (
+        codes.includes('timeout-or-duplicate') ||
+        codes.includes('internal-error')
+      ) {
+        sawSoftTokenError = true;
       }
-    } else {
-      const svCdata = String(svData.cdata || '');
-      if (svCdata.length >= 58) {
-        const cdataHw = svCdata.slice(-24);
-        const sep2 = svCdata.slice(-25, -24);
-        const cdataNid = svCdata.slice(-57, -25);
-        const sep1 = svCdata.slice(-58, -57);
-        const cdataAppId = svCdata.slice(0, -58);
-        if (
-          sep1 !== '_' ||
-          sep2 !== '_' ||
-          cdataAppId !== appId ||
-          !timingSafeEqualStr(cdataNid, nid) ||
-          !timingSafeEqualStr(cdataHw, hw)
-        ) {
-          emitGateCounter(ctx.env, 'G6', 'cdata_binding', 'fail', family);
-          return softRetryResponse({ setCookie: setCookieHeader });
-        }
+      if (
+        codes.includes('invalid-input-secret') ||
+        codes.includes('missing-input-secret')
+      ) {
+        sawSecretConfigError = true;
       }
-      emitGateCounter(ctx.env, 'G6', 'turnstile', 'pass', family);
+    } catch {
+      sawNetworkOr5xxError = true;
+    } finally {
+      clearTimeout(svTimer);
     }
   }
+
+  if (!svData || svData.success !== true) {
+    if (sawSoftTokenError || sawNetworkOr5xxError || sawSecretConfigError) {
+      emitGateCounter(ctx.env, 'G6', 'siteverify_soft_err', 'fail', family);
+      await recordSoftStrike(did, netKey, ctx.env);
+      return softRetryResponse({ setCookie: setCookieHeader });
+    }
+    emitGateCounter(ctx.env, 'G6', 'siteverify_hard_reject', 'fail', family);
+    await recordHardFailure(did, netKey, ctx.env, false);
+    return paddedHard404Response();
+  }
+
+  // Verify Turnstile action when returned by Cloudflare
+  if (svData.action && svData.action !== TURNSTILE_ACTION) {
+    emitGateCounter(ctx.env, 'G6', 'action_mismatch', 'fail', family);
+    await recordHardFailure(did, netKey, ctx.env, false);
+    return paddedHard404Response();
+  }
+
+  // Verify Turnstile hostname when returned by Cloudflare
+  if (svData.hostname && !isNonProdHost) {
+    const svHost = String(svData.hostname).trim().toLowerCase().replace(/^www\./, '');
+    const reqHost = rawHost.replace(/^www\./, '');
+    const allowedHosts = getAllowedHostnames(ctx.env);
+    const hostOk =
+      svHost === reqHost ||
+      allowedHosts.has(svHost) ||
+      allowedHosts.has(`www.${svHost}`);
+    if (!hostOk) {
+      emitGateCounter(ctx.env, 'G6', 'hostname_mismatch', 'fail', family);
+      await recordHardFailure(did, netKey, ctx.env, false);
+      return paddedHard404Response();
+    }
+  }
+
+  // Verify Turnstile cData hardware + nonce + appId commitment (`${appId}_${nid}_${hw}`)
+  const svCdata = String(svData.cdata || '');
+  if (svCdata) {
+    if (svCdata.length < 58) {
+      emitGateCounter(ctx.env, 'G6', 'cdata_short', 'fail', family);
+      await recordHardFailure(did, netKey, ctx.env, false);
+      return paddedHard404Response();
+    }
+    const cdataHw = svCdata.slice(-24);
+    const sep2 = svCdata.slice(-25, -24);
+    const cdataNid = svCdata.slice(-57, -25);
+    const sep1 = svCdata.slice(-58, -57);
+    const cdataAppId = svCdata.slice(0, -58);
+    if (
+      sep1 !== '_' ||
+      sep2 !== '_' ||
+      cdataAppId !== appId ||
+      !timingSafeEqualStr(cdataNid, nid) ||
+      !timingSafeEqualStr(cdataHw, hw)
+    ) {
+      emitGateCounter(ctx.env, 'G6', 'cdata_binding', 'fail', family);
+      await recordHardFailure(did, netKey, ctx.env, false);
+      return paddedHard404Response();
+    }
+  }
+  emitGateCounter(ctx.env, 'G6', 'turnstile', 'pass', family);
 
   // --------------------------------------------------------------------------
   // Gate G7 — Late Decrypt & Dispatch (< 0.5 ms)

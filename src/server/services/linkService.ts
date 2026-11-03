@@ -23,7 +23,17 @@ function normalizeIdentifier(id: string): string {
 
 function sanitizeKey(raw: unknown): string {
   if (!raw || typeof raw !== 'string') return '';
-  return raw.trim().replace(/^["'`]+|["'`]+$/g, '').trim();
+  const cleaned = raw
+    .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '')
+    .trim()
+    .replace(/^[A-Za-z0-9_]+\s*=\s*/, '')
+    .replace(/^["'`]+|["'`]+$/g, '')
+    .trim();
+  const match0x = cleaned.match(/0x[1-9A-Za-z][A-Za-z0-9_-]{15,45}/);
+  if (match0x) return match0x[0];
+  const matchTest = cleaned.match(/[123]x00000000000000000000[A-Za-z0-9_-]+/);
+  if (matchTest) return matchTest[0];
+  return cleaned;
 }
 
 function isTestTurnstileKey(k: string): boolean {
@@ -52,24 +62,24 @@ function isRealTurnstileKeyValue(k: unknown): k is string {
 }
 
 /**
- * Cloudflare Turnstile Site Keys start with `0x4` and are 24 characters long (e.g. `0x4AAAAAAA...`).
+ * Cloudflare Turnstile Site Keys start with `0x4` and are ~24 characters long (e.g. `0x4AAAAAAFxgKXeAuu3G5TRX`).
  * Secret Keys are 35 characters (`0x4...`) and Cloudflare API Tokens are 40 characters (not `0x4...`).
- * Strict format validation prevents Secret Keys or API Tokens from ever being rendered as a widget sitekey.
+ * Strict format validation prevents 35-character Secret Keys or 40-character API Tokens from ever being rendered as a widget sitekey.
  */
 export function isValidTurnstileSiteKey(k: unknown): k is string {
   const clean = sanitizeKey(k);
   if (!isRealTurnstileKeyValue(clean) || isTestTurnstileKey(clean)) return false;
-  return /^0x4[A-Za-z0-9_-]{17,24}$/.test(clean);
+  return /^0x4[A-Za-z0-9_-]{16,25}$/.test(clean);
 }
 
 /**
- * Cloudflare Turnstile Secret Keys start with `0x4` and are 35 characters long.
+ * Cloudflare Turnstile Secret Keys start with `0x4` and are 35 characters long (e.g. `0x4AAAAAAFxgKfs1f0QEYWCXFLKX1pdDXWA`).
  */
 export function isValidTurnstileSecretKey(k: unknown): k is string {
   const clean = sanitizeKey(k);
   if (!isRealTurnstileKeyValue(clean)) return false;
   if (isTestTurnstileKey(clean)) return true;
-  return /^0x4[A-Za-z0-9_-]{25,42}$/.test(clean);
+  return /^0x4[A-Za-z0-9_-]{27,42}$/.test(clean);
 }
 
 /**
@@ -644,11 +654,11 @@ export function getEnvOnlyTurnstileSiteKey(
 export function getCandidateTurnstileSiteKeys(
   env?: Record<string, string | undefined>
 ): string[] {
-  const settingsSiteKey = (bundledStaticData as any)?.settings?.turnstile_site_key;
   const cachedStoreSiteKey =
     cachedTurnstileSiteKeyFromStore && Date.now() < cachedTurnstileSiteKeyFromStore.expiresAt
       ? cachedTurnstileSiteKeyFromStore.siteKey
       : '';
+  const settingsSiteKey = (bundledStaticData as any)?.settings?.turnstile_site_key;
   const rawCandidates = [
     ...collectAllTurnstileEnvValues(env),
     cachedStoreSiteKey,
@@ -657,34 +667,43 @@ export function getCandidateTurnstileSiteKeys(
   const realKeys: string[] = [];
   for (const c of rawCandidates) {
     const clean = sanitizeKey(c);
-    if (isValidTurnstileSiteKey(clean)) {
-      if (!realKeys.includes(clean)) {
-        realKeys.push(clean);
-      }
+    if (isValidTurnstileSiteKey(clean) && !realKeys.includes(clean)) {
+      realKeys.push(clean);
     }
   }
   return realKeys;
 }
 
 /**
- * Async variant that checks environment variables FIRST, then also checks Firestore `store_data/settings`
- * & `public_settings` when no site key is present in environment variables.
+ * Async variant that resolves Turnstile site keys with Environment Variables FIRST,
+ * followed by Firestore `store_data/settings` & `public_settings` as a fallback candidate.
  */
 export async function getCandidateTurnstileSiteKeysAsync(
   env?: Record<string, string | undefined>
 ): Promise<string[]> {
   const envOnlyKey = getEnvOnlyTurnstileSiteKey(env);
   const syncKeys = getCandidateTurnstileSiteKeys(env);
-  if (envOnlyKey) {
-    return [envOnlyKey, ...syncKeys.filter((k) => k !== envOnlyKey)];
-  }
-  if (syncKeys.length > 0) return syncKeys;
+  const ordered: string[] = [];
 
-  const fsKeys = await fetchTurnstileKeysFromFirestoreRest(env);
-  if (fsKeys?.siteKey && isValidTurnstileSiteKey(fsKeys.siteKey)) {
-    return [fsKeys.siteKey];
+  if (envOnlyKey) {
+    ordered.push(envOnlyKey);
   }
-  return [];
+  for (const k of syncKeys) {
+    if (!ordered.includes(k)) ordered.push(k);
+  }
+
+  if (
+    !cachedTurnstileSiteKeyFromStore ||
+    Date.now() >= cachedTurnstileSiteKeyFromStore.expiresAt
+  ) {
+    const fsKeys = await fetchTurnstileKeysFromFirestoreRest(env);
+    if (fsKeys?.siteKey && isValidTurnstileSiteKey(fsKeys.siteKey)) {
+      if (!ordered.includes(fsKeys.siteKey)) {
+        ordered.push(fsKeys.siteKey);
+      }
+    }
+  }
+  return ordered;
 }
 
 /**
@@ -703,7 +722,7 @@ export function getPublicTurnstileSiteKey(
  * Resolves all candidate Cloudflare Turnstile secret keys across:
  * 1. Environment variables (auto-classified by 35-char `0x4...` Secret Key format across all Turnstile env vars)
  * 2. Sealed `ENCRYPTED_TURNSTILE_SECRET` in `src/lib/secureVault.ts` (zero-Firebase static edge resolution)
- * 3. Admin Settings `turnstile_secret_key` (from local or bundled `staticData.json`, or cached Firestore `store_data/settings`)
+ * 3. Admin Settings `turnstile_secret_key` (from local or bundled `staticData.json`, or cached/live Firestore `store_data/settings`)
  */
 export async function getCandidateTurnstileSecrets(
   env?: Record<string, string | undefined>
@@ -721,15 +740,9 @@ export async function getCandidateTurnstileSecrets(
     }
   };
 
-  // 1. Always check runtime environment variables FIRST so any dashboard update is active immediately
+  // 1. Always check runtime environment variables FIRST so any dashboard update is #1 priority
   for (const c of collectAllTurnstileEnvValues(env)) {
     addSecret(c);
-  }
-
-  // If a real secret key is explicitly configured in environment variables, return it immediately
-  // so old/deleted secrets in vault or staticData never cause unnecessary fallback round-trips.
-  if (realSecrets.length > 0) {
-    return [...realSecrets, ...testSecrets];
   }
 
   // 2. Check in-memory cached secret from store/vault
@@ -739,7 +752,6 @@ export async function getCandidateTurnstileSecrets(
     Date.now() < cachedTurnstileSecretFromStore.expiresAt
   ) {
     addSecret(cachedTurnstileSecretFromStore.secret);
-    return [...realSecrets, ...testSecrets];
   }
 
   // 3. Decrypt sealed ENCRYPTED_TURNSTILE_SECRET from src/lib/secureVault.ts (works on Cloudflare Edge & Node with 0 I/O)
@@ -748,10 +760,12 @@ export async function getCandidateTurnstileSecrets(
       const decSecret = await decryptVaultValue(ENCRYPTED_TURNSTILE_SECRET, env);
       const cleanDec = sanitizeKey(decSecret);
       if (cleanDec && isValidTurnstileSecretKey(cleanDec) && !isTestTurnstileKey(cleanDec)) {
-        cachedTurnstileSecretFromStore = {
-          secret: cleanDec,
-          expiresAt: Date.now() + 3_600_000,
-        };
+        if (!cachedTurnstileSecretFromStore) {
+          cachedTurnstileSecretFromStore = {
+            secret: cleanDec,
+            expiresAt: Date.now() + 3_600_000,
+          };
+        }
         addSecret(cleanDec);
       }
     }
@@ -764,18 +778,23 @@ export async function getCandidateTurnstileSecrets(
     const parsed = await loadStaticDataSnapshot();
     const sec = sanitizeKey(parsed?.settings?.turnstile_secret_key);
     if (sec && isValidTurnstileSecretKey(sec) && !isTestTurnstileKey(sec)) {
-      cachedTurnstileSecretFromStore = {
-        secret: sec,
-        expiresAt: Date.now() + 3_600_000,
-      };
+      if (!cachedTurnstileSecretFromStore) {
+        cachedTurnstileSecretFromStore = {
+          secret: sec,
+          expiresAt: Date.now() + 3_600_000,
+        };
+      }
       addSecret(sec);
     }
   } catch {
     // Ignore local fs errors on Edge
   }
 
-  // 5. Try reading from Firestore REST (store_data/settings) if still empty on a clone deployment
-  if (realSecrets.length === 0) {
+  // 5. Also check Firestore REST (store_data/settings) if not yet cached in memory
+  if (
+    !cachedTurnstileSecretFromStore ||
+    Date.now() >= cachedTurnstileSecretFromStore.expiresAt
+  ) {
     const fsKeys = await fetchTurnstileKeysFromFirestoreRest(env);
     if (fsKeys?.secretKey) {
       addSecret(fsKeys.secretKey);

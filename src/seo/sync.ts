@@ -206,16 +206,50 @@ export async function syncFromFirestore(): Promise<any> {
       const settingsDoc = pubSettingsRes?.fields ? pubSettingsRes : (rawSettingsRes?.fields ? rawSettingsRes : null);
       const remoteSettings = settingsDoc?.fields ? parseFirestoreDoc(settingsDoc.fields) : {};
       delete remoteSettings.turnstile_secret_key;
+      delete remoteSettings.turnstile_site_key;
       delete remoteSettings.cloudinary_api_secret;
       delete remoteSettings.gemini_api_key;
       delete remoteSettings.admin_password;
       delete remoteSettings.admin_totp_secret;
 
-      const settings = cleanSettingsMetaTitles(
-        (remoteSettings && Object.keys(remoteSettings).length > 0)
+      const sanitizeSiteKey = (raw: unknown): string => {
+        let s = String(raw || '').replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '').trim();
+        s = s.replace(/^[A-Za-z0-9_]+\s*=\s*/, '').trim();
+        s = s.replace(/^["'`]+|["'`]+$/g, '').trim();
+        const match = s.match(/(0x4[A-Za-z0-9_-]{16,25})/);
+        return match ? match[1] : '';
+      };
+
+      const envTurnstileSiteKey = [
+        process.env.VITE_TURNSTILE_SITE_KEY,
+        process.env.TURNSTILE_SITE_KEY,
+        process.env.CF_TURNSTILE_SITE_KEY,
+        process.env.CLOUDFLARE_TURNSTILE_SITE_KEY,
+        process.env.PUBLIC_TURNSTILE_SITE_KEY,
+        process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+        process.env.VITE_TURNSTILE_KEY,
+        process.env.TURNSTILE_KEY,
+      ]
+        .map(sanitizeSiteKey)
+        .find((k) => /^0x4[A-Za-z0-9_-]{16,25}$/.test(k));
+
+      const mergedRawSettings =
+        remoteSettings && Object.keys(remoteSettings).length > 0
           ? { ...(fallbackData.settings || {}), ...remoteSettings }
-          : (fallbackData.settings || {})
-      );
+          : { ...(fallbackData.settings || {}) };
+
+      if (envTurnstileSiteKey) {
+        mergedRawSettings.turnstile_site_key = envTurnstileSiteKey;
+      } else {
+        const cleanRemoteKey = sanitizeSiteKey(mergedRawSettings.turnstile_site_key);
+        if (cleanRemoteKey) {
+          mergedRawSettings.turnstile_site_key = cleanRemoteKey;
+        } else {
+          delete mergedRawSettings.turnstile_site_key;
+        }
+      }
+
+      const settings = cleanSettingsMetaTitles(mergedRawSettings);
 
       const newsParsed = newsRes?.fields ? parseFirestoreDoc(newsRes.fields) : null;
       const news = Array.isArray(newsParsed?.items)

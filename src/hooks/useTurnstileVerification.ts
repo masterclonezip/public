@@ -46,7 +46,17 @@ function ensureTurnstileScriptLoaded(): void {
 
 function sanitizeTurnstileKey(raw: unknown): string {
   if (!raw || typeof raw !== 'string') return '';
-  return raw.trim().replace(/^["'`]+|["'`]+$/g, '').trim();
+  const cleaned = raw
+    .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '')
+    .trim()
+    .replace(/^[A-Za-z0-9_]+\s*=\s*/, '')
+    .replace(/^["'`]+|["'`]+$/g, '')
+    .trim();
+  const match0x = cleaned.match(/0x[1-9A-Za-z][A-Za-z0-9_-]{15,45}/);
+  if (match0x) return match0x[0];
+  const matchTest = cleaned.match(/[123]x00000000000000000000[A-Za-z0-9_-]+/);
+  if (matchTest) return matchTest[0];
+  return cleaned;
 }
 
 function isTestTurnstileSiteKey(k: string): boolean {
@@ -71,7 +81,7 @@ function isNonProdHost(): boolean {
 /**
  * Strictly validates that a key is a 24-character Cloudflare Turnstile Site Key (`0x4...`).
  * Rejects 35-character Secret Keys, 40-character API Tokens, and placeholders so Cloudflare's
- * iframe never renders a white "Troubleshoot" error box.
+ * iframe never renders an "Invalid sitekey" error box due to swapped keys.
  */
 function isRealTurnstileKey(raw: unknown): boolean {
   const k = sanitizeTurnstileKey(raw);
@@ -87,7 +97,7 @@ function isRealTurnstileKey(raw: unknown): boolean {
   ) {
     return false;
   }
-  return /^0x4[A-Za-z0-9_-]{17,24}$/.test(k);
+  return /^0x4[A-Za-z0-9_-]{16,25}$/.test(k);
 }
 
 export function useTurnstileVerification({
@@ -165,10 +175,11 @@ export function useTurnstileVerification({
     const metaEnv = ((import.meta as any).env || {}) as Record<string, unknown>;
     const buildEnv = ((globalThis as any).__APP_BUILD_ENV__ || {}) as Record<string, unknown>;
 
-    // Prioritize deployment-specific runtime & build env keys FIRST so master-clone domains
-    // (e.g. rummydex.com vs yonoappdex.com) use their own Cloudflare Turnstile key before
-    // falling back to the shared staticData.json adminTurnstileSiteKey.
+    // 1. Prioritize live server runtime keys (from /api/v1/app/session-init & /api/v1/public/runtime-config)
+    // FIRST, followed by build-time VITE_TURNSTILE_SITE_KEY, followed by Admin Settings key.
     const rawSources: unknown[] = [
+      serverSiteKeyRef.current,
+      ...serverSiteKeysRef.current,
       metaEnv.VITE_TURNSTILE_SITE_KEY,
       metaEnv.TURNSTILE_SITE_KEY,
       metaEnv.CF_TURNSTILE_SITE_KEY,
@@ -181,8 +192,6 @@ export function useTurnstileVerification({
       buildEnv.TURNSTILE_SITE_KEY,
       ...Object.values(metaEnv),
       ...Object.values(buildEnv),
-      serverSiteKeyRef.current,
-      ...serverSiteKeysRef.current,
       adminSiteKeyRef.current,
     ];
 
@@ -197,7 +206,6 @@ export function useTurnstileVerification({
     }
 
     // Strictly restrict Cloudflare's dummy test key (1x00000000000000000000AA) to local/preview hosts ONLY.
-    // Never append 1x00000000000000000000AA on production domains so the red "For testing only" banner can NEVER appear.
     if (isNonProdHost()) {
       const fallbackKey = '1x00000000000000000000AA';
       if (!failedSiteKeysRef.current.has(fallbackKey) && !candidates.includes(fallbackKey)) {
@@ -319,8 +327,9 @@ export function useTurnstileVerification({
             ]);
             if (rcRes && rcRes.ok) {
               const rcData = await rcRes.json().catch(() => null);
-              if (rcData?.turnstileSiteKey && isRealTurnstileKey(rcData.turnstileSiteKey)) {
-                serverSiteKeyRef.current = sanitizeTurnstileKey(rcData.turnstileSiteKey);
+              const runtimeKey = rcData?.turnstileSiteKey || rcData?.turnstile?.siteKey;
+              if (runtimeKey && isRealTurnstileKey(runtimeKey)) {
+                serverSiteKeyRef.current = sanitizeTurnstileKey(runtimeKey);
               }
             }
             if (!serverSiteKeyRef.current && stRes && stRes.ok) {
@@ -359,21 +368,14 @@ export function useTurnstileVerification({
           }
         }, NONCE_REFRESH_MS);
 
-        const activateHardwareVerifiedFallback = () => {
-          if (unmountedRef.current || !nonceRef.current) return;
-          removeWidget();
-          cfTokenRef.current = `HW_VERIFIED_MOBILE.${nonceRef.current}`;
-          retryCountRef.current = 0;
-          markTokenReady();
-        };
-
         // 3. Render visible Turnstile widget with hardware commitment cData = `${appId}_${nid}_${hw}` (§5.5)
         const renderTurnstileWidget = () => {
           if (unmountedRef.current) return;
 
           const candidates = resolveCandidateSiteKeys();
           if (candidates.length === 0) {
-            activateHardwareVerifiedFallback();
+            removeWidget();
+            setUiTimeoutExceeded(true);
             return;
           }
 
@@ -402,6 +404,7 @@ export function useTurnstileVerification({
             }
             callbackDeferTimerRef.current = setTimeout(() => {
               if (unmountedRef.current) return;
+              // Immediately destroy the Turnstile iframe so an "Invalid sitekey" error box never stays on screen
               removeWidget();
               const remainingCandidates = resolveCandidateSiteKeys();
               if (remainingCandidates.length > 0 && nonceRef.current) {
@@ -409,15 +412,8 @@ export function useTurnstileVerification({
                 renderTurnstileWidget();
                 return;
               }
-              if (retryCountRef.current < 1) {
-                retryCountRef.current += 1;
-                keyIndexRef.current = 0;
-                failedSiteKeysRef.current.clear();
-                void startSessionFlow(true);
-              } else {
-                activateHardwareVerifiedFallback();
-              }
-            }, 60);
+              setUiTimeoutExceeded(true);
+            }, 40);
           };
 
           const cData = `${safeAppId}_${nid}_${env.hw}`;
@@ -438,7 +434,10 @@ export function useTurnstileVerification({
                 retryCountRef.current = 0;
                 markTokenReady();
               },
-              'error-callback': softReinit,
+              'error-callback': () => {
+                softReinit();
+                return true;
+              },
               'expired-callback': () => {
                 if (unmountedRef.current) return;
                 cfTokenRef.current = null;
@@ -473,14 +472,16 @@ export function useTurnstileVerification({
   );
 
   // If adminTurnstileSiteKey arrives asynchronously from DataContextPublic after mount,
-  // only re-run if we are NOT already verifying or solved with a real key, and the key hasn't failed.
+  // only re-run if no server/env key was already resolved, we haven't already solved, and the key hasn't failed.
   useEffect(() => {
     const cleanAdminKey = sanitizeTurnstileKey(adminTurnstileSiteKey);
     if (
       cleanAdminKey &&
       isRealTurnstileKey(cleanAdminKey) &&
+      !serverSiteKeyRef.current &&
       !failedSiteKeysRef.current.has(cleanAdminKey) &&
       !solvedWithRealKeyRef.current &&
+      !cfTokenRef.current &&
       (!activeSiteKeyRef.current || isTestTurnstileSiteKey(activeSiteKeyRef.current)) &&
       nonceRef.current
     ) {

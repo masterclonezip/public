@@ -3,7 +3,7 @@ import staticData from '../../lib/staticData.json';
 import { fetchStoreData } from '../../seoHelper';
 import { resolveAppSlug } from '../../lib/slugResolver';
 import { formatNewsDate, calculateReadingTime, getPlainTextSnippet } from '../../lib/newsUtils';
-import { getPublicTurnstileSiteKey } from '../services/linkService';
+import { getPublicTurnstileSiteKey, getEnvOnlyTurnstileSiteKey, isValidTurnstileSiteKey } from '../services/linkService';
 
 export const publicApiRouter = Router();
 
@@ -162,12 +162,26 @@ publicApiRouter.get('/api/v1/public/videos', async (req, res) => {
 function sanitizeSettingsForPublicClient(settings: any): any {
   const copy = settings && typeof settings === 'object' ? { ...settings } : {};
   delete copy.turnstile_secret_key;
-  const envSiteKey = getPublicTurnstileSiteKey();
+  const envSiteKey = getEnvOnlyTurnstileSiteKey();
   if (envSiteKey) {
     copy.turnstile_site_key = envSiteKey;
+  } else if (copy.turnstile_site_key && isValidTurnstileSiteKey(String(copy.turnstile_site_key).trim())) {
+    copy.turnstile_site_key = String(copy.turnstile_site_key).trim();
+  } else {
+    delete copy.turnstile_site_key;
   }
   return copy;
 }
+
+publicApiRouter.get('/api/v1/public/runtime-config', (_req, res) => {
+  const siteKey = getEnvOnlyTurnstileSiteKey() || getPublicTurnstileSiteKey();
+  res.setHeader('Cache-Control', 'no-store, private');
+  res.json({
+    success: true,
+    turnstileSiteKey: siteKey,
+    turnstile: { siteKey },
+  });
+});
 
 publicApiRouter.get('/api/v1/public/settings', async (req, res) => {
   const data = await fetchStoreData();

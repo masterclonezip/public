@@ -95,6 +95,14 @@ async function doFetchStoreData() {
   };
   delete mergedSettings.turnstile_secret_key;
 
+  const sanitizeSiteKey = (raw: unknown): string => {
+    let s = String(raw || '').replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '').trim();
+    s = s.replace(/^[A-Za-z0-9_]+\s*=\s*/, '').trim();
+    s = s.replace(/^["'`]+|["'`]+$/g, '').trim();
+    const match = s.match(/(0x4[A-Za-z0-9_-]{16,25})/);
+    return match ? match[1] : '';
+  };
+
   const envTurnstileSiteKey = [
     process.env.VITE_TURNSTILE_SITE_KEY,
     process.env.TURNSTILE_SITE_KEY,
@@ -104,12 +112,21 @@ async function doFetchStoreData() {
     process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
     process.env.VITE_TURNSTILE_KEY,
     process.env.TURNSTILE_KEY,
+    process.env.TURNSTILE_SECRET_KEY,
+    process.env.VITE_TURNSTILE_SECRET_KEY,
   ]
-    .map((k) => String(k || '').trim().replace(/^["'`]+|["'`]+$/g, '').trim())
-    .find((k) => /^0x4[A-Za-z0-9_-]{17,24}$/.test(k));
+    .map(sanitizeSiteKey)
+    .find((k) => /^0x4[A-Za-z0-9_-]{16,25}$/.test(k));
 
   if (envTurnstileSiteKey) {
     mergedSettings.turnstile_site_key = envTurnstileSiteKey;
+  } else {
+    const cleanStoredKey = sanitizeSiteKey(mergedSettings.turnstile_site_key);
+    if (cleanStoredKey) {
+      mergedSettings.turnstile_site_key = cleanStoredKey;
+    } else {
+      delete mergedSettings.turnstile_site_key;
+    }
   }
 
   // Guarantee arrays and custom SEO titles/descriptions are preserved
