@@ -12,6 +12,7 @@ let t1Loaded = false;
 let t2Loaded = false;
 let t3CircuitBrokenUntil = 0;
 let cachedTurnstileSecretFromStore: { secret: string; expiresAt: number } | null = null;
+let cachedTurnstileSiteKeyFromStore: { siteKey: string; expiresAt: number } | null = null;
 
 function normalizeIdentifier(id: string): string {
   return String(id || '')
@@ -181,6 +182,8 @@ async function normalizeVaultPayloadToMap(
       const obj = item as Record<string, unknown>;
       const idStr = String(obj.id ?? '').trim();
       const slugStr = String(obj.slug ?? '').trim();
+      const serialStr = String(obj.serial_number ?? '').trim();
+      const nameStr = String(obj.name ?? '').trim();
       const candidates = [
         obj.more_information_url,
         obj.download_url,
@@ -193,6 +196,8 @@ async function normalizeVaultPayloadToMap(
         if (resolved) {
           if (idStr) out[idStr] = resolved;
           if (slugStr) out[slugStr] = resolved;
+          if (serialStr) out[serialStr] = resolved;
+          if (nameStr) out[nameStr] = resolved;
           break;
         }
       }
@@ -272,6 +277,16 @@ async function resolveFromT2Backup(
         expiresAt: Date.now() + 300_000,
       };
     }
+    if (
+      data?.settings?.turnstile_site_key &&
+      typeof data.settings.turnstile_site_key === 'string' &&
+      isValidTurnstileSiteKey(data.settings.turnstile_site_key)
+    ) {
+      cachedTurnstileSiteKeyFromStore = {
+        siteKey: sanitizeKey(data.settings.turnstile_site_key),
+        expiresAt: Date.now() + 300_000,
+      };
+    }
 
     // 1. Check encrypted_links inside staticData.json if present
     if (data?.encrypted_links && typeof data.encrypted_links === 'string') {
@@ -336,17 +351,7 @@ async function resolveFromT2Backup(
   return null;
 }
 
-/**
- * Last-resort T3 fallback for clone/edge deployments where an app was added via Admin to Firestore
- * (`store_data/secure_links` or `store_data/apps_chunk_0..1`) before a full GitHub vault code sync.
- * Strictly guarded by a 60s circuit breaker and caches all discovered links in `ramCache` so
- * subsequent requests resolve in T0_RAM (0ms, 0 external requests).
- */
-async function resolveFromT3FirestoreRest(
-  identifier: string,
-  env?: Record<string, string | undefined>
-): Promise<string | null> {
-  if (Date.now() < t3CircuitBrokenUntil) return null;
+function getFirestoreRestConfig(env?: Record<string, string | undefined>) {
   const procEnv =
     typeof process !== 'undefined' && process.env
       ? (process.env as Record<string, string | undefined>)
@@ -389,58 +394,145 @@ async function resolveFromT3FirestoreRest(
       : rawDbId;
 
   if (!projectId) return null;
-
   const baseUrl = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/${encodeURIComponent(dbId)}/documents/store_data`;
   const keyParam = apiKey ? `?key=${encodeURIComponent(apiKey)}` : '';
+  return { baseUrl, keyParam };
+}
 
-  const fromRestVal = (v: any): any => {
-    if (!v || typeof v !== 'object') return null;
-    if ('stringValue' in v) return v.stringValue;
-    if ('integerValue' in v) return Number(v.integerValue);
-    if ('doubleValue' in v) return Number(v.doubleValue);
-    if ('booleanValue' in v) return Boolean(v.booleanValue);
-    if ('nullValue' in v) return null;
-    if ('arrayValue' in v) return (v.arrayValue?.values || []).map(fromRestVal);
-    if ('mapValue' in v) {
-      const out: Record<string, any> = {};
-      const fields = v.mapValue?.fields || {};
-      for (const [k, fv] of Object.entries(fields)) out[k] = fromRestVal(fv);
-      return out;
+function fromFirestoreRestVal(v: any): any {
+  if (!v || typeof v !== 'object') return null;
+  if ('stringValue' in v) return v.stringValue;
+  if ('integerValue' in v) return Number(v.integerValue);
+  if ('doubleValue' in v) return Number(v.doubleValue);
+  if ('booleanValue' in v) return Boolean(v.booleanValue);
+  if ('nullValue' in v) return null;
+  if ('arrayValue' in v) return (v.arrayValue?.values || []).map(fromFirestoreRestVal);
+  if ('mapValue' in v) {
+    const out: Record<string, any> = {};
+    const fields = v.mapValue?.fields || {};
+    for (const [k, fv] of Object.entries(fields)) out[k] = fromFirestoreRestVal(fv);
+    return out;
+  }
+  return null;
+}
+
+async function fetchTurnstileKeysFromFirestoreRest(
+  env?: Record<string, string | undefined>
+): Promise<{ siteKey?: string; secretKey?: string } | null> {
+  const cfg = getFirestoreRestConfig(env);
+  if (!cfg) return null;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 1800);
+  try {
+    const [settingsRes, pubSettingsRes] = await Promise.all([
+      fetch(`${cfg.baseUrl}/settings${cfg.keyParam}`, { signal: controller.signal }).catch(() => null),
+      fetch(`${cfg.baseUrl}/public_settings${cfg.keyParam}`, { signal: controller.signal }).catch(() => null),
+    ]);
+    let siteKey = '';
+    let secretKey = '';
+
+    for (const r of [settingsRes, pubSettingsRes]) {
+      if (r && r.ok) {
+        const j = await r.json().catch(() => null);
+        if (j?.fields) {
+          const d = fromFirestoreRestVal({ mapValue: { fields: j.fields } }) || {};
+          const sk = sanitizeKey(d.turnstile_site_key);
+          const sec = sanitizeKey(d.turnstile_secret_key);
+          if (!siteKey && isValidTurnstileSiteKey(sk)) {
+            siteKey = sk;
+            cachedTurnstileSiteKeyFromStore = {
+              siteKey: sk,
+              expiresAt: Date.now() + 600_000,
+            };
+          }
+          if (!secretKey && isValidTurnstileSecretKey(sec) && !isTestTurnstileKey(sec)) {
+            secretKey = sec;
+            cachedTurnstileSecretFromStore = {
+              secret: sec,
+              expiresAt: Date.now() + 600_000,
+            };
+          }
+        }
+      }
     }
+    return { siteKey, secretKey };
+  } catch {
     return null;
-  };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Last-resort T3 fallback for clone/edge deployments where an app was added via Admin to Firestore
+ * (`store_data/secure_links` or `store_data/apps_chunk_0..3`) before a full GitHub vault code sync.
+ * Strictly guarded by a 60s circuit breaker and caches all discovered links in `ramCache` so
+ * subsequent requests resolve in T0_RAM (0ms, 0 external requests).
+ */
+async function resolveFromT3FirestoreRest(
+  identifier: string,
+  env?: Record<string, string | undefined>
+): Promise<string | null> {
+  if (Date.now() < t3CircuitBrokenUntil) return null;
+  const cfg = getFirestoreRestConfig(env);
+  if (!cfg) return null;
 
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 2500);
     try {
-      const [secRes, chunk0Res, chunk1Res] = await Promise.all([
-        fetch(`${baseUrl}/secure_links${keyParam}`, { signal: controller.signal }).catch(() => null),
-        fetch(`${baseUrl}/apps_chunk_0${keyParam}`, { signal: controller.signal }).catch(() => null),
-        fetch(`${baseUrl}/apps_chunk_1${keyParam}`, { signal: controller.signal }).catch(() => null),
+      const [secRes, chunk0Res, chunk1Res, chunk2Res] = await Promise.all([
+        fetch(`${cfg.baseUrl}/secure_links${cfg.keyParam}`, { signal: controller.signal }).catch(() => null),
+        fetch(`${cfg.baseUrl}/apps_chunk_0${cfg.keyParam}`, { signal: controller.signal }).catch(() => null),
+        fetch(`${cfg.baseUrl}/apps_chunk_1${cfg.keyParam}`, { signal: controller.signal }).catch(() => null),
+        fetch(`${cfg.baseUrl}/apps_chunk_2${cfg.keyParam}`, { signal: controller.signal }).catch(() => null),
       ]);
 
       // 1. Parse store_data/secure_links if present
       if (secRes && secRes.ok) {
         const secJson = await secRes.json().catch(() => null);
         if (secJson?.fields) {
-          const secData = fromRestVal({ mapValue: { fields: secJson.fields } }) || {};
+          const secData = fromFirestoreRestVal({ mapValue: { fields: secJson.fields } }) || {};
           const items = Array.isArray(secData.items) ? secData.items : [];
           const mapObj = await normalizeVaultPayloadToMap(items.length > 0 ? items : secData.links || secData, env);
           primeRamVaultMap(mapObj);
         }
       }
 
-      // 2. Parse store_data/apps_chunk_0 & apps_chunk_1 if present
-      for (const cRes of [chunk0Res, chunk1Res]) {
+      // 2. Parse store_data/apps_chunk_0..2 and cross-index id <-> slug <-> serial_number <-> name
+      const allApps: Record<string, unknown>[] = [];
+      for (const cRes of [chunk0Res, chunk1Res, chunk2Res]) {
         if (cRes && cRes.ok) {
           const cJson = await cRes.json().catch(() => null);
           if (cJson?.fields) {
-            const cData = fromRestVal({ mapValue: { fields: cJson.fields } }) || {};
+            const cData = fromFirestoreRestVal({ mapValue: { fields: cJson.fields } }) || {};
             const apps = Array.isArray(cData.items) ? cData.items : [];
+            for (const a of apps) {
+              if (a && typeof a === 'object') allApps.push(a as Record<string, unknown>);
+            }
             const mapObj = await normalizeVaultPayloadToMap(apps, env);
             primeRamVaultMap(mapObj);
           }
+        }
+      }
+
+      // 3. Cross-bind any link already in ramCache by app.id to app.slug / serial_number / name (and vice versa)
+      for (const app of allApps) {
+        const idStr = String(app.id ?? '').trim();
+        const slugStr = String(app.slug ?? '').trim();
+        const serialStr = String(app.serial_number ?? '').trim();
+        const nameStr = String(app.name ?? '').trim();
+        const existingUrl =
+          (idStr && lookupInMap(ramCache, idStr)) ||
+          (slugStr && lookupInMap(ramCache, slugStr)) ||
+          (serialStr && lookupInMap(ramCache, serialStr)) ||
+          (nameStr && lookupInMap(ramCache, nameStr));
+        if (existingUrl) {
+          if (idStr) setRamVaultLink(idStr, existingUrl);
+          if (slugStr) setRamVaultLink(slugStr, existingUrl);
+          if (serialStr) setRamVaultLink(serialStr, existingUrl);
+          if (nameStr) setRamVaultLink(nameStr, existingUrl);
         }
       }
 
@@ -538,8 +630,13 @@ export function getCandidateTurnstileSiteKeys(
   env?: Record<string, string | undefined>
 ): string[] {
   const settingsSiteKey = (bundledStaticData as any)?.settings?.turnstile_site_key;
+  const cachedStoreSiteKey =
+    cachedTurnstileSiteKeyFromStore && Date.now() < cachedTurnstileSiteKeyFromStore.expiresAt
+      ? cachedTurnstileSiteKeyFromStore.siteKey
+      : '';
   const rawCandidates = [
     ...collectAllTurnstileEnvValues(env),
+    cachedStoreSiteKey,
     settingsSiteKey,
   ];
   const realKeys: string[] = [];
@@ -552,6 +649,23 @@ export function getCandidateTurnstileSiteKeys(
     }
   }
   return realKeys;
+}
+
+/**
+ * Async variant that also checks Firestore `store_data/settings` & `public_settings` when no site key
+ * is present in environment variables or `staticData.json` (e.g. on a fresh Master Clone deployment).
+ */
+export async function getCandidateTurnstileSiteKeysAsync(
+  env?: Record<string, string | undefined>
+): Promise<string[]> {
+  const syncKeys = getCandidateTurnstileSiteKeys(env);
+  if (syncKeys.length > 0) return syncKeys;
+
+  const fsKeys = await fetchTurnstileKeysFromFirestoreRest(env);
+  if (fsKeys?.siteKey && isValidTurnstileSiteKey(fsKeys.siteKey)) {
+    return [fsKeys.siteKey];
+  }
+  return [];
 }
 
 /**
@@ -570,10 +684,7 @@ export function getPublicTurnstileSiteKey(
  * Resolves all candidate Cloudflare Turnstile secret keys across:
  * 1. Environment variables (auto-classified by 35-char `0x4...` Secret Key format across all Turnstile env vars)
  * 2. Sealed `ENCRYPTED_TURNSTILE_SECRET` in `src/lib/secureVault.ts` (zero-Firebase static edge resolution)
- * 3. Admin Settings `turnstile_secret_key` (from local or bundled `staticData.json`)
- *
- * Completely independent of Firebase/Firestore so Firebase quota exhaustion (429)
- * has zero impact on the /moreinfo gateway.
+ * 3. Admin Settings `turnstile_secret_key` (from local or bundled `staticData.json`, or cached Firestore `store_data/settings`)
  */
 export async function getCandidateTurnstileSecrets(
   env?: Record<string, string | undefined>
@@ -642,6 +753,14 @@ export async function getCandidateTurnstileSecrets(
     }
   } catch {
     // Ignore local fs errors on Edge
+  }
+
+  // 5. Try reading from Firestore REST (store_data/settings) if still empty on a clone deployment
+  if (realSecrets.length === 0) {
+    const fsKeys = await fetchTurnstileKeysFromFirestoreRest(env);
+    if (fsKeys?.secretKey) {
+      addSecret(fsKeys.secretKey);
+    }
   }
 
   return [...realSecrets, ...testSecrets];

@@ -27,17 +27,50 @@ export async function onRequest(context) {
     return response;
   }
 
-  // Enforce strict no-store and noindex on /moreinfo gateway routes at the edge
+  // Enforce strict no-store, crawler block, and SPA template fallback on /moreinfo gateway routes at the edge
   if (pathname.toLowerCase().startsWith('/moreinfo')) {
-    const headers = new Headers(response.headers);
+    const ua = (context.request.headers.get('user-agent') || '').toLowerCase();
+    const isCrawlerOrBot =
+      /googlebot|bingbot|yandexbot|baiduspider|duckduckbot|slurp|ahrefsbot|semrushbot|dotbot|mj12bot|petalbot|bytespider|gptbot|claudebot|perplexitybot|ccbot|curl\/|wget\/|python|scrapy|httpx|aiohttp|headlesschrome|puppeteer|playwright|selenium|phantomjs/.test(
+        ua
+      );
+
+    if (isCrawlerOrBot) {
+      return new Response('Forbidden', {
+        status: 403,
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Cache-Control': 'no-store, no-cache, must-revalidate, private, max-age=0',
+          'X-Robots-Tag': 'noindex, nofollow, noarchive, nosnippet',
+          'Referrer-Policy': 'no-referrer'
+        }
+      });
+    }
+
+    let gatewayRes = response;
+    if (gatewayRes.status === 404 && context.env && context.env.ASSETS) {
+      const tplUrl = new URL('/template.html', url.origin);
+      const tplRes = await context.env.ASSETS.fetch(new Request(tplUrl.toString(), context.request)).catch(() => null);
+      if (tplRes && tplRes.ok) {
+        gatewayRes = tplRes;
+      } else {
+        const idxUrl = new URL('/index.html', url.origin);
+        const idxRes = await context.env.ASSETS.fetch(new Request(idxUrl.toString(), context.request)).catch(() => null);
+        if (idxRes && idxRes.ok) {
+          gatewayRes = idxRes;
+        }
+      }
+    }
+
+    const headers = new Headers(gatewayRes.headers);
     headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, private, max-age=0');
     headers.set('CDN-Cache-Control', 'no-store, private');
     headers.set('Cloudflare-CDN-Cache-Control', 'no-store, private');
     headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
     headers.set('Referrer-Policy', 'no-referrer');
-    return new Response(response.body, {
-      status: response.status,
-      statusText: response.statusText,
+    return new Response(gatewayRes.body, {
+      status: gatewayRes.ok ? 200 : gatewayRes.status,
+      statusText: gatewayRes.ok ? 'OK' : gatewayRes.statusText,
       headers
     });
   }

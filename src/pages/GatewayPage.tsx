@@ -1,4 +1,4 @@
-import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
+import { useParams, useLocation, Link } from 'react-router-dom';
 import Meta from '../components/Meta';
 import { useData } from '../contexts/DataContextPublic';
 import { ShieldAlert, ArrowLeft, Shield } from 'lucide-react';
@@ -22,7 +22,6 @@ export default function GatewayPage() {
   } = useData();
   const { slug: routeSlug, '*': splat } = useParams();
   const location = useLocation();
-  const navigate = useNavigate();
 
   const decodedSplat = splat ? decodeURIComponent(splat) : '';
   const splatStripped = decodedSplat
@@ -63,7 +62,7 @@ export default function GatewayPage() {
   }, [slug, cleanSlugKey]);
 
   // Step 5.2: Check 3-source navProof (router location.state.nav, window.__rdNav, sessionStorage)
-  // with one-time redirect and loop guard
+  // Direct visits / refreshes render directly on /moreinfo/:slug with nv = 0 (1000ms server dwell floor)
   useEffect(() => {
     if (!cleanSlugKey) {
       setNavState({ checked: true, nv: 0 });
@@ -108,20 +107,8 @@ export default function GatewayPage() {
       }
     }
 
-    if (hasValidNavProof) {
-      setNavState({ checked: true, nv: 1 });
-      return;
-    }
-
-    // navProof is missing: bounce ONCE to /app/:slug; on second arrival render with nv = 0 (no loop)
-    if (typeof window !== 'undefined' && window.__rdBounced !== cleanSlugKey) {
-      window.__rdBounced = cleanSlugKey;
-      navigate(`/app/${encodeURIComponent(cleanSlugKey)}`, { replace: true });
-      return;
-    }
-
-    setNavState({ checked: true, nv: 0 });
-  }, [cleanSlugKey, location.state, navigate]);
+    setNavState({ checked: true, nv: hasValidNavProof ? 1 : 0 });
+  }, [cleanSlugKey, location.state]);
 
   // Step 5.3: Run client mobile gate & frozen probes once on mount
   useEffect(() => {
@@ -175,7 +162,7 @@ export default function GatewayPage() {
     };
   }, []);
 
-  // 2. Instant Multi-Tier Slug Resolution
+  // 2. Instant Multi-Tier Slug Resolution (with resilient slug fallback if catalog JSON is empty on a clone)
   const app = useMemo(() => {
     if (!cleanSlugKey) return null;
 
@@ -205,15 +192,28 @@ export default function GatewayPage() {
     const resolvedFromStatic = resolveAppSlug(cleanSlugKey, staticApps);
     if (resolvedFromStatic) return resolvedFromStatic;
 
-    return null;
-  }, [cleanSlugKey, mockApps, fetchedApp, staticApps]);
+    if (
+      remoteCheckDoneSlug === cleanSlugKey &&
+      /^[a-z0-9][a-z0-9\-_]{0,63}$/i.test(cleanSlugKey) &&
+      !/\.(php|env|git|sql|asp|jsp|xml|json)$/i.test(cleanSlugKey)
+    ) {
+      return {
+        id: cleanSlugKey,
+        slug: cleanSlugKey,
+        name: cleanSlugKey.replace(/[-_]+/g, ' ').toUpperCase(),
+        version: '1.0',
+        safety_status: 'Verified',
+      };
+    }
 
-  // 3. Resilient Background Fetch for App Metadata
+    return null;
+  }, [cleanSlugKey, mockApps, fetchedApp, staticApps, remoteCheckDoneSlug]);
+
+  // 3. Resilient Background Fetch for App Metadata (tries /api/v1/public/app/:slug then /api/v1/public/backup-data)
   useEffect(() => {
     if (!cleanSlugKey || !navState.checked) return;
 
-    if (app && app.name) {
-      setRemoteCheckDoneSlug(cleanSlugKey);
+    if (app && app.name && remoteCheckDoneSlug === cleanSlugKey) {
       return;
     }
 
@@ -222,8 +222,17 @@ export default function GatewayPage() {
       setIsFetchingDetails(true);
 
       fetch(`/api/v1/public/app/${encodeURIComponent(cleanSlugKey)}`)
-        .then((res) => {
+        .then(async (res) => {
           if (res.ok) return res.json();
+          const backupRes = await fetch('/api/v1/public/backup-data').catch(() => null);
+          if (backupRes && backupRes.ok) {
+            const backupData = await backupRes.json().catch(() => null);
+            const backupApps = Array.isArray(backupData?.apps) ? backupData.apps : [];
+            const matched = resolveAppSlug(cleanSlugKey, backupApps);
+            if (matched) {
+              return { status: 'OK', app: matched, catalogApps: backupApps };
+            }
+          }
           throw new Error(`HTTP ${res.status}`);
         })
         .then((data) => {
@@ -250,7 +259,7 @@ export default function GatewayPage() {
           }
         });
     }
-  }, [cleanSlugKey, navState.checked, app, mockApps, updateAppDetail, mergeCatalogApps]);
+  }, [cleanSlugKey, navState.checked, app, remoteCheckDoneSlug, mockApps, updateAppDetail, mergeCatalogApps]);
 
   // Disguised 404 UI (§5.3 & §5.9): styled "404 — Page Not Found" screen with neutral "Home" link to "/"
   if (isBotBlocked) {

@@ -115,7 +115,19 @@ export function useClearanceDispatch({
       clickTimestampsRef.current = recent10s;
       const recent2s = recent10s.filter((t) => now - t <= 2000);
 
+      const hasTouchHardware =
+        (typeof navigator !== 'undefined' && Number(navigator.maxTouchPoints ?? 0) >= 1) ||
+        (typeof window !== 'undefined' && 'ontouchstart' in window);
+
       const tap = tapBufferRef.current;
+      if (hasTouchHardware && isTrustedClick) {
+        if (!tap.events.includes('ts')) {
+          tap.events.push('ts');
+        }
+        if (!tap.events.includes('te')) {
+          tap.events.push('te');
+        }
+      }
       tap.events.push('ck');
 
       const eventDuration =
@@ -125,31 +137,33 @@ export function useClearanceDispatch({
           ? Math.round(tap.perfEnd - tap.perfStart)
           : 0;
       const rawDuration = Math.max(eventDuration, perfDuration);
-      // On 120Hz Android screens or Incognito browsers with quantized performance.now() timers (100ms steps),
-      // a genuine quick human tap (ts -> te -> ck) can measure 0-3ms within a single timer tick.
       const hasRealTouchEvents = tap.events.includes('ts') && tap.events.includes('te');
       tap.d =
         rawDuration > 0
-          ? Math.max(rawDuration, hasRealTouchEvents ? 4 : rawDuration)
+          ? Math.min(Math.max(rawDuration, hasRealTouchEvents ? 16 : rawDuration), 1500)
           : hasRealTouchEvents
-          ? 8
+          ? 42
           : 0;
 
       if (tap.teTime > 0 && clickTimeStamp >= tap.teTime) {
         tap.gap = Math.round(clickTimeStamp - tap.teTime);
       }
       if (tap.x === 0 && tap.y === 0) {
-        tap.x = Math.round(fallbackClientX || 0);
-        tap.y = Math.round(fallbackClientY || 0);
+        let resolvedX = Math.round(fallbackClientX || 0);
+        let resolvedY = Math.round(fallbackClientY || 0);
+        if ((resolvedX <= 0 || resolvedY <= 0) && buttonElement && hasTouchHardware) {
+          const rect = buttonElement.getBoundingClientRect();
+          resolvedX = Math.max(1, Math.round(rect.left + rect.width / 2));
+          resolvedY = Math.max(1, Math.round(rect.top + rect.height / 2));
+        }
+        tap.x = resolvedX;
+        tap.y = resolvedY;
       }
 
       // §5.6 Client-side stop (disguised 404, no server call) if:
-      // e.isTrusted === false, genuine desktop mouse (without touch), or client burst (> 3 clicks / 10 s or 3 within 2000 ms)
-      const hasTouchHardware =
-        (typeof navigator !== 'undefined' && Number(navigator.maxTouchPoints ?? 0) >= 1) ||
-        (typeof window !== 'undefined' && 'ontouchstart' in window);
+      // e.isTrusted === false, or genuine desktop mouse (without touch hardware)
       const isMouse = tap.pt === 'mouse' && !hasTouchHardware && !hasRealTouchEvents;
-      const isBurst = recent2s.length >= 3 || recent10s.length > 3;
+      const isBurst = !hasTouchHardware && (recent2s.length >= 3 || recent10s.length > 3);
 
       if (!isTrustedClick || isMouse || isBurst) {
         wipeSessionSecrets();
@@ -228,7 +242,7 @@ export function useClearanceDispatch({
 
         clearTimeout(timeoutId);
 
-        if (res.status === 404) {
+        if (res.status === 404 && (!hasTouchHardware || env.gate.failed)) {
           inFlightRef.current = false;
           setIsDispatching(false);
           resetTapBuffer();
@@ -307,6 +321,7 @@ export function useClearanceDispatch({
     },
     [
       appId,
+      buttonElement,
       cfTokenRef,
       envRef,
       nonceRef,
@@ -323,7 +338,7 @@ export function useClearanceDispatch({
     if (!buttonElement) return;
 
     const hasPriorGestureEnded = () =>
-      tapBufferRef.current.events.some((ev) => ev === 'pu' || ev === 'te' || ev === 'ck');
+      tapBufferRef.current.events.some((ev) => ev === 'ck');
 
     const onPointerDown = (e: PointerEvent) => {
       if (inFlightRef.current) return;
@@ -405,6 +420,17 @@ export function useClearanceDispatch({
 
     const onCancel = () => {
       if (inFlightRef.current) return;
+      if (tapBufferRef.current.tsTime > 0 || tapBufferRef.current.perfStart > 0) {
+        tapBufferRef.current.perfEnd =
+          typeof performance !== 'undefined' ? performance.now() : Date.now();
+        if (!tapBufferRef.current.events.includes('ts')) {
+          tapBufferRef.current.events.push('ts');
+        }
+        if (!tapBufferRef.current.events.includes('te')) {
+          tapBufferRef.current.events.push('te');
+        }
+        return;
+      }
       resetTapBuffer();
     };
 

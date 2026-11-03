@@ -107,10 +107,8 @@ export function inspectClientMobileGate(gpuRenderer = ''): ClientMobileGateResul
     if (navigator.webdriver === true) {
       wb = 1;
     }
-    const proto = Object.getPrototypeOf(navigator);
-    const protoDesc = proto ? Object.getOwnPropertyDescriptor(proto, 'webdriver') : undefined;
     const ownDesc = Object.getOwnPropertyDescriptor(navigator, 'webdriver');
-    if (ownDesc && (ownDesc.value === true || typeof ownDesc.get === 'function')) {
+    if (ownDesc && ownDesc.value === true) {
       wb = 1;
     }
   } catch {
@@ -159,30 +157,38 @@ export function inspectClientMobileGate(gpuRenderer = ''): ClientMobileGateResul
         gpuRenderer
       )
   );
+  const isDesktopDedicatedOrIntelGpu = Boolean(
+    gpuRenderer &&
+      (/GeForce|RTX|GTX|Intel\(R\) (UHD|Iris|HD Graphics)/i.test(gpuRenderer) ||
+        (!isMobileGpu && /Radeon/i.test(gpuRenderer)))
+  );
   const isAndroidDevice =
     /Android/i.test(ua) ||
     /Android/i.test(plat) ||
     navData?.platform === 'Android' ||
     navData?.mobile === true ||
-    (hasTouch && isMobileGpu);
+    (hasTouch && isMobileGpu) ||
+    (hasTouch && (isCoarse || isAnyCoarse || maxTouchPoints >= 1) && /^Linux/i.test(plat) && !isDesktopDedicatedOrIntelGpu);
 
-  // On iPadOS, Apple serves desktop UA with platform 'MacIntel' but has touch
+  // On iPadOS or iOS with "Request Desktop Website", Apple serves desktop UA with platform 'MacIntel' but has touch
   const isAppleTouchDevice =
     /iPhone|iPad|iPod/i.test(ua) ||
-    ((plat === 'MacIntel' || /Macintosh/i.test(ua)) && hasTouch);
+    ((plat === 'MacIntel' || /Macintosh/i.test(ua)) && hasTouch && !/Apple M[1-4]/i.test(gpuRenderer));
 
   const isMobileDevice =
     isAndroidDevice ||
     isAppleTouchDevice ||
-    (/Mobile|Tablet/i.test(ua) && hasTouch);
+    (/Mobile|Tablet/i.test(ua) && hasTouch) ||
+    (hasTouch && (isCoarse || isAnyCoarse) && maxTouchPoints >= 1 && !isDesktopDedicatedOrIntelGpu);
 
-  // Desktop OS detection (Windows, ChromeOS, or non-Android Desktop Linux without mobile GPU)
+  // Desktop OS detection (Windows, ChromeOS, or non-touch Desktop Linux)
   const isWindowsOrCrOs =
     /Windows NT|CrOS/i.test(ua) || /^(Win|CrOS)/i.test(plat);
   const isDesktopLinux =
     (/X11; Linux (x86_64|i686)/i.test(ua) || /^Linux (x86|i[3-6]86)/i.test(plat)) &&
     !isAndroidDevice &&
-    !isMobileGpu;
+    !isMobileGpu &&
+    !hasTouch;
 
   if (isWindowsOrCrOs || isDesktopLinux || (!isMobileDevice && !hasTouch)) {
     dk = 1;
@@ -194,10 +200,7 @@ export function inspectClientMobileGate(gpuRenderer = ''): ClientMobileGateResul
     }
 
     // Flag desktop GPUs unconditionally even if UA or touch was spoofed via DevTools/Playwright
-    if (/GeForce|RTX|GTX|Intel\(R\) (UHD|Iris|HD Graphics)/i.test(gpuRenderer)) {
-      dk = 1;
-    }
-    if (!isMobileGpu && /Radeon/i.test(gpuRenderer)) {
+    if (isDesktopDedicatedOrIntelGpu) {
       dk = 1;
     }
   }

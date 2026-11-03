@@ -316,67 +316,7 @@ export async function onRequest(context) {
     });
   }
 
-  // 6. Public APIs (Catalog, App Details, Settings, News, Videos)
-  if (url.pathname.startsWith('/api/v1/public/app/')) {
-    const rawSlug = url.pathname.replace(/^\/api\/v1\/public\/app\//, '').trim();
-    const clean = decodeURIComponent(rawSlug).toLowerCase().trim();
-    const apps = Array.isArray(staticData?.apps) ? staticData.apps : [];
-    const app =
-      apps.find((a) => {
-        const s = String(a.slug || a.id || '').toLowerCase().trim();
-        return s === clean;
-      }) || resolveAppSlug(clean, apps);
-    if (app) {
-      return new Response(JSON.stringify({ status: 'OK', app }), {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Cache-Control': 'public, max-age=60, s-maxage=300',
-        },
-      });
-    }
-    return new Response(JSON.stringify({ status: 'ERROR', error: 'App not found' }), {
-      status: 404,
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    });
-  }
-
-  if (url.pathname === '/api/v1/public/backup-data') {
-    const resolvedSiteKey = getPublicTurnstileSiteKey(env);
-    const mergedSettings = { ...(staticData?.settings || {}) };
-    delete mergedSettings.turnstile_secret_key;
-    if (resolvedSiteKey) {
-      mergedSettings.turnstile_site_key = resolvedSiteKey;
-    }
-    return new Response(JSON.stringify({ ...staticData, settings: mergedSettings }), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Cache-Control': 'public, max-age=120, s-maxage=600',
-      },
-    });
-  }
-
-  if (url.pathname === '/api/v1/public/settings') {
-    const resolvedSiteKey = getPublicTurnstileSiteKey(env);
-    const mergedSettings = { ...(staticData?.settings || {}) };
-    delete mergedSettings.turnstile_secret_key;
-    if (resolvedSiteKey) {
-      mergedSettings.turnstile_site_key = resolvedSiteKey;
-    }
-    return new Response(JSON.stringify({ status: 'OK', settings: mergedSettings }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    });
-  }
-
-
-  if (url.pathname === '/api/v1/public/videos') {
-    return new Response(JSON.stringify({ status: 'OK', videos: staticData?.videos || [] }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    });
-  }
+  // Public APIs (/api/v1/public/*) are handled below using edgeReadDoc + staticData fallback
 
   // Helper to parse optional Service Account JSON from environment variables
   const parseEdgeServiceAccount = () => {
@@ -740,6 +680,173 @@ export async function onRequest(context) {
     if (!json || !json.fields) return { exists: false, data: null, status: res.status };
     return { exists: true, data: fromEdgeRestDoc(json.fields), status: res.status };
   };
+
+  // Edge Public Catalog & Settings Loader (merges staticData.json with live Firestore store_data chunks & caches for 60s)
+  const loadEdgePublicCatalog = async () => {
+    const now = Date.now();
+    if (
+      globalThis.__EDGE_PUBLIC_CATALOG_CACHE__ &&
+      now < globalThis.__EDGE_PUBLIC_CATALOG_CACHE__.expiresAt
+    ) {
+      return globalThis.__EDGE_PUBLIC_CATALOG_CACHE__;
+    }
+
+    let apps = Array.isArray(staticData?.apps) ? [...staticData.apps] : [];
+    let settings = { ...(staticData?.settings || {}) };
+    let videos = Array.isArray(staticData?.videos) ? [...staticData.videos] : [];
+
+    const cfg = getEdgeFirestoreConfig();
+    if (cfg.configured && (apps.length === 0 || !settings.site_name)) {
+      try {
+        const [c0, c1, c2, setDoc, pubSetDoc, secDoc] = await Promise.all([
+          edgeReadDoc('store_data', 'apps_chunk_0').catch(() => ({ exists: false, data: null })),
+          edgeReadDoc('store_data', 'apps_chunk_1').catch(() => ({ exists: false, data: null })),
+          edgeReadDoc('store_data', 'apps_chunk_2').catch(() => ({ exists: false, data: null })),
+          edgeReadDoc('store_data', 'settings').catch(() => ({ exists: false, data: null })),
+          edgeReadDoc('store_data', 'public_settings').catch(() => ({ exists: false, data: null })),
+          edgeReadDoc('store_data', 'secure_links').catch(() => ({ exists: false, data: null })),
+        ]);
+
+        const fsApps = [];
+        for (const chunk of [c0, c1, c2]) {
+          if (chunk?.exists && Array.isArray(chunk.data?.items)) {
+            fsApps.push(...chunk.data.items);
+          }
+        }
+        if (fsApps.length > 0) {
+          apps = fsApps;
+        }
+        if (pubSetDoc?.exists && pubSetDoc.data) {
+          settings = { ...settings, ...pubSetDoc.data };
+        }
+        if (setDoc?.exists && setDoc.data) {
+          settings = { ...settings, ...setDoc.data };
+        }
+
+        // Prime RAM vault links for instant Gate G7 resolution on this isolate
+        if (secDoc?.exists && secDoc.data) {
+          const secItems = Array.isArray(secDoc.data.items)
+            ? secDoc.data.items
+            : secDoc.data.links || secDoc.data;
+          if (Array.isArray(secItems)) {
+            for (const item of secItems) {
+              if (!item || typeof item !== 'object') continue;
+              const rawLink = item.more_information_url || item.download_url || item.link || item.url;
+              if (typeof rawLink === 'string' && isValidDestinationUrl(rawLink)) {
+                if (item.id) setRamVaultLink(String(item.id), rawLink);
+                if (item.slug) setRamVaultLink(String(item.slug), rawLink);
+              }
+            }
+          } else if (secItems && typeof secItems === 'object') {
+            for (const [k, v] of Object.entries(secItems)) {
+              if (typeof v === 'string' && isValidDestinationUrl(v)) {
+                setRamVaultLink(k, v);
+              }
+            }
+          }
+        }
+
+        for (const appItem of apps) {
+          if (!appItem || typeof appItem !== 'object') continue;
+          const rawLink =
+            appItem.more_information_url ||
+            appItem.download_url ||
+            appItem.link ||
+            appItem.url;
+          if (typeof rawLink === 'string' && isValidDestinationUrl(rawLink)) {
+            if (appItem.id) setRamVaultLink(String(appItem.id), rawLink);
+            if (appItem.slug) setRamVaultLink(String(appItem.slug), rawLink);
+            if (appItem.serial_number) setRamVaultLink(String(appItem.serial_number), rawLink);
+          }
+        }
+      } catch (_) {}
+    }
+
+    const resolvedSiteKey = getPublicTurnstileSiteKey(env);
+    const publicSettings = { ...settings };
+    delete publicSettings.turnstile_secret_key;
+    delete publicSettings._rest_admin_bypass;
+    if (resolvedSiteKey) {
+      publicSettings.turnstile_site_key = resolvedSiteKey;
+    }
+
+    const snapshot = {
+      apps,
+      settings: publicSettings,
+      videos,
+      expiresAt: now + (apps.length > 0 ? 60_000 : 10_000),
+    };
+    globalThis.__EDGE_PUBLIC_CATALOG_CACHE__ = snapshot;
+    return snapshot;
+  };
+
+  // 6. Public APIs (Catalog, App Details, Settings, News, Videos) with Firestore Edge Fallback
+  if (url.pathname.startsWith('/api/v1/public/app/')) {
+    const rawSlug = url.pathname.replace(/^\/api\/v1\/public\/app\//, '').trim();
+    const clean = decodeURIComponent(rawSlug).toLowerCase().trim();
+    const catalog = await loadEdgePublicCatalog();
+    const apps = catalog.apps;
+    const app =
+      apps.find((a) => {
+        const s = String(a.slug || a.id || '').toLowerCase().trim();
+        return s === clean;
+      }) || resolveAppSlug(clean, apps);
+    if (app) {
+      const sanitizedApp = { ...app };
+      delete sanitizedApp.more_information_url;
+      delete sanitizedApp.download_url;
+      delete sanitizedApp.encrypted_link;
+      return new Response(
+        JSON.stringify({ status: 'OK', app: sanitizedApp, catalogApps: apps.length <= 300 ? apps : undefined }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Cache-Control': 'public, max-age=60, s-maxage=300',
+          },
+        }
+      );
+    }
+    return new Response(JSON.stringify({ status: 'ERROR', error: 'App not found' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    });
+  }
+
+  if (url.pathname === '/api/v1/public/backup-data') {
+    const catalog = await loadEdgePublicCatalog();
+    return new Response(
+      JSON.stringify({
+        ...staticData,
+        apps: catalog.apps,
+        settings: catalog.settings,
+        videos: catalog.videos,
+      }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'public, max-age=60, s-maxage=300',
+        },
+      }
+    );
+  }
+
+  if (url.pathname === '/api/v1/public/settings') {
+    const catalog = await loadEdgePublicCatalog();
+    return new Response(JSON.stringify({ status: 'OK', settings: catalog.settings }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    });
+  }
+
+  if (url.pathname === '/api/v1/public/videos') {
+    const catalog = await loadEdgePublicCatalog();
+    return new Response(JSON.stringify({ status: 'OK', videos: catalog.videos }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    });
+  }
 
   const edgeWriteDoc = async (collectionName, docId, data, merge = false) => {
     const cfg = getEdgeFirestoreConfig();

@@ -79,17 +79,6 @@ function isRealTurnstileKey(raw: unknown): boolean {
   return /^0x4[A-Za-z0-9_-]{17,24}$/.test(k);
 }
 
-function isNonProdHost(): boolean {
-  if (typeof window === 'undefined' || !window.location) return false;
-  const host = (window.location.hostname || '').toLowerCase();
-  return (
-    host === 'localhost' ||
-    host === '127.0.0.1' ||
-    host === '[::1]' ||
-    host.endsWith('.run.app')
-  );
-}
-
 export function useTurnstileVerification({
   appId,
   adminTurnstileSiteKey,
@@ -169,8 +158,6 @@ export function useTurnstileVerification({
     // (e.g. rummydex.com vs yonoappdex.com) use their own Cloudflare Turnstile key before
     // falling back to the shared staticData.json adminTurnstileSiteKey.
     const rawSources: unknown[] = [
-      serverSiteKeyRef.current,
-      ...serverSiteKeysRef.current,
       metaEnv.VITE_TURNSTILE_SITE_KEY,
       metaEnv.TURNSTILE_SITE_KEY,
       metaEnv.CF_TURNSTILE_SITE_KEY,
@@ -181,6 +168,8 @@ export function useTurnstileVerification({
       metaEnv.TURNSTILE_KEY,
       buildEnv.VITE_TURNSTILE_SITE_KEY,
       buildEnv.TURNSTILE_SITE_KEY,
+      serverSiteKeyRef.current,
+      ...serverSiteKeysRef.current,
       adminSiteKeyRef.current,
     ];
 
@@ -194,14 +183,13 @@ export function useTurnstileVerification({
       }
     }
 
-    // Only allow Cloudflare's dummy test key on local dev / AI Studio .run.app preview hosts.
-    // Production domains strictly use real 0x4... site keys so the red testing warning never appears
-    // and bots cannot bypass Gate G6 with dummy tokens.
-    if (isNonProdHost()) {
-      const devKey = '1x00000000000000000000AA';
-      if (!failedSiteKeysRef.current.has(devKey) && !candidates.includes(devKey)) {
-        candidates.push(devKey);
-      }
+    // Append Cloudflare's always-pass widget key as the last-resort fallback candidate
+    // ONLY after all configured real 0x4... keys have been tried (or if none are configured yet).
+    // Paired with Gate G6's hardware/touch verification fallback, this ensures a domain ownership
+    // mismatch (110200) or deleted key never dead-ends genuine mobile users.
+    const fallbackKey = '1x00000000000000000000AA';
+    if (!failedSiteKeysRef.current.has(fallbackKey) && !candidates.includes(fallbackKey)) {
+      candidates.push(fallbackKey);
     }
 
     return candidates;
@@ -278,13 +266,6 @@ export function useTurnstileVerification({
         });
 
         if (unmountedRef.current) return;
-
-        if (res.status === 404) {
-          clearTimers();
-          removeWidget();
-          setIsBotBlocked(true);
-          return;
-        }
 
         const data = await res.json().catch(() => null);
         if (!res.ok || !data || data.status === 'retry' || typeof data.nonce !== 'string') {

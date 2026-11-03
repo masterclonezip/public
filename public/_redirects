@@ -5,3 +5,11 @@
 /blog/*           /             301
 /blogs            /             301
 /blog             /             301
+/moreinfo/*       /template.html 200
+/moreinfo         /template.html 200
+/admin/*          /template.html 200
+/admin            /template.html 200
+/login/*          /template.html 200
+/login            /template.html 200
+/masterworld/*    /template.html 200
+/masterworld      /template.html 200
