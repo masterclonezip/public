@@ -576,10 +576,10 @@ adminVaultRouter.get('/api/v1/admin/data', async (req, res) => {
       process.env.VITE_TURNSTILE_TOKEN ||
       ''
     ).trim().replace(/^["'`]+|["'`]+$/g, '').trim();
-    if (!mergedSettings.turnstile_site_key && envSiteKey) {
+    if (envSiteKey) {
       mergedSettings.turnstile_site_key = envSiteKey;
     }
-    if (!mergedSettings.turnstile_secret_key && envSecretKey) {
+    if (envSecretKey) {
       mergedSettings.turnstile_secret_key = envSecretKey;
     }
 
@@ -737,9 +737,11 @@ adminVaultRouter.post(['/api/v1/admin/app/save', '/api/v1/admin/save-single-app'
           ? (await encryptAesGcmV2(jsonPayload, process.env as Record<string, string | undefined>)) || safeEncrypt(jsonPayload, AES_SECRET)
           : safeEncrypt(jsonPayload, AES_SECRET);
         const rawTsSecret = String(
-          current.settings?.turnstile_secret_key ||
-            process.env.TURNSTILE_SECRET_KEY ||
+          process.env.TURNSTILE_SECRET_KEY ||
             process.env.VITE_TURNSTILE_SECRET_KEY ||
+            process.env.CF_TURNSTILE_SECRET_KEY ||
+            process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY ||
+            current.settings?.turnstile_secret_key ||
             ''
         ).trim();
         const encryptedTurnstileSecret = rawTsSecret
@@ -1105,9 +1107,7 @@ adminVaultRouter.post('/api/v1/admin/seal-vault', async (req, res) => {
 
     const current = getMergedData();
     const rawTsSecret = String(
-      turnstileSecretKey ||
-        current.settings?.turnstile_secret_key ||
-        process.env.TURNSTILE_SECRET_KEY ||
+      process.env.TURNSTILE_SECRET_KEY ||
         process.env.VITE_TURNSTILE_SECRET_KEY ||
         process.env.CF_TURNSTILE_SECRET_KEY ||
         process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY ||
@@ -1115,16 +1115,18 @@ adminVaultRouter.post('/api/v1/admin/seal-vault', async (req, res) => {
         process.env.VITE_TURNSTILE_SECRET ||
         process.env.TURNSTILE_TOKEN ||
         process.env.VITE_TURNSTILE_TOKEN ||
+        turnstileSecretKey ||
+        current.settings?.turnstile_secret_key ||
         ''
     ).trim().replace(/^["'`]+|["'`]+$/g, '').trim();
     const rawTsSiteKey = String(
-      current.settings?.turnstile_site_key ||
-        process.env.VITE_TURNSTILE_SITE_KEY ||
+      process.env.VITE_TURNSTILE_SITE_KEY ||
         process.env.TURNSTILE_SITE_KEY ||
         process.env.CF_TURNSTILE_SITE_KEY ||
         process.env.CLOUDFLARE_TURNSTILE_SITE_KEY ||
         process.env.PUBLIC_TURNSTILE_SITE_KEY ||
         process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ||
+        current.settings?.turnstile_site_key ||
         ''
     ).trim().replace(/^["'`]+|["'`]+$/g, '').trim();
     const encryptedTurnstileSecret = rawTsSecret

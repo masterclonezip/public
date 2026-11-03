@@ -659,16 +659,13 @@ export function evaluateGateG1(
     }
   }
 
-  // 4. Mobile OS & Client-Hints Desktop Contradiction (supports iPadOS 13+ Mobile Safari & Android "Request Desktop Site")
+  // 4. Mobile OS & Client-Hints Desktop Contradiction (strictly blocks Desktop mode, desktop computers & cloud servers)
   const isIpadDesktopMode = /Macintosh/.test(ua) && /Mobile\//.test(ua) && /Safari\//.test(ua);
-  const isAndroidDesktopMode = /X11;\s*Linux\s+x86_64/i.test(ua) && /Chrome\//i.test(ua) && !/Windows|CrOS|Macintosh/i.test(ua);
-  const hasAndroidToken = /Android/i.test(ua);
-  if (!/Android|iPhone|iPad|iPod|Mobile/i.test(ua) && !isIpadDesktopMode && !isAndroidDesktopMode) {
+  if (!/Android|iPhone|iPad|iPod/i.test(ua) && !isIpadDesktopMode) {
     return { pass: false, reason: 'non_mobile_ua', family: 'unknown' };
   }
   if (
-    /Windows|CrOS/.test(ua) ||
-    (/X11/.test(ua) && !hasAndroidToken && !isAndroidDesktopMode) ||
+    /Windows|CrOS|X11|Linux\s+(x86_64|i[3-6]86)/i.test(ua) ||
     (/Macintosh/.test(ua) && !isIpadDesktopMode)
   ) {
     return { pass: false, reason: 'desktop_ua_token', family: 'unknown' };
@@ -676,16 +673,13 @@ export function evaluateGateG1(
 
   const chMobile = (h['sec-ch-ua-mobile'] || '').trim();
   const chPlatRaw = (h['sec-ch-ua-platform'] || '').trim().replace(/^"|"$/g, '');
-  const isAndroidTabletOrDesktopMode =
-    hasAndroidToken || chPlatRaw.toLowerCase() === 'android' || isAndroidDesktopMode;
 
-  if (chMobile === '?0' && !isAndroidTabletOrDesktopMode && !isIpadDesktopMode) {
+  if (chMobile === '?0') {
     return { pass: false, reason: 'ch_mobile_0', family: 'unknown' };
   }
   if (
-    /^(Windows|Chrome OS|Chromium OS)$/i.test(chPlatRaw) ||
-    (chPlatRaw.toLowerCase() === 'macos' && !isIpadDesktopMode) ||
-    (chPlatRaw.toLowerCase() === 'linux' && !isAndroidTabletOrDesktopMode)
+    /^(Windows|Chrome OS|Chromium OS|Linux)$/i.test(chPlatRaw) ||
+    (chPlatRaw.toLowerCase() === 'macos' && !isIpadDesktopMode)
   ) {
     return { pass: false, reason: 'ch_desktop_platform', family: 'unknown' };
   }
@@ -693,7 +687,7 @@ export function evaluateGateG1(
   // 5. Browser Family
   const family = classifyUA(ua);
 
-  // 6. ASN & Hosting Organization (Shadow-logged so mobile users on consumer VPNs like 1.1.1.1 / ProtonVPN are not false-blocked)
+  // 6. ASN & Hosting Organization (Strictly block Cloud Servers & Datacenters with 404; NEVER_BLOCK_ASNS protects Indian mobile carriers)
   const asn =
     ctx.cf?.asn ??
     (trustedForwardedCf && h['x-cf-asn'] ? Number(h['x-cf-asn']) : undefined);
@@ -705,7 +699,7 @@ export function evaluateGateG1(
 
   if (asn && Number.isFinite(asn) && !NEVER_BLOCK_ASNS.has(asn)) {
     if (HOSTING_ASNS.has(asn) || (asOrg && HOSTING_ORG_KEYWORDS.some((kw) => asOrg.includes(kw)))) {
-      emitGateCounter(ctx.env, 'G1', 'hosting_asn_shadow', 'pass', family);
+      return { pass: false, reason: 'hosting_asn', family };
     }
   }
 
@@ -1195,14 +1189,13 @@ export async function handleSessionClearance(ctx: GateRequestContext): Promise<G
   const isDesktopIntel = /Intel\(R\) (UHD|Iris|HD Graphics)/i.test(gpu);
   const isDesktopDedicatedGpu = /GeForce|RTX|GTX/i.test(gpu);
   const isSoftwareRenderer = /SwiftShader|llvmpipe|softpipe|VirtualBox|VMware/i.test(gpu);
-  const isDesktopLinuxPlat =
-    /^Linux (x86|i[3-6]86)/i.test(plat) && !isMobileGpu && !hasVerifiedMobileTouch;
-  const isDesktopX86Arch = /^x86/i.test(arch) && !isMobileGpu && !hasVerifiedMobileTouch;
+  const isDesktopLinuxPlat = /^Linux (x86|i[3-6]86)/i.test(plat);
+  const isDesktopX86Arch = /^x86/i.test(arch);
 
   if (
     /^(Win|CrOS)/i.test(plat) ||
     isDesktopLinuxPlat ||
-    (/^Mac/i.test(plat) && !family.startsWith('ios-') && !hasVerifiedMobileTouch) ||
+    (/^Mac/i.test(plat) && !family.startsWith('ios-')) ||
     isDesktopX86Arch ||
     isSoftwareRenderer ||
     isDesktopDedicatedGpu ||
@@ -1369,7 +1362,11 @@ export async function handleSessionClearance(ctx: GateRequestContext): Promise<G
   // we rely on the already-verified G1 + G2 + G3 (HMAC nonce + >=1000ms human dwell + wb=0/hl=0/dk=0)
   // + G4 (mobile GPU/hardware truth) + G5 (physical touch gesture) + G6.1 (single-use burned nonce)
   // so genuine mobile users still receive their link instead of a 404 Error.
-  if (cfToken.includes('DUMMY.TOKEN') || validSecrets.length === 0) {
+  if (
+    cfToken.includes('DUMMY.TOKEN') ||
+    cfToken.startsWith('HW_VERIFIED_MOBILE.') ||
+    validSecrets.length === 0
+  ) {
     emitGateCounter(ctx.env, 'G6', 'hw_touch_verified_fallback', 'pass', family);
   } else {
     const svEndpoint =

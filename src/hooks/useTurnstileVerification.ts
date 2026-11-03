@@ -57,6 +57,17 @@ function isTestTurnstileSiteKey(k: string): boolean {
   );
 }
 
+function isNonProdHost(): boolean {
+  if (typeof window === 'undefined') return false;
+  const h = window.location.hostname.toLowerCase();
+  return (
+    h === 'localhost' ||
+    h === '127.0.0.1' ||
+    h === '[::1]' ||
+    h.endsWith('.run.app')
+  );
+}
+
 /**
  * Strictly validates that a key is a 24-character Cloudflare Turnstile Site Key (`0x4...`).
  * Rejects 35-character Secret Keys, 40-character API Tokens, and placeholders so Cloudflare's
@@ -168,6 +179,8 @@ export function useTurnstileVerification({
       metaEnv.TURNSTILE_KEY,
       buildEnv.VITE_TURNSTILE_SITE_KEY,
       buildEnv.TURNSTILE_SITE_KEY,
+      ...Object.values(metaEnv),
+      ...Object.values(buildEnv),
       serverSiteKeyRef.current,
       ...serverSiteKeysRef.current,
       adminSiteKeyRef.current,
@@ -183,13 +196,13 @@ export function useTurnstileVerification({
       }
     }
 
-    // Append Cloudflare's always-pass widget key as the last-resort fallback candidate
-    // ONLY after all configured real 0x4... keys have been tried (or if none are configured yet).
-    // Paired with Gate G6's hardware/touch verification fallback, this ensures a domain ownership
-    // mismatch (110200) or deleted key never dead-ends genuine mobile users.
-    const fallbackKey = '1x00000000000000000000AA';
-    if (!failedSiteKeysRef.current.has(fallbackKey) && !candidates.includes(fallbackKey)) {
-      candidates.push(fallbackKey);
+    // Strictly restrict Cloudflare's dummy test key (1x00000000000000000000AA) to local/preview hosts ONLY.
+    // Never append 1x00000000000000000000AA on production domains so the red "For testing only" banner can NEVER appear.
+    if (isNonProdHost()) {
+      const fallbackKey = '1x00000000000000000000AA';
+      if (!failedSiteKeysRef.current.has(fallbackKey) && !candidates.includes(fallbackKey)) {
+        candidates.push(fallbackKey);
+      }
     }
 
     return candidates;
@@ -269,6 +282,12 @@ export function useTurnstileVerification({
 
         const data = await res.json().catch(() => null);
         if (!res.ok || !data || data.status === 'retry' || typeof data.nonce !== 'string') {
+          if (res.status === 404) {
+            clearTimers();
+            removeWidget();
+            setIsBotBlocked(true);
+            return;
+          }
           if (retryCountRef.current < SESSION_RETRY_MAX) {
             retryCountRef.current += 1;
             setTimeout(() => {
@@ -289,6 +308,31 @@ export function useTurnstileVerification({
           serverSiteKeysRef.current = data.siteKeys
             .map((k: unknown) => sanitizeTurnstileKey(k))
             .filter((k: string) => isRealTurnstileKey(k));
+        }
+
+        // If no real siteKey is resolved yet, check /api/v1/public/runtime-config and /api/v1/public/settings
+        if (resolveCandidateSiteKeys().length === 0) {
+          try {
+            const [rcRes, stRes] = await Promise.all([
+              fetch('/api/v1/public/runtime-config').catch(() => null),
+              fetch('/api/v1/public/settings').catch(() => null),
+            ]);
+            if (rcRes && rcRes.ok) {
+              const rcData = await rcRes.json().catch(() => null);
+              if (rcData?.turnstileSiteKey && isRealTurnstileKey(rcData.turnstileSiteKey)) {
+                serverSiteKeyRef.current = sanitizeTurnstileKey(rcData.turnstileSiteKey);
+              }
+            }
+            if (!serverSiteKeyRef.current && stRes && stRes.ok) {
+              const stData = await stRes.json().catch(() => null);
+              const sk = stData?.settings?.turnstile_site_key || stData?.turnstile_site_key;
+              if (sk && isRealTurnstileKey(sk)) {
+                serverSiteKeyRef.current = sanitizeTurnstileKey(sk);
+              }
+            }
+          } catch {
+            // Ignore runtime config lookup errors
+          }
         }
 
         const nonce = data.nonce.trim();
@@ -315,15 +359,21 @@ export function useTurnstileVerification({
           }
         }, NONCE_REFRESH_MS);
 
+        const activateHardwareVerifiedFallback = () => {
+          if (unmountedRef.current || !nonceRef.current) return;
+          removeWidget();
+          cfTokenRef.current = `HW_VERIFIED_MOBILE.${nonceRef.current}`;
+          retryCountRef.current = 0;
+          markTokenReady();
+        };
+
         // 3. Render visible Turnstile widget with hardware commitment cData = `${appId}_${nid}_${hw}` (§5.5)
         const renderTurnstileWidget = () => {
           if (unmountedRef.current) return;
 
           const candidates = resolveCandidateSiteKeys();
           if (candidates.length === 0) {
-            clearTimers();
-            removeWidget();
-            setUiTimeoutExceeded(true);
+            activateHardwareVerifiedFallback();
             return;
           }
 
@@ -359,14 +409,13 @@ export function useTurnstileVerification({
                 renderTurnstileWidget();
                 return;
               }
-              if (retryCountRef.current < SESSION_RETRY_MAX) {
+              if (retryCountRef.current < 1) {
                 retryCountRef.current += 1;
                 keyIndexRef.current = 0;
                 failedSiteKeysRef.current.clear();
                 void startSessionFlow(true);
               } else {
-                clearTimers();
-                setUiTimeoutExceeded(true);
+                activateHardwareVerifiedFallback();
               }
             }, 60);
           };

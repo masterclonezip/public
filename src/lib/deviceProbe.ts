@@ -155,42 +155,51 @@ export function inspectClientMobileGate(gpuRenderer = ''): ClientMobileGateResul
     gpuRenderer &&
       /Xclipse|Samsung|Adreno|Mali|Immortalis|Apple|PowerVR|RDNA|Qualcomm|Exynos|MediaTek|Vivante|Tegra/i.test(
         gpuRenderer
-      )
+      ) &&
+      !/Apple M[1-4]/i.test(gpuRenderer)
   );
   const isDesktopDedicatedOrIntelGpu = Boolean(
     gpuRenderer &&
-      (/GeForce|RTX|GTX|Intel\(R\) (UHD|Iris|HD Graphics)/i.test(gpuRenderer) ||
+      (/GeForce|RTX|GTX|Intel\(R\) (UHD|Iris|HD Graphics)|Apple M[1-4]/i.test(gpuRenderer) ||
         (!isMobileGpu && /Radeon/i.test(gpuRenderer)))
   );
-  const isAndroidDevice =
-    /Android/i.test(ua) ||
-    /Android/i.test(plat) ||
-    navData?.platform === 'Android' ||
-    navData?.mobile === true ||
-    (hasTouch && isMobileGpu) ||
-    (hasTouch && (isCoarse || isAnyCoarse || maxTouchPoints >= 1) && /^Linux/i.test(plat) && !isDesktopDedicatedOrIntelGpu);
 
-  // On iPadOS or iOS with "Request Desktop Website", Apple serves desktop UA with platform 'MacIntel' but has touch
-  const isAppleTouchDevice =
-    /iPhone|iPad|iPod/i.test(ua) ||
-    ((plat === 'MacIntel' || /Macintosh/i.test(ua)) && hasTouch && !/Apple M[1-4]/i.test(gpuRenderer));
+  // Strict Desktop Mode & Desktop OS detection:
+  // 1. Android Chrome / Brave / Edge / Samsung Internet in "Desktop site" mode sends X11; Linux x86_64 and navData.mobile === false
+  // 2. iOS Safari in "Request Desktop Website" mode sends Macintosh and plat === 'MacIntel'
+  // 3. Mobile browsers in "Desktop site" mode scale layout viewport width >= 768px (typically 980px) while physical screen short side < 650px
+  const isDesktopUaOrDesktopMode =
+    /Windows NT|Win64|WOW64|CrOS|X11;\s*Linux\s+(x86_64|i[3-6]86)|Linux\s+(x86_64|i[3-6]86)|Ubuntu|Fedora|Debian|Macintosh/i.test(
+      ua
+    ) ||
+    !/Android|iPhone|iPad|iPod/i.test(ua);
 
-  const isMobileDevice =
-    isAndroidDevice ||
-    isAppleTouchDevice ||
-    (/Mobile|Tablet/i.test(ua) && hasTouch) ||
-    (hasTouch && (isCoarse || isAnyCoarse) && maxTouchPoints >= 1 && !isDesktopDedicatedOrIntelGpu);
+  const isClientHintsDesktopMode =
+    navData?.mobile === false ||
+    Boolean(
+      navData?.platform &&
+        /^(Windows|macOS|Chrome OS|Chromium OS|Linux)$/i.test(navData.platform.trim())
+    );
 
-  // Desktop OS detection (Windows, ChromeOS, or non-touch Desktop Linux)
-  const isWindowsOrCrOs =
-    /Windows NT|CrOS/i.test(ua) || /^(Win|CrOS)/i.test(plat);
-  const isDesktopLinux =
-    (/X11; Linux (x86_64|i686)/i.test(ua) || /^Linux (x86|i[3-6]86)/i.test(plat)) &&
-    !isAndroidDevice &&
-    !isMobileGpu &&
-    !hasTouch;
+  const vw = Number(window.innerWidth || 0);
+  const vh = Number(window.innerHeight || 0);
+  const sw = Number(window.screen?.width || 0);
+  const sh = Number(window.screen?.height || 0);
+  const minScreen = Math.min(sw || vw, sh || vh);
+  const isDesktopViewportMode =
+    vw >= 768 && (minScreen < 650 || Math.min(vw, vh) >= 680);
 
-  if (isWindowsOrCrOs || isDesktopLinux || (!isMobileDevice && !hasTouch)) {
+  const isDesktopPlatform = /^(Win|CrOS|Mac|Linux x86|Linux i[3-6]86)/i.test(plat);
+
+  if (
+    isDesktopUaOrDesktopMode ||
+    isClientHintsDesktopMode ||
+    isDesktopViewportMode ||
+    isDesktopPlatform ||
+    !hasTouch ||
+    maxTouchPoints < 1 ||
+    (!isCoarse && !isAnyCoarse)
+  ) {
     dk = 1;
   }
 

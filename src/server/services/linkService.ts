@@ -559,7 +559,7 @@ function collectAllTurnstileEnvValues(
     typeof process !== 'undefined' && process.env
       ? (process.env as Record<string, string | undefined>)
       : {};
-  return [
+  const explicit: unknown[] = [
     env?.VITE_TURNSTILE_SITE_KEY,
     env?.TURNSTILE_SITE_KEY,
     env?.CF_TURNSTILE_SITE_KEY,
@@ -603,6 +603,21 @@ function collectAllTurnstileEnvValues(
     procEnv.CF_TURNSTILE_TOKEN,
     procEnv.CLOUDFLARE_TURNSTILE_TOKEN,
   ];
+  if (env && typeof env === 'object') {
+    for (const v of Object.values(env)) {
+      if (typeof v === 'string' && v.trim().replace(/^["'`]+|["'`]+$/g, '').startsWith('0x4')) {
+        explicit.push(v);
+      }
+    }
+  }
+  if (procEnv && typeof procEnv === 'object') {
+    for (const v of Object.values(procEnv)) {
+      if (typeof v === 'string' && v.trim().replace(/^["'`]+|["'`]+$/g, '').startsWith('0x4')) {
+        explicit.push(v);
+      }
+    }
+  }
+  return explicit;
 }
 
 /**
@@ -652,13 +667,17 @@ export function getCandidateTurnstileSiteKeys(
 }
 
 /**
- * Async variant that also checks Firestore `store_data/settings` & `public_settings` when no site key
- * is present in environment variables or `staticData.json` (e.g. on a fresh Master Clone deployment).
+ * Async variant that checks environment variables FIRST, then also checks Firestore `store_data/settings`
+ * & `public_settings` when no site key is present in environment variables.
  */
 export async function getCandidateTurnstileSiteKeysAsync(
   env?: Record<string, string | undefined>
 ): Promise<string[]> {
+  const envOnlyKey = getEnvOnlyTurnstileSiteKey(env);
   const syncKeys = getCandidateTurnstileSiteKeys(env);
+  if (envOnlyKey) {
+    return [envOnlyKey, ...syncKeys.filter((k) => k !== envOnlyKey)];
+  }
   if (syncKeys.length > 0) return syncKeys;
 
   const fsKeys = await fetchTurnstileKeysFromFirestoreRest(env);

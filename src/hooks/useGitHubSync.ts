@@ -40,25 +40,37 @@ import rawFallbackRouteMatcherTsx from '../components/FallbackRouteMatcher.tsx?r
 import rawPreRenderEngineTs from '../seo/preRenderEngine.ts?raw';
 import rawCatchallJs from '../../functions/api/[[catchall]].js?raw';
 import rawVercelJson from '../../vercel.json?raw';
+import rawRedirectsFile from '../../public/_redirects?raw';
+import rawCryptoUtilsTs from '../lib/cryptoUtils.ts?raw';
+import rawServerCryptoTs from '../server/crypto.ts?raw';
+import rawAppActionButtonsTsx from '../components/public/AppActionButtons.tsx?raw';
+import rawNewsRelatedAppBoxTsx from '../components/public/newsDetails/NewsRelatedAppBox.tsx?raw';
+import rawNewsRendererTs from '../seo/renderers/newsRenderer.ts?raw';
 
 const BUNDLED_PUBLIC_CORE_FILES: Record<string, string> = {
   'functions/_middleware.js': rawMiddlewareJs,
   'functions/api/[[catchall]].js': rawCatchallJs,
   'public/_headers': rawHeadersFile,
+  'public/_redirects': rawRedirectsFile,
   'vercel.json': rawVercelJson,
   'scripts/prerender.ts': rawPrerenderTs,
   'src/lib/sitemapGenerator.ts': rawSitemapGeneratorTs,
   'src/lib/seoUtils.ts': rawSeoUtilsTs,
+  'src/lib/cryptoUtils.ts': rawCryptoUtilsTs,
+  'src/server/crypto.ts': rawServerCryptoTs,
   'src/seoHelper.ts': rawSeoHelperTs,
   'src/seo/utils.ts': rawSeoSubUtilsTs,
   'src/seo/preRenderEngine.ts': rawPreRenderEngineTs,
   'src/seo/schemaBuilder.ts': rawSchemaBuilderTs,
   'src/seo/metaBuilder.ts': rawMetaBuilderTs,
   'src/seo/renderers/appDetailsRenderer.ts': rawAppDetailsRendererTs,
+  'src/seo/renderers/newsRenderer.ts': rawNewsRendererTs,
   'src/seo/initialDataOptimizer.ts': rawInitialDataOptimizerTs,
   'src/server/routes/seoRoutes.ts': rawSeoRoutesTs,
   'src/components/Meta.tsx': rawMetaTsx,
   'src/components/FallbackRouteMatcher.tsx': rawFallbackRouteMatcherTsx,
+  'src/components/public/AppActionButtons.tsx': rawAppActionButtonsTsx,
+  'src/components/public/newsDetails/NewsRelatedAppBox.tsx': rawNewsRelatedAppBoxTsx,
   'src/components/public/appDetails/AppSimilarCarousel.tsx': rawAppSimilarCarouselTsx,
   'src/pages/AppDetails.tsx': rawAppDetailsPageTsx,
   'src/pages/GatewayPage.tsx': rawGatewayPageTsx,
@@ -720,8 +732,7 @@ export function useGitHubSync(
             if (
               vaultData.turnstileSiteKey &&
               typeof vaultData.turnstileSiteKey === 'string' &&
-              vaultData.turnstileSiteKey.trim() &&
-              !finalSettings.turnstile_site_key
+              vaultData.turnstileSiteKey.trim()
             ) {
               finalSettings.turnstile_site_key = vaultData.turnstileSiteKey.trim();
               activeUpdatedCode = generateStaticDataFileCode(publicApps, finalSettings, publicNews, targetVideos);

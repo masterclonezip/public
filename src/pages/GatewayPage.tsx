@@ -1,7 +1,7 @@
 import { useParams, useLocation, Link } from 'react-router-dom';
 import Meta from '../components/Meta';
 import { useData } from '../contexts/DataContextPublic';
-import { ShieldAlert, ArrowLeft, Shield } from 'lucide-react';
+import { ArrowLeft, Shield } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import ClearanceButton from '../components/ClearanceButton';
 import { loadFullStaticDataset } from '../lib/lightFallback';
@@ -9,7 +9,7 @@ import { resolveAppSlug } from '../lib/slugResolver';
 import { getPrefetchedApp } from '../lib/preloadHelper';
 import { getOptimizedImageUrl } from '../seo/utils';
 import { NAV_BREADCRUMB_TTL_MS } from '../lib/gateConfig';
-import { collectEnv } from '../lib/deviceProbe';
+import { collectEnv, inspectClientMobileGate } from '../lib/deviceProbe';
 
 export default function GatewayPage() {
   const {
@@ -35,7 +35,9 @@ export default function GatewayPage() {
   const [staticLoaded, setStaticLoaded] = useState<boolean>(false);
   const [isFetchingDetails, setIsFetchingDetails] = useState<boolean>(false);
   const [remoteCheckDoneSlug, setRemoteCheckDoneSlug] = useState<string>('');
-  const [isBotBlocked, setIsBotBlocked] = useState<boolean>(false);
+  const [isBotBlocked, setIsBotBlocked] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? inspectClientMobileGate().failed : false
+  );
   const [navState, setNavState] = useState<{ checked: boolean; nv: 0 | 1 }>({
     checked: false,
     nv: 1,
@@ -110,9 +112,13 @@ export default function GatewayPage() {
     setNavState({ checked: true, nv: hasValidNavProof ? 1 : 0 });
   }, [cleanSlugKey, location.state]);
 
-  // Step 5.3: Run client mobile gate & frozen probes once on mount
+  // Step 5.3: Run client mobile gate & frozen probes once on mount + re-check on viewport resize ("Desktop site" toggle)
   useEffect(() => {
     let active = true;
+    if (inspectClientMobileGate().failed) {
+      setIsBotBlocked(true);
+      return;
+    }
     collectEnv()
       .then((env) => {
         if (active && env.gate.failed) {
@@ -120,8 +126,16 @@ export default function GatewayPage() {
         }
       })
       .catch(() => {});
+
+    const onResize = () => {
+      if (inspectClientMobileGate().failed) {
+        setIsBotBlocked(true);
+      }
+    };
+    window.addEventListener('resize', onResize, { passive: true });
     return () => {
       active = false;
+      window.removeEventListener('resize', onResize);
     };
   }, []);
 
@@ -271,7 +285,7 @@ export default function GatewayPage() {
           noindex={true}
         />
         <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 rounded-2xl flex items-center justify-center mb-6">
-          <ShieldAlert className="w-8 h-8" />
+          <span className="text-xl font-bold tracking-tight">404</span>
         </div>
         <h1 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">
           404 — Page Not Found
@@ -319,7 +333,7 @@ export default function GatewayPage() {
           noindex={true}
         />
         <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 rounded-2xl flex items-center justify-center mb-6">
-          <ShieldAlert className="w-8 h-8" />
+          <span className="text-xl font-bold tracking-tight">404</span>
         </div>
         <h1 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">
           404 — Page Not Found

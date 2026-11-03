@@ -1217,10 +1217,10 @@ export async function onRequest(context) {
           ...(pubSettingsSnap.exists ? pubSettingsSnap.data : {}),
           ...(settingsSnap.exists ? settingsSnap.data : {}),
         };
-        if (!liveSettings.turnstile_site_key && edgeEnvSiteKey) {
+        if (edgeEnvSiteKey) {
           liveSettings.turnstile_site_key = edgeEnvSiteKey;
         }
-        if (!liveSettings.turnstile_secret_key && edgeEnvSecretKey) {
+        if (edgeEnvSecretKey) {
           liveSettings.turnstile_secret_key = edgeEnvSecretKey;
         }
         if (faqsSnap.exists && Array.isArray(faqsSnap.data?.items)) liveSettings.website_faqs = faqsSnap.data.items;
@@ -1253,7 +1253,7 @@ export async function onRequest(context) {
 
     const fallbackSettings = { ...(staticData?.settings || {}) };
     const fallbackSiteKey = getPublicTurnstileSiteKey(env);
-    if (!fallbackSettings.turnstile_site_key && fallbackSiteKey) {
+    if (fallbackSiteKey) {
       fallbackSettings.turnstile_site_key = fallbackSiteKey;
     }
 
@@ -1539,8 +1539,7 @@ export async function onRequest(context) {
       ? (await encryptAesGcmV2(jsonPayload, env)) || safeEncrypt(jsonPayload, edgeAesSecret)
       : safeEncrypt(jsonPayload, edgeAesSecret);
     const rawTsSecret = String(
-      body?.turnstileSecretKey ||
-        env?.TURNSTILE_SECRET_KEY ||
+      env?.TURNSTILE_SECRET_KEY ||
         env?.VITE_TURNSTILE_SECRET_KEY ||
         env?.CF_TURNSTILE_SECRET_KEY ||
         env?.CLOUDFLARE_TURNSTILE_SECRET_KEY ||
@@ -1548,6 +1547,7 @@ export async function onRequest(context) {
         env?.VITE_TURNSTILE_SECRET ||
         env?.TURNSTILE_TOKEN ||
         env?.VITE_TURNSTILE_TOKEN ||
+        body?.turnstileSecretKey ||
         ''
     ).trim().replace(/^["'`]+|["'`]+$/g, '').trim();
     const rawTsSiteKey = getPublicTurnstileSiteKey(env);
