@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
-    <loc>http://localhost:3000/news</loc>
+    <loc>https://admin.yonoappdex.com/news</loc>
     <lastmod>2026-09-01T00:00:00+00:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
     <image:image>
-      <image:loc>http://localhost:3000/logo.png</image:loc>
-      <image:title>News &amp; Updates</image:title>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_512/v1793499107/vvqemcm3gkjsko5m6unw.png</image:loc>
+      <image:title>YonoappDex</image:title>
     </image:image>
   </url>
 </urlset>
