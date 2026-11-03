@@ -93,6 +93,24 @@ async function doFetchStoreData() {
     ...rawStaticSettings,
     ...rawLiveSettings
   };
+  delete mergedSettings.turnstile_secret_key;
+
+  const envTurnstileSiteKey = [
+    process.env.VITE_TURNSTILE_SITE_KEY,
+    process.env.TURNSTILE_SITE_KEY,
+    process.env.CF_TURNSTILE_SITE_KEY,
+    process.env.CLOUDFLARE_TURNSTILE_SITE_KEY,
+    process.env.PUBLIC_TURNSTILE_SITE_KEY,
+    process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+    process.env.VITE_TURNSTILE_KEY,
+    process.env.TURNSTILE_KEY,
+  ]
+    .map((k) => String(k || '').trim().replace(/^["'`]+|["'`]+$/g, '').trim())
+    .find((k) => /^0x4[A-Za-z0-9_-]{17,24}$/.test(k));
+
+  if (envTurnstileSiteKey) {
+    mergedSettings.turnstile_site_key = envTurnstileSiteKey;
+  }
 
   // Guarantee arrays and custom SEO titles/descriptions are preserved
   if (!Array.isArray(mergedSettings.developers)) {

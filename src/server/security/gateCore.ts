@@ -1451,13 +1451,21 @@ export async function handleSessionClearance(ctx: GateRequestContext): Promise<G
     ctx.env.STRICT_HOST_CHECK === '1' ||
     !isLocalOrRunAppPreview;
 
+  // Strictly block dummy test tokens on any production domain
+  if (isProdDomain && cfToken.includes('DUMMY.TOKEN') && !ctx.env.TURNSTILE_SITEVERIFY_URL) {
+    emitGateCounter(ctx.env, 'G6', 'dummy_token_prod', 'fail', family);
+    await recordHardFailure(did, netKey, ctx.env, true);
+    return paddedHard404Response();
+  }
+
   const rawSecrets = await getCandidateTurnstileSecrets(ctx.env);
-  const isFallbackWidgetToken =
+  const isNonProdDummyToken =
+    !isProdDomain &&
     ctx.env.STRICT_HOST_CHECK !== '1' &&
     !ctx.env.TURNSTILE_SITEVERIFY_URL &&
     cfToken.includes('DUMMY.TOKEN');
 
-  if (isFallbackWidgetToken) {
+  if (isNonProdDummyToken) {
     rawSecrets.unshift('1x0000000000000000000000000000000AA');
   } else if (
     !isProdDomain &&
@@ -1468,15 +1476,9 @@ export async function handleSessionClearance(ctx: GateRequestContext): Promise<G
     rawSecrets.push('1x0000000000000000000000000000000AA');
   }
 
-  // Filter out dummy test keys when STRICT_HOST_CHECK === '1' (§5.7 G6.3 & §7)
+  // Filter out dummy test keys on all production domains or when STRICT_HOST_CHECK === '1' (§5.7 G6.3 & §7)
   const validSecrets = rawSecrets.filter(
-    (s) =>
-      s &&
-      !(
-        isProdDomain &&
-        !isFallbackWidgetToken &&
-        s.startsWith('1x00000000000000000000')
-      )
+    (s) => s && !(isProdDomain && s.startsWith('1x00000000000000000000'))
   );
 
   // §5.7 G6.3: Secret missing/empty => fail closed (SOFT + alert counter).
@@ -1555,7 +1557,9 @@ export async function handleSessionClearance(ctx: GateRequestContext): Promise<G
 
   // Verify action, hostname, and cData commitment (parsed from the END: _<nid 32>_<hw 24>)
   const svAction = String(svData.action || '');
-  const svHostname = String(svData.hostname || '').toLowerCase();
+  const svHostname = String(svData.hostname || '').toLowerCase().trim();
+  const bareSvHostname = svHostname.replace(/^www\./, '');
+  const bareRawHost = rawHost.replace(/^www\./, '');
   const svCdata = String(svData.cdata || '');
   const allowedHosts = getAllowedHostnames(ctx.env);
 
@@ -1575,20 +1579,26 @@ export async function handleSessionClearance(ctx: GateRequestContext): Promise<G
     ) {
       cdataValid = true;
     }
-  } else if (isFallbackWidgetToken && !svCdata && !svAction) {
+  } else if (isNonProdDummyToken && !svCdata && !svAction) {
     cdataValid = true;
   }
 
-  const actionValid = svAction === TURNSTILE_ACTION || (isFallbackWidgetToken && !svAction);
+  const actionValid = svAction === TURNSTILE_ACTION || (isNonProdDummyToken && !svAction);
+  const isStrictHostAllowlistActive = ctx.env.STRICT_HOST_CHECK === '1' && allowedHosts.size > 0;
   const hostAllowed =
     allowedHosts.has(svHostname) ||
-    (ctx.env.STRICT_HOST_CHECK !== '1' &&
-      (svHostname === rawHost ||
-        Boolean(cdataValid && svHostname) ||
-        svHostname.endsWith('.run.app') ||
-        svHostname.endsWith('.pages.dev') ||
-        svHostname.endsWith('.vercel.app'))) ||
-    (isFallbackWidgetToken && svHostname === 'example.com');
+    allowedHosts.has(bareSvHostname) ||
+    (!isStrictHostAllowlistActive &&
+      Boolean(
+        svHostname &&
+          (svHostname === rawHost ||
+            bareSvHostname === bareRawHost ||
+            cdataValid ||
+            svHostname.endsWith('.run.app') ||
+            svHostname.endsWith('.pages.dev') ||
+            svHostname.endsWith('.vercel.app'))
+      )) ||
+    (isNonProdDummyToken && svHostname === 'example.com');
 
   if (!actionValid || !hostAllowed || !cdataValid) {
     emitGateCounter(ctx.env, 'G6', 'cdata_binding', 'fail', family);

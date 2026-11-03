@@ -162,11 +162,9 @@ publicApiRouter.get('/api/v1/public/videos', async (req, res) => {
 function sanitizeSettingsForPublicClient(settings: any): any {
   const copy = settings && typeof settings === 'object' ? { ...settings } : {};
   delete copy.turnstile_secret_key;
-  if (!copy.turnstile_site_key) {
-    const envSiteKey = getPublicTurnstileSiteKey();
-    if (envSiteKey) {
-      copy.turnstile_site_key = envSiteKey;
-    }
+  const envSiteKey = getPublicTurnstileSiteKey();
+  if (envSiteKey) {
+    copy.turnstile_site_key = envSiteKey;
   }
   return copy;
 }

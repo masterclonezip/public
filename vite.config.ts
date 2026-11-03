@@ -244,7 +244,8 @@ function adminAuthDevPlugin(env: Record<string, string>) {
 
           if (req.url === '/api/v1/public/settings' || req.url.startsWith('/api/v1/public/settings?')) {
             const mergedSettings = { ...(staticData.settings || {}) };
-            if (!mergedSettings.turnstile_site_key && envTurnstileSiteKey) {
+            delete mergedSettings.turnstile_secret_key;
+            if (envTurnstileSiteKey && /^0x4[A-Za-z0-9_-]{17,24}$/.test(envTurnstileSiteKey)) {
               mergedSettings.turnstile_site_key = envTurnstileSiteKey;
             }
             res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -274,7 +275,8 @@ function adminAuthDevPlugin(env: Record<string, string>) {
 
           if (req.url.startsWith('/api/v1/public/backup-data')) {
             const mergedStatic = { ...staticData, settings: { ...(staticData.settings || {}) } };
-            if (!mergedStatic.settings.turnstile_site_key && envTurnstileSiteKey) {
+            delete mergedStatic.settings.turnstile_secret_key;
+            if (envTurnstileSiteKey && /^0x4[A-Za-z0-9_-]{17,24}$/.test(envTurnstileSiteKey)) {
               mergedStatic.settings.turnstile_site_key = envTurnstileSiteKey;
             }
             res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -584,17 +586,23 @@ export default defineConfig(({mode}) => {
   const communityMessagingSenderId = pickEnv('VITE_COMMUNITY_FIREBASE_MESSAGING_SENDER_ID', 'COMMUNITY_FIREBASE_MESSAGING_SENDER_ID', 'VITE_COMMUNITY_FIREBASE_MESSAGING_ID', 'VITE_FIREBASE_MESSAGING_SENDER_ID');
   const communityDatabaseId = pickEnv('VITE_COMMUNITY_FIREBASE_DATABASE_ID', 'COMMUNITY_FIREBASE_DATABASE_ID') || '(default)';
 
-  const turnstileSiteKey = pickEnv(
-    'VITE_TURNSTILE_SITE_KEY',
-    'TURNSTILE_SITE_KEY',
-    'CF_TURNSTILE_SITE_KEY',
-    'CLOUDFLARE_TURNSTILE_SITE_KEY',
-    'PUBLIC_TURNSTILE_SITE_KEY',
-    'NEXT_PUBLIC_TURNSTILE_SITE_KEY',
-    'VITE_TURNSTILE_KEY',
-    'TURNSTILE_KEY',
-    'CLOUDFLARE_TURNSTILE_KEY'
-  );
+  const rawTurnstileCandidates = [
+    pickEnv('VITE_TURNSTILE_SITE_KEY'),
+    pickEnv('TURNSTILE_SITE_KEY'),
+    pickEnv('CF_TURNSTILE_SITE_KEY'),
+    pickEnv('CLOUDFLARE_TURNSTILE_SITE_KEY'),
+    pickEnv('PUBLIC_TURNSTILE_SITE_KEY'),
+    pickEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY'),
+    pickEnv('VITE_TURNSTILE_KEY'),
+    pickEnv('TURNSTILE_KEY'),
+    pickEnv('CLOUDFLARE_TURNSTILE_KEY'),
+    pickEnv('TURNSTILE_SECRET_KEY'),
+    pickEnv('VITE_TURNSTILE_SECRET_KEY'),
+  ];
+  const turnstileSiteKey =
+    rawTurnstileCandidates
+      .map((k) => String(k || '').trim().replace(/^["'`]+|["'`]+$/g, '').trim())
+      .find((k) => /^0x4[A-Za-z0-9_-]{17,24}$/.test(k)) || '';
 
   const resolvedBuildEnv: Record<string, string> = {
     VITE_ADMIN_PATH: pickEnv('VITE_ADMIN_PATH', 'ADMIN_PATH') || 'masterworld',

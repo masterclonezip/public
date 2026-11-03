@@ -194,13 +194,14 @@ export function useTurnstileVerification({
       }
     }
 
-    // Final fallback candidate: Cloudflare's visible pass widget key ('1x00000000000000000000AA').
-    // Placed AFTER all configured real keys so real keys are always used first, and if a newly
-    // deployed master clone domain has not yet added its hostname to the Turnstile widget (110200),
-    // it fails over cleanly to the visible widget without locking out real mobile users.
-    const fallbackKey = '1x00000000000000000000AA';
-    if (!failedSiteKeysRef.current.has(fallbackKey) && !candidates.includes(fallbackKey)) {
-      candidates.push(fallbackKey);
+    // Only allow Cloudflare's dummy test key on local dev / AI Studio .run.app preview hosts.
+    // Production domains strictly use real 0x4... site keys so the red testing warning never appears
+    // and bots cannot bypass Gate G6 with dummy tokens.
+    if (isNonProdHost()) {
+      const devKey = '1x00000000000000000000AA';
+      if (!failedSiteKeysRef.current.has(devKey) && !candidates.includes(devKey)) {
+        candidates.push(devKey);
+      }
     }
 
     return candidates;

@@ -514,6 +514,22 @@ function collectAllTurnstileEnvValues(
 }
 
 /**
+ * Resolves the primary public Turnstile site key strictly from environment variables (ignoring staticData.json).
+ * Used to ensure environment variable keys always override any stale key stored in database/static settings.
+ */
+export function getEnvOnlyTurnstileSiteKey(
+  env?: Record<string, string | undefined>
+): string {
+  for (const c of collectAllTurnstileEnvValues(env)) {
+    const clean = sanitizeKey(c);
+    if (isValidTurnstileSiteKey(clean)) {
+      return clean;
+    }
+  }
+  return '';
+}
+
+/**
  * Resolves all candidate public Turnstile site keys across environment variables and Admin Settings.
  * Strictly validates the 24-character `0x4...` Site Key format so 35-character Secret Keys or 40-character
  * API Tokens are never sent to the browser, even if Site Key and Secret Key env vars were swapped.
@@ -578,6 +594,12 @@ export async function getCandidateTurnstileSecrets(
   // 1. Always check runtime environment variables FIRST so any dashboard update is active immediately
   for (const c of collectAllTurnstileEnvValues(env)) {
     addSecret(c);
+  }
+
+  // If a real secret key is explicitly configured in environment variables, return it immediately
+  // so old/deleted secrets in vault or staticData never cause unnecessary fallback round-trips.
+  if (realSecrets.length > 0) {
+    return [...realSecrets, ...testSecrets];
   }
 
   // 2. Check in-memory cached secret from store/vault

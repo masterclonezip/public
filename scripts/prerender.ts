@@ -258,11 +258,9 @@ async function syncStaticDataAndSitemaps() {
     for (const [filename, xmlContent] of Object.entries(sitemaps)) {
       const xmlStr = xmlContent as string;
       try {
+        const gzBuffer = zlib.gzipSync(Buffer.from(xmlStr, 'utf-8'), { level: 9 });
         fs.writeFileSync(path.join(publicPath, filename), xmlStr, 'utf-8');
-        const oldGz = path.join(publicPath, `${filename}.gz`);
-        if (fs.existsSync(oldGz)) {
-          fs.unlinkSync(oldGz);
-        }
+        fs.writeFileSync(path.join(publicPath, `${filename}.gz`), gzBuffer);
       } catch (e) {}
     }
   }

@@ -14,7 +14,7 @@ export const NONCE_BURN_TTL_S = 150 as const;
 export const CLIENT_TAP_HOLD_MS = 1000 as const;
 export const DWELL_HARD_BELOW_MS = 150 as const;
 export const MIN_SERVER_DWELL_MS = 500 as const;
-export const DWELL_NV0_MIN_MS = 900 as const;
+export const DWELL_NV0_MIN_MS = 1000 as const;
 
 export const TOUCH_MIN_MS = 4 as const;
 export const TOUCH_MAX_MS = 2000 as const;
