@@ -361,13 +361,12 @@ function writeMergedData(data: any) {
       const publicDir = path.join(process.cwd(), 'public');
       const distDir = path.join(process.cwd(), 'dist');
       for (const [filename, content] of Object.entries(sitemaps)) {
-        const gzBuffer = zlib.gzipSync(Buffer.from(content, 'utf8'), { level: 6 });
         try {
           fs.writeFileSync(path.join(publicDir, filename), content, 'utf8');
-          fs.writeFileSync(path.join(publicDir, `${filename}.gz`), gzBuffer);
         } catch (_) {}
         if (fs.existsSync(distDir)) {
           try {
+            const gzBuffer = zlib.gzipSync(Buffer.from(content, 'utf8'), { level: 6 });
             fs.writeFileSync(path.join(distDir, filename), content, 'utf8');
             fs.writeFileSync(path.join(distDir, `${filename}.gz`), gzBuffer);
           } catch (_) {}

@@ -7,8 +7,29 @@ import { useState, useEffect, useRef } from 'react';
 import { useLocation, Link, Navigate } from 'react-router-dom';
 import { useData } from '../contexts/DataContextPublic';
 import { resolveAppSlug } from '../lib/slugResolver';
-import { getCachedStaticDatasetSync, loadFullStaticDataset, StaticDatasetPayload } from '../lib/lightFallback';
+import * as lightFallback from '../lib/lightFallback';
 import Meta from './Meta';
+
+interface FallbackDatasetPayload {
+  apps: any[];
+  settings: any;
+  news: any[];
+  videos: any[];
+}
+
+const getCachedStaticDatasetSyncSafe = (): FallbackDatasetPayload | null => {
+  if (typeof (lightFallback as any).getCachedStaticDatasetSync === 'function') {
+    return (lightFallback as any).getCachedStaticDatasetSync();
+  }
+  return null;
+};
+
+const loadFullStaticDatasetSafe = async (): Promise<FallbackDatasetPayload | null> => {
+  if (typeof (lightFallback as any).loadFullStaticDataset === 'function') {
+    return (lightFallback as any).loadFullStaticDataset();
+  }
+  return null;
+};
 
 const getInitialData = () => {
   if (typeof window !== 'undefined' && (window as any).__INITIAL_DATA__) {
@@ -25,7 +46,7 @@ export default function FallbackRouteMatcher() {
   const rawPath = decodeURIComponent(location.pathname);
   const slug = rawPath.replace(/^\/app\//i, '/').replace(/^\/|\/$/g, '').toLowerCase().trim();
   
-  const [staticDataset, setStaticDataset] = useState<StaticDatasetPayload | null>(() => getCachedStaticDatasetSync());
+  const [staticDataset, setStaticDataset] = useState<FallbackDatasetPayload | null>(() => getCachedStaticDatasetSyncSafe());
   const [triedRefresh, setTriedRefresh] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const syncAttemptedRef = useRef<Record<string, boolean>>({});
@@ -34,7 +55,7 @@ export default function FallbackRouteMatcher() {
     setTriedRefresh(false);
     setIsRefreshing(false);
     if (!staticDataset) {
-      loadFullStaticDataset().then(ds => {
+      loadFullStaticDatasetSafe().then(ds => {
         if (ds) setStaticDataset(ds);
       }).catch(() => {});
     }

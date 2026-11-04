@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { AppConfig, GlobalSettings, NewsItem, VideoItem } from '../typesPublic';
 import { mockApps, mockApps as staticMockApps, mockSettings, mockNews, mockVideos, loadFullStaticDataset } from '../lib/lightFallback';
+import { isPublicReadyApp, isPublicReadyNews } from '../lib/seoUtils';
 
 interface DataContextType {
   apps: AppConfig[];
@@ -51,7 +52,7 @@ const mergeUniqueApps = (baseList: AppConfig[], incomingList: AppConfig[]): AppC
 
   // 1. Seed base apps keyed by clean canonical slug / id
   for (const app of (baseList || [])) {
-    if (!app) continue;
+    if (!app || !isPublicReadyApp(app)) continue;
     const key = (app.slug || app.id || '').toLowerCase().trim();
     const idKey = (app.id || '').toLowerCase().trim();
     if (key) {
@@ -64,7 +65,7 @@ const mergeUniqueApps = (baseList: AppConfig[], incomingList: AppConfig[]): AppC
 
   // 2. Merge incoming / updated items by ID or canonical key
   for (const app of (incomingList || [])) {
-    if (!app) continue;
+    if (!app || !isPublicReadyApp(app)) continue;
     const key = (app.slug || app.id || '').toLowerCase().trim();
     const idKey = (app.id || '').toLowerCase().trim();
     if (key) {
@@ -77,9 +78,17 @@ const mergeUniqueApps = (baseList: AppConfig[], incomingList: AppConfig[]): AppC
       if (idKey) idToKey.set(idKey, key);
 
       if (existing) {
+        const exAny = existing as any;
+        const appAny = app as any;
+        const isExistingFullSsr = Boolean(exAny._isFullApp);
         map.set(key, {
           ...existing,
           ...app,
+          rating: isExistingFullSsr && existing.rating !== undefined ? existing.rating : (app.rating ?? existing.rating),
+          review_count: isExistingFullSsr && existing.review_count !== undefined ? existing.review_count : (app.review_count ?? existing.review_count),
+          reviews: isExistingFullSsr && Array.isArray((existing as any).reviews) && (existing as any).reviews.length > 0
+            ? (existing as any).reviews
+            : ((app as any).reviews || (existing as any).reviews),
           description_html: (app.description_html && app.description_html.trim().length > 10)
             ? app.description_html
             : (existing.description_html || ''),
@@ -98,7 +107,11 @@ const mergeUniqueApps = (baseList: AppConfig[], incomingList: AppConfig[]): AppC
           yellow_box_msg: app.yellow_box_msg || existing.yellow_box_msg || '',
           red_box_msg: app.red_box_msg || existing.red_box_msg || '',
           idea_box_msg: app.idea_box_msg || existing.idea_box_msg || '',
-        });
+          ...(isExistingFullSsr ? { _isFullApp: true, _isTrimmed: false } : {}),
+          ...(exAny._totalCategoryCount !== undefined ? { _totalCategoryCount: exAny._totalCategoryCount } : {}),
+          ...(typeof exAny._similarOrder === 'number' ? { _similarOrder: exAny._similarOrder, _similarForSlug: exAny._similarForSlug } : {}),
+          ...(typeof appAny._similarOrder === 'number' ? { _similarOrder: appAny._similarOrder, _similarForSlug: appAny._similarForSlug } : {}),
+        } as AppConfig);
       } else {
         map.set(key, { ...app });
       }
@@ -121,7 +134,7 @@ const mergeUniqueNews = (baseList: NewsItem[], incomingList: NewsItem[]): NewsIt
   const idToKey = new Map<string, string>();
 
   for (const item of (baseList || [])) {
-    if (!item) continue;
+    if (!item || !isPublicReadyNews(item)) continue;
     const key = (item.slug || item.id || '').toLowerCase().trim();
     const idKey = (item.id || '').toLowerCase().trim();
     if (key) {
@@ -131,7 +144,7 @@ const mergeUniqueNews = (baseList: NewsItem[], incomingList: NewsItem[]): NewsIt
   }
 
   for (const item of (incomingList || [])) {
-    if (!item) continue;
+    if (!item || !isPublicReadyNews(item)) continue;
     const key = (item.slug || item.id || '').toLowerCase().trim();
     const idKey = (item.id || '').toLowerCase().trim();
     if (key) {
@@ -219,9 +232,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Dedicated lightweight fetchers for each section on-demand when URL/route changes
   const fetchNews = useCallback(async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
     try {
       const res = await fetch('/api/v1/public/news', {
-        headers: { 'Accept': 'application/json' }
+        headers: { 'Accept': 'application/json' },
+        signal: controller.signal
       });
       if (res.ok) {
         const payload = await res.json();
@@ -229,15 +245,23 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setNews(prev => mergeUniqueNews(prev, payload.news));
         }
       }
-    } catch (e) {
-      console.warn("Public news fetch warning:", e);
+    } catch (_e) {
+      const full = await loadFullStaticDataset().catch(() => null);
+      if (full?.news && full.news.length > 0) {
+        setNews(prev => mergeUniqueNews(prev, full.news));
+      }
+    } finally {
+      clearTimeout(timeoutId);
     }
   }, []);
 
   const fetchSettings = useCallback(async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
     try {
       const res = await fetch('/api/v1/public/settings', {
-        headers: { 'Accept': 'application/json' }
+        headers: { 'Accept': 'application/json' },
+        signal: controller.signal
       });
       if (res.ok) {
         const payload = await res.json();
@@ -245,15 +269,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setSettings(prev => ({ ...prev, ...payload.settings }));
         }
       }
-    } catch (e) {
-      console.warn("Public settings fetch warning:", e);
+    } catch (_e) {
+      // Static fallback settings already active
+    } finally {
+      clearTimeout(timeoutId);
     }
   }, []);
 
   const fetchVideos = useCallback(async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
     try {
       const res = await fetch('/api/v1/public/videos', {
-        headers: { 'Accept': 'application/json' }
+        headers: { 'Accept': 'application/json' },
+        signal: controller.signal
       });
       if (res.ok) {
         const payload = await res.json();
@@ -261,25 +290,32 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setVideos(payload.videos);
         }
       }
-    } catch (e) {
-      console.warn("Public videos fetch warning:", e);
+    } catch (_e) {
+      const full = await loadFullStaticDataset().catch(() => null);
+      if (full?.videos && full.videos.length > 0) {
+        setVideos(prev => (prev.length >= full.videos.length ? prev : full.videos));
+      }
+    } finally {
+      clearTimeout(timeoutId);
     }
   }, []);
 
-  // Fetch from server backup endpoint with fast memory caching (zero main-thread localStorage serialization stall)
+  // Fetch from server backup endpoint with fast memory caching and strict timeout so mobile navigation never stalls
   const fetchBackupData = useCallback(async (silent = false) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
     try {
       if (!silent && apps.length === 0 && news.length === 0) setLoading(true);
       const res = await fetch('/api/v1/public/backup-data', {
-        headers: { 'Accept': 'application/json' }
+        headers: { 'Accept': 'application/json' },
+        signal: controller.signal
       });
       if (res.ok) {
         const backup = await res.json();
         if (backup) {
           try {
-            // Remove legacy multi-megabyte localStorage entry if present to free browser storage and avoid main-thread stalls
             localStorage.removeItem(DATA_CACHE_KEY);
-          } catch (e) {}
+          } catch (_e) {}
 
           if (backup.apps && Array.isArray(backup.apps)) {
             if (backup.apps.length > 0) {
@@ -327,14 +363,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setLoadedFromServer(true);
         }
       }
-    } catch (e) {
-      console.warn("Public backup data fetch failed, falling back to static dataset:", e);
+    } catch (_e) {
       loadFullStaticDataset().then(full => {
         if (full?.apps && full.apps.length > 0) {
           setApps(prev => mergeUniqueApps(prev, full.apps));
         }
+        if (full?.news && full.news.length > 0) {
+          setNews(prev => mergeUniqueNews(prev, full.news));
+        }
+        if (full?.videos && full.videos.length > 0) {
+          setVideos(prev => (prev.length >= full.videos.length ? prev : full.videos));
+        }
       });
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   }, [apps.length, news.length]);
@@ -381,15 +423,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const p = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
     const isGateway = p.startsWith('/moreinfo/');
-    const isCatalog = p === '/' || p === '/new-apps' || p.startsWith('/categories') || p.startsWith('/category');
-    const isNewsRoute = p === '/news' || p.startsWith('/news/');
+    const isAppDetail = p.startsWith('/app/');
+    const isNewsDetail = p.startsWith('/news/') && p !== '/news';
+    const isCatalog = p === '/' || p === '/new-apps' || p.startsWith('/categories') || p.startsWith('/category') || p === '/developers';
+    const isNewsRoute = p === '/news' || isNewsDetail;
 
-    // Pre-warm the full static dataset (apps, news, settings, videos) in background after initial paint
-    // so client-side navigation from any detail page (/app/:slug or /news/:slug) to any other page renders in 0ms.
     let timer: ReturnType<typeof setTimeout> | undefined;
     if (!isGateway) {
       timer = setTimeout(() => {
-        loadFullStaticDataset().then(hydrateFromStaticDataset).catch(() => {});
+        if (isAppDetail || isNewsDetail) {
+          // Strictly isolate detail pages: pre-warm the static dataset singleton in memory for 0ms next-click navigation,
+          // WITHOUT dumping 230+ unrelated apps into React state on /app/:slug or /news/:slug!
+          loadFullStaticDataset().catch(() => {});
+        } else {
+          loadFullStaticDataset().then(hydrateFromStaticDataset).catch(() => {});
+        }
       }, 150);
     }
 
@@ -397,7 +445,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (news.length === 0) {
         fetchBackupData(true);
       }
-    } else if (apps.length === 0 || (isCatalog && apps.length < 50)) {
+    } else if (!isAppDetail && (apps.length === 0 || (isCatalog && apps.length < 50))) {
       fetchBackupData(false);
     }
     return () => {
@@ -405,7 +453,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [apps.length, news.length, fetchBackupData, hydrateFromStaticDataset]);
 
-  // Ensure full catalog is loaded if user navigates from an /app/:slug or /news/:slug page to catalog listing routes or opens search
+  // Ensure full catalog is hydrated ONLY when navigating to a catalog listing route or opening global search
   const routeFetchDoneRef = React.useRef(false);
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -419,7 +467,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     const checkCatalogRoute = () => {
       const p = window.location.pathname.toLowerCase();
-      if (!p.startsWith('/moreinfo/')) {
+      const isCatalogOrListing =
+        p === '/' ||
+        p === '/new-apps' ||
+        p === '/developers' ||
+        p === '/news' ||
+        p === '/videos' ||
+        p.startsWith('/categories') ||
+        p.startsWith('/category');
+      if (isCatalogOrListing) {
         ensureFullCatalogLoaded();
       }
     };

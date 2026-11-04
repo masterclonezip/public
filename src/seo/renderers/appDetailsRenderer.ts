@@ -426,7 +426,7 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
             <svg class="w-3 h-3 xs:w-3.5 xs:h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
           </a>
         </div>
-        <div class="grid grid-rows-2 grid-flow-col auto-cols-[calc((100%-1.5rem)/4)] xs:auto-cols-[calc((100%-2.25rem)/4)] sm:auto-cols-[calc((100%-5.25rem)/8)] gap-x-2 xs:gap-x-3 gap-y-3 xs:gap-y-3.5 overflow-x-auto pt-2.5 pb-2 snap-x snap-mandatory touch-pan-y overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" style="-webkit-overflow-scrolling: touch;">
+        <div class="grid grid-rows-2 grid-flow-col auto-cols-[calc((100%-1.75rem)/4.25)] xs:auto-cols-[calc((100%-2.5rem)/4.25)] sm:auto-cols-[calc((100%-5.25rem)/8)] gap-x-2 xs:gap-x-3 gap-y-3 xs:gap-y-3.5 overflow-x-auto pt-2.5 pb-2 snap-x snap-mandatory touch-pan-y overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" style="-webkit-overflow-scrolling: touch;">
           ${displaySimilarApps.slice(0, 16).map((sim) => {
             const simName = getField(sim, 'name');
             const simSlug = getField(sim, 'slug');

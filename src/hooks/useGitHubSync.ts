@@ -11,16 +11,26 @@ import { getResolvedCommunityFirebaseConfig, parseFirestoreFields } from '../lib
 import communityCatalogStats from '../lib/communityCatalogStats.json';
 import communityStaticReviews from '../lib/communityStaticReviews.json';
 
+import rawIndexHtml from '../../index.html?raw';
 import rawMiddlewareJs from '../../functions/_middleware.js?raw';
 import rawHeadersFile from '../../public/_headers?raw';
 import rawPrerenderTs from '../../scripts/prerender.ts?raw';
+import rawCompressDistTs from '../../scripts/compress-dist.ts?raw';
+import rawBuildApiJs from '../../scripts/build-api.js?raw';
 import rawSitemapGeneratorTs from '../lib/sitemapGenerator.ts?raw';
 import rawSeoUtilsTs from '../lib/seoUtils.ts?raw';
 import rawSeoHelperTs from '../seoHelper.ts?raw';
 import rawSeoSubUtilsTs from '../seo/utils.ts?raw';
 import rawSchemaBuilderTs from '../seo/schemaBuilder.ts?raw';
 import rawMetaBuilderTs from '../seo/metaBuilder.ts?raw';
+import rawReviewFallbackTs from '../seo/reviewFallback.ts?raw';
+import rawCommonRendererTs from '../seo/renderers/common.ts?raw';
+import rawRenderersIndexTs from '../seo/renderers/index.ts?raw';
+import rawHomeRendererTs from '../seo/renderers/homeRenderer.ts?raw';
 import rawAppDetailsRendererTs from '../seo/renderers/appDetailsRenderer.ts?raw';
+import rawStaticPageRendererTs from '../seo/renderers/staticPageRenderer.ts?raw';
+import rawVideoRendererTs from '../seo/renderers/videoRenderer.ts?raw';
+import rawGatewayRendererTs from '../seo/renderers/gatewayRenderer.ts?raw';
 import rawInitialDataOptimizerTs from '../seo/initialDataOptimizer.ts?raw';
 import rawSeoRoutesTs from '../server/routes/seoRoutes.ts?raw';
 import rawMetaTsx from '../components/Meta.tsx?raw';
@@ -47,20 +57,25 @@ import rawCriticalCssTs from '../seo/criticalCss.ts?raw';
 import rawNewsUtilsTs from '../lib/newsUtils.ts?raw';
 import rawSafeHtmlPublicTs from '../lib/safeHtmlPublic.ts?raw';
 import rawLightFallbackTs from '../lib/lightFallback.ts?raw';
+import rawPreloadHelperTs from '../lib/preloadHelper.ts?raw';
 
 const BUNDLED_PUBLIC_CORE_FILES: Record<string, string> = {
+  'index.html': rawIndexHtml,
   'functions/_middleware.js': rawMiddlewareJs,
   'functions/api/[[catchall]].js': rawCatchallJs,
   'public/_headers': rawHeadersFile,
   'vercel.json': rawVercelJson,
   'vite.config.ts': rawViteConfigTs,
   'scripts/prerender.ts': rawPrerenderTs,
+  'scripts/compress-dist.ts': rawCompressDistTs,
+  'scripts/build-api.js': rawBuildApiJs,
   'src/lib/sitemapGenerator.ts': rawSitemapGeneratorTs,
   'src/lib/seoUtils.ts': rawSeoUtilsTs,
   'src/lib/slugResolver.ts': rawSlugResolverTs,
   'src/lib/newsUtils.ts': rawNewsUtilsTs,
   'src/lib/safeHtmlPublic.ts': rawSafeHtmlPublicTs,
   'src/lib/lightFallback.ts': rawLightFallbackTs,
+  'src/lib/preloadHelper.ts': rawPreloadHelperTs,
   'src/lib/cryptoUtils.ts': rawCryptoUtilsTs,
   'src/server/crypto.ts': rawServerCryptoTs,
   'src/seoHelper.ts': rawSeoHelperTs,
@@ -70,8 +85,15 @@ const BUNDLED_PUBLIC_CORE_FILES: Record<string, string> = {
   'src/seo/preRenderEngine.ts': rawPreRenderEngineTs,
   'src/seo/schemaBuilder.ts': rawSchemaBuilderTs,
   'src/seo/metaBuilder.ts': rawMetaBuilderTs,
+  'src/seo/reviewFallback.ts': rawReviewFallbackTs,
+  'src/seo/renderers/common.ts': rawCommonRendererTs,
+  'src/seo/renderers/index.ts': rawRenderersIndexTs,
+  'src/seo/renderers/homeRenderer.ts': rawHomeRendererTs,
   'src/seo/renderers/appDetailsRenderer.ts': rawAppDetailsRendererTs,
   'src/seo/renderers/newsRenderer.ts': rawNewsRendererTs,
+  'src/seo/renderers/staticPageRenderer.ts': rawStaticPageRendererTs,
+  'src/seo/renderers/videoRenderer.ts': rawVideoRendererTs,
+  'src/seo/renderers/gatewayRenderer.ts': rawGatewayRendererTs,
   'src/seo/initialDataOptimizer.ts': rawInitialDataOptimizerTs,
   'src/server/routes/seoRoutes.ts': rawSeoRoutesTs,
   'src/server/routes/publicApiRoutes.ts': rawPublicApiRoutesTs,

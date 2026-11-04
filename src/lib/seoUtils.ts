@@ -220,3 +220,126 @@ export function cleanFaqQuestion(q?: string): string {
     .trim();
 }
 
+export function isPublicReadyApp(app: any): boolean {
+  if (!app || typeof app !== 'object') return false;
+  if (app.sync_to_public === false || app.sync_to_public === 'false' || app.sync_to_public === 0 || app.sync_to_public === '0') return false;
+  if (app.is_published === false || app.is_published === 'false') return false;
+  if (app.is_draft === true || app.is_draft === 'true') return false;
+  if (app.is_hidden === true || app.is_hidden === 'true') return false;
+  if (typeof app.status === 'string') {
+    const st = app.status.trim().toLowerCase();
+    if (st === 'draft' || st === 'unpublished' || st === 'hidden' || st === 'archived') return false;
+  }
+  return true;
+}
+
+export function isPublicReadyNews(newsItem: any): boolean {
+  if (!newsItem || typeof newsItem !== 'object') return false;
+  if (newsItem.sync_to_public === false || newsItem.sync_to_public === 'false' || newsItem.sync_to_public === 0 || newsItem.sync_to_public === '0') return false;
+  if (newsItem.is_published === false || newsItem.is_published === 'false') return false;
+  if (newsItem.is_draft === true || newsItem.is_draft === 'true') return false;
+  if (typeof newsItem.status === 'string') {
+    const st = newsItem.status.trim().toLowerCase();
+    if (st === 'draft' || st === 'unpublished' || st === 'hidden' || st === 'archived') return false;
+  }
+  return true;
+}
+
+export function isValidPublicProductionDomain(rawHost: string): boolean {
+  if (!rawHost || typeof rawHost !== 'string') return false;
+  try {
+    const normalized = normalizeNonWwwDomain(rawHost);
+    if (!normalized) return false;
+    const u = new URL(normalized);
+    const h = u.hostname.toLowerCase();
+    if (
+      !h ||
+      !h.includes('.') ||
+      h === 'localhost' ||
+      h === '127.0.0.1' ||
+      h === 'example.com' ||
+      h.endsWith('.pages.dev') ||
+      h.endsWith('.workers.dev') ||
+      h.endsWith('.run.app') ||
+      h.endsWith('.vercel.app') ||
+      h.endsWith('.netlify.app') ||
+      h.endsWith('.local') ||
+      h.startsWith('admin.') ||
+      h.startsWith('masterworld.')
+    ) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function resolvePublicSiteDomain(settings?: any, apps?: any[], news?: any[]): string {
+  const candidates: string[] = [
+    settings?.site_domain,
+    settings?.domain,
+    settings?.public_domain,
+    settings?.canonical_domain,
+  ].filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+
+  try {
+    if (typeof __APP_BUILD_ENV__ !== 'undefined' && __APP_BUILD_ENV__) {
+      if (__APP_BUILD_ENV__.PUBLIC_DOMAIN) candidates.push(__APP_BUILD_ENV__.PUBLIC_DOMAIN);
+      if (__APP_BUILD_ENV__.VITE_PUBLIC_DOMAIN) candidates.push(__APP_BUILD_ENV__.VITE_PUBLIC_DOMAIN);
+    }
+  } catch {}
+
+  if (typeof process !== 'undefined' && process.env) {
+    if (process.env.PUBLIC_DOMAIN) candidates.push(process.env.PUBLIC_DOMAIN);
+    if (process.env.VITE_PUBLIC_DOMAIN) candidates.push(process.env.VITE_PUBLIC_DOMAIN);
+    if (process.env.SITE_DOMAIN) candidates.push(process.env.SITE_DOMAIN);
+    if (process.env.DOMAIN) candidates.push(process.env.DOMAIN);
+  }
+
+  try {
+    const metaEnv = import.meta.env as Record<string, any> | undefined;
+    if (metaEnv) {
+      if (metaEnv.VITE_PUBLIC_DOMAIN) candidates.push(String(metaEnv.VITE_PUBLIC_DOMAIN));
+      if (metaEnv.PUBLIC_DOMAIN) candidates.push(String(metaEnv.PUBLIC_DOMAIN));
+    }
+  } catch {}
+
+  if (Array.isArray(apps)) {
+    for (const a of apps) {
+      if (a && typeof a.canonical_url === 'string' && a.canonical_url.startsWith('http')) {
+        try {
+          const u = new URL(a.canonical_url.trim());
+          candidates.push(u.origin);
+          break;
+        } catch {}
+      }
+    }
+  }
+
+  if (Array.isArray(news)) {
+    for (const n of news) {
+      if (n && typeof n.canonical_url === 'string' && n.canonical_url.startsWith('http')) {
+        try {
+          const u = new URL(n.canonical_url.trim());
+          candidates.push(u.origin);
+          break;
+        } catch {}
+      }
+    }
+  }
+
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    candidates.push(window.location.origin);
+  }
+
+  for (const c of candidates) {
+    if (isValidPublicProductionDomain(c)) {
+      return normalizeNonWwwDomain(c);
+    }
+  }
+
+  return 'https://yonoappdex.com';
+}
+
+
