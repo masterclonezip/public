@@ -154,9 +154,11 @@ export default function NewsDetailPage() {
       const match = (dataset?.news || []).find((n: any) =>
         (n.slug || '').toLowerCase().trim() === slugKey || (n.id || '').toLowerCase().trim() === slugKey
       );
-      if (match && ((match.content || '').length > 0 || (match.description_html || '').length > 0 || (match.description || '').length > 0)) {
+      if (match) {
         setFetchedNewsItem(match);
         updateNewsDetail?.(match);
+        setIsRefreshing(false);
+        setRemoteCheckDoneSlug(slugKey);
       }
     }).catch(() => {});
 
@@ -165,8 +167,12 @@ export default function NewsDetailPage() {
       syncAttemptedRef.current[slugKey] = true;
       setIsRefreshing(true);
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+
       fetch(`/api/v1/public/news/${encodeURIComponent(slugKey)}`, {
-        headers: { 'Accept': 'application/json' }
+        headers: { 'Accept': 'application/json' },
+        signal: controller.signal
       })
         .then(res => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -186,6 +192,7 @@ export default function NewsDetailPage() {
           if (!newsItem && refreshAll) refreshAll(true);
         })
         .finally(() => {
+          clearTimeout(timeoutId);
           if (activeSlugRef.current === slugKey) {
             setIsRefreshing(false);
             setRemoteCheckDoneSlug(slugKey);

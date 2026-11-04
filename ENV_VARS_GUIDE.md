@@ -73,7 +73,7 @@ The Public Website is deployed to your clean non-www canonical domain (e.g., `ht
 The Public Website **NEVER** connects to Database A (Master Catalog). It connects **ONLY** to **Database B (Community Firebase)** so users can read reviews, write reviews, upvote helpfulness, and submit abuse reports.
 
 > **Why are Firebase Web Keys marked Non-Secret?**  
-> Google Firebase Web API keys (`AIzaSy...`) are public identifiers designed to be bundled in frontend applications. They identify your project, while **Firestore Security Rules** (`firestore.rules`) enforce permissions and protect data.
+> Google Firebase Web API keys are public identifiers designed to be bundled in frontend applications. They identify your project, while **Firestore Security Rules** (`firestore.rules`) enforce permissions and protect data.
 
 | Variable | Security Level | System Portion | Required? |
 | :--- | :--- | :--- | :--- |
@@ -135,8 +135,8 @@ The public website serves the clearance gateway `/moreinfo/:slug`. App download 
   2. Select **Turnstile** from the left navigation menu.
   3. Click **Add Site**. Enter your site name and domain (`example.com`).
   4. Select Widget Mode: **Managed** or **Non-interactive**.
-  5. Copy the generated **Site Key** (`0x4AAAAAA...`) ➔ `VITE_TURNSTILE_SITE_KEY`.
-  6. Copy the generated **Secret Key** (`0x4AAAAAA...`) ➔ `TURNSTILE_SECRET_KEY`.
+  5. Copy the generated **Site Key** ➔ `VITE_TURNSTILE_SITE_KEY`.
+  6. Copy the generated **Secret Key** ➔ `TURNSTILE_SECRET_KEY`.
 - **How to Add It**:
   - `VITE_TURNSTILE_SITE_KEY`: Set as Plain text.
   - `TURNSTILE_SECRET_KEY`: Set as **Secret / Encrypted**.
@@ -167,7 +167,7 @@ VITE_SUPPORT_EMAIL="support@example.com"
 
 # 2. Database B: Community Reviews & Reports (Firebase Web Client)
 VITE_COMMUNITY_FIREBASE_PROJECT_ID="my-community-db"
-VITE_COMMUNITY_FIREBASE_API_KEY="AIzaSyA1234567890abcdef"
+VITE_COMMUNITY_FIREBASE_API_KEY="<YOUR_COMMUNITY_FIREBASE_API_KEY>"
 VITE_COMMUNITY_FIREBASE_AUTH_DOMAIN="my-community-db.firebaseapp.com"
 VITE_COMMUNITY_FIREBASE_STORAGE_BUCKET="my-community-db.appspot.com"
 VITE_COMMUNITY_FIREBASE_MESSAGING_SENDER_ID="123456789012"
@@ -176,8 +176,8 @@ VITE_COMMUNITY_FIREBASE_DATABASE_ID="(default)"
 
 # 3. Cryptographic Link Vault & Anti-Bot Clearance Gateway
 AES_KEY="generate_64_char_hex_key_using_openssl_rand_hex_32"
-VITE_TURNSTILE_SITE_KEY="0x4AAAAAAACopyFromCloudflareTurnstileSiteKey"
-TURNSTILE_SECRET_KEY="0x4AAAAAAACopyFromCloudflareTurnstileSecretKey"
+VITE_TURNSTILE_SITE_KEY="<YOUR_CLOUDFLARE_TURNSTILE_SITE_KEY>"
+TURNSTILE_SECRET_KEY="<YOUR_CLOUDFLARE_TURNSTILE_SECRET_KEY>"
 NONCE_HMAC_SECRET="generate_random_secret_string_32_bytes"
 DID_HMAC_SECRET="generate_random_secret_string_32_bytes"
 IP_HASH_SALT="generate_random_secret_string_32_bytes"
@@ -283,7 +283,7 @@ The Admin Dashboard includes the **AI Review Studio**, allowing administrators t
 1. Visit **[Google AI Studio](https://aistudio.google.com/app/apikey)**.
 2. Sign in with your Google account.
 3. Click **Create API Key** (choose a Google Cloud project or create a free one).
-4. Copy the generated key (`AIzaSy...`).
+4. Copy the generated key.
 5. Add as **Secret / Encrypted**: `GEMINI_API_KEY` = `your_gemini_api_key`.
 
 > **Built-in Resilience**: The system features a 7-model automatic failover chain (`gemini-2.5-flash`, `gemini-3-flash-preview`, `gemini-2.5-flash-lite`, `gemini-3.1-flash-lite-preview`, `gemini-flash-latest`, `gemini-2.5-pro`). If Google experiences high demand (HTTP 503), the engine automatically switches models in milliseconds with zero downtime. You can also override or rotate the key live in the Admin UI without restarting the server!
@@ -348,8 +348,8 @@ The Admin Dashboard includes a **One-Click Split-Sync** button. When clicked, th
 5. Select scopes:
    - `repo` (Full control of private repositories).
    - `workflow` (Update GitHub Action workflows).
-6. Click **Generate token** and copy the `ghp_...` string immediately.
-7. Add as **Secret / Encrypted**: `GITHUB_TOKEN` = `ghp_yourGeneratedToken`.
+6. Click **Generate token** and copy the token string immediately.
+7. Add as **Secret / Encrypted**: `GITHUB_TOKEN` = `<YOUR_GITHUB_PAT_TOKEN>`.
 
 ---
 
@@ -375,18 +375,18 @@ VITE_SITE_NAME="My App Directory — Admin Console"
 
 # 3. Database A: Master Catalog Firebase (ADMIN EXCLUSIVE)
 VITE_FIREBASE_PROJECT_ID="my-master-catalog"
-VITE_FIREBASE_API_KEY="AIzaSyMasterCatalogApiKey123"
+VITE_FIREBASE_API_KEY="<YOUR_MASTER_CATALOG_FIREBASE_API_KEY>"
 VITE_FIREBASE_AUTH_DOMAIN="my-master-catalog.firebaseapp.com"
 VITE_FIREBASE_STORAGE_BUCKET="my-master-catalog.appspot.com"
 VITE_FIREBASE_MESSAGING_SENDER_ID="987654321098"
 VITE_FIREBASE_APP_ID="1:987654321098:web:abcdef123"
 VITE_FIREBASE_DATABASE_ID="(default)"
 # Firebase Admin SDK Service Account (JSON string on a single line)
-FIREBASE_SERVICE_ACCOUNT_KEY='{"type":"service_account","project_id":"my-master-catalog","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"firebase-adminsdk@my-master-catalog.iam.gserviceaccount.com"}'
+FIREBASE_SERVICE_ACCOUNT_KEY='{"type":"service_account","project_id":"my-master-catalog","private_key":"<YOUR_FIREBASE_PRIVATE_KEY>","client_email":"firebase-adminsdk@my-master-catalog.iam.gserviceaccount.com"}'
 
 # 4. Database B: Community Reviews & Moderation (Firebase)
 VITE_COMMUNITY_FIREBASE_PROJECT_ID="my-community-db"
-VITE_COMMUNITY_FIREBASE_API_KEY="AIzaSyA1234567890abcdef"
+VITE_COMMUNITY_FIREBASE_API_KEY="<YOUR_COMMUNITY_FIREBASE_API_KEY>"
 VITE_COMMUNITY_FIREBASE_AUTH_DOMAIN="my-community-db.firebaseapp.com"
 VITE_COMMUNITY_FIREBASE_STORAGE_BUCKET="my-community-db.appspot.com"
 VITE_COMMUNITY_FIREBASE_MESSAGING_SENDER_ID="123456789012"
@@ -394,7 +394,7 @@ VITE_COMMUNITY_FIREBASE_APP_ID="1:123456789012:web:abcdef"
 VITE_COMMUNITY_FIREBASE_DATABASE_ID="(default)"
 
 # 5. Google AI Studio (Gemini Engine) for AI Review Studio
-GEMINI_API_KEY="AIzaSyYourGeminiApiKeyFromGoogleAiStudio"
+GEMINI_API_KEY="<YOUR_GEMINI_API_KEY>"
 
 # 6. Cloudinary Image CDN (Media Uploads)
 CLOUDINARY_CLOUD_NAME="my-cloudinary-cloud"
@@ -408,7 +408,7 @@ CLOUDINARY_UPLOAD_FOLDER="app_uploads"
 AES_KEY="generate_64_char_hex_key_using_openssl_rand_hex_32"
 
 # 8. GitHub Dual-Repo Split-Sync Automation
-GITHUB_TOKEN="ghp_YourGitHubPersonalAccessTokenHere"
+GITHUB_TOKEN="<YOUR_GITHUB_PERSONAL_ACCESS_TOKEN>"
 GITHUB_OWNER="your-github-username-or-org"
 VITE_GITHUB_OWNER="your-github-username-or-org"
 GITHUB_PUBLIC_REPO="my-public-repo"

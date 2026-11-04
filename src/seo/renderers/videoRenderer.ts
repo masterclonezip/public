@@ -64,17 +64,17 @@ export function renderVideosList(videos: any[], _settings: any): string {
   });
 
   return `
-    <div class="animate-fade-in min-h-screen max-w-[1550px] mx-auto plain-content px-3 sm:px-6 md:px-10 pb-20 text-left">
-      <div class="mb-8 pt-4">
+    <div class="animate-fade-in min-h-screen max-w-[1550px] mx-auto pt-1 sm:pt-3 pb-16 px-3 sm:px-6 md:px-10 text-left">
+      <div class="mb-3 sm:mb-5">
         <a href="/" class="inline-flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline transition-colors group">
           Home
         </a>
       </div>
-      <div class="mb-10">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div class="mb-6 sm:mb-8">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 sm:mb-6">
           <div>
-            <h1 class="text-2xl sm:text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-white m-0">Videos &amp; Guides</h1>
-            <p class="text-xs sm:text-sm text-zinc-500 mt-1">Verified visual walkthroughs and platform guides</p>
+            <h1 class="text-xl sm:text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-white m-0">Videos &amp; Guides</h1>
+            <p class="text-xs sm:text-sm text-zinc-500 mt-0.5">Verified visual walkthroughs and platform guides</p>
           </div>
         </div>
       </div>
@@ -103,20 +103,20 @@ export function renderVideoDetail(slug: string, videos: any[], _settings: any): 
 
   return `
     <div class="animate-fade-in max-w-[1550px] mx-auto px-3 sm:px-6 md:px-10 pb-12 text-left">
-      <div class="mb-6 pt-4">
+      <div class="mb-3 sm:mb-5 pt-1 sm:pt-3">
         <a href="/videos" class="inline-flex items-center gap-2 text-sm font-medium text-blue-500 hover:text-blue-600 transition-colors group">Videos</a>
       </div>
-      <div class="bg-zinc-50 dark:bg-zinc-800/30 rounded-[32px] overflow-hidden shadow-sm border border-black/5 dark:border-white/5 relative">
-        <div class="relative w-full bg-black">
+      <div class="bg-transparent sm:bg-zinc-50 sm:dark:bg-zinc-800/30 rounded-none sm:rounded-[32px] overflow-hidden shadow-none sm:shadow-sm border-0 sm:border sm:border-black/5 sm:dark:border-white/5 relative">
+        <div class="relative w-full bg-black rounded-2xl sm:rounded-none overflow-hidden">
           <div class="aspect-video w-full max-w-5xl mx-auto">
             ${videoId ? `<iframe class="w-full h-full" src="https://www.youtube.com/embed/${escapeHtml(videoId)}?autoplay=0" title="${escapeHtml(title)}" frameborder="0" allowfullscreen></iframe>` : `<div class="flex items-center justify-center h-full text-zinc-500 font-medium text-sm">Invalid video URL</div>`}
           </div>
         </div>
-        <div class="p-6 sm:p-10">
-          <div class="flex items-center gap-2 mb-4">
+        <div class="py-4 px-0.5 sm:p-10">
+          <div class="flex items-center gap-2 mb-3">
             <span class="bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400 text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wider">Video Hub</span>
           </div>
-          <h1 class="text-2xl sm:text-4xl font-bold leading-tight mb-4 tracking-tight text-zinc-900 dark:text-zinc-100">${escapeHtml(title)}</h1>
+          <h1 class="text-xl sm:text-4xl font-bold leading-tight mb-3 tracking-tight text-zinc-900 dark:text-zinc-100">${escapeHtml(title)}</h1>
           <div class="flex items-center gap-2 mb-8 text-sm font-medium text-zinc-500">
             <span>${escapeHtml(dateLabel)}</span>
           </div>

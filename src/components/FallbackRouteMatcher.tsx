@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useLocation, Link, Navigate } from 'react-router-dom';
 import { useData } from '../contexts/DataContextPublic';
 import { resolveAppSlug } from '../lib/slugResolver';
+import { getCachedStaticDatasetSync, loadFullStaticDataset, StaticDatasetPayload } from '../lib/lightFallback';
 import Meta from './Meta';
 
 const getInitialData = () => {
@@ -24,6 +25,7 @@ export default function FallbackRouteMatcher() {
   const rawPath = decodeURIComponent(location.pathname);
   const slug = rawPath.replace(/^\/app\//i, '/').replace(/^\/|\/$/g, '').toLowerCase().trim();
   
+  const [staticDataset, setStaticDataset] = useState<StaticDatasetPayload | null>(() => getCachedStaticDatasetSync());
   const [triedRefresh, setTriedRefresh] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const syncAttemptedRef = useRef<Record<string, boolean>>({});
@@ -31,7 +33,12 @@ export default function FallbackRouteMatcher() {
   useEffect(() => {
     setTriedRefresh(false);
     setIsRefreshing(false);
-  }, [slug]);
+    if (!staticDataset) {
+      loadFullStaticDataset().then(ds => {
+        if (ds) setStaticDataset(ds);
+      }).catch(() => {});
+    }
+  }, [slug, staticDataset]);
 
   if (!slug || slug.match(/\.(xml|json|txt|php|png|jpg|jpeg|gif|svg|ico|webp|js|css|map|webmanifest)$/i)) {
     return (
@@ -43,28 +50,40 @@ export default function FallbackRouteMatcher() {
     );
   }
 
-  // 1. Check if slug matches an app -> Always 301 Redirect to canonical /app/:slug
+  // 1. Check if slug matches an app -> Always Redirect to canonical /app/:slug
   const initData = getInitialData();
-  const matchedApp = resolveAppSlug(slug, apps) || resolveAppSlug(slug, initData.apps || []);
+  const matchedApp =
+    resolveAppSlug(slug, apps) ||
+    resolveAppSlug(slug, initData.apps || []) ||
+    resolveAppSlug(slug, staticDataset?.apps || []);
   if (matchedApp && (matchedApp.slug || matchedApp.id)) {
     const targetSlug = matchedApp.slug || matchedApp.id;
     return <Navigate to={`/app/${targetSlug}`} replace />;
   }
 
   // 2. Check if slug matches news -> Redirect to /news/:slug
-  const matchedNews = news.find(n => n.slug?.toLowerCase() === slug) || (initData.news || []).find((n: any) => n.slug?.toLowerCase() === slug);
+  const matchedNews =
+    news.find(n => n.slug?.toLowerCase() === slug) ||
+    (initData.news || []).find((n: any) => n.slug?.toLowerCase() === slug) ||
+    (staticDataset?.news || []).find(n => n.slug?.toLowerCase() === slug);
   if (matchedNews && matchedNews.slug) {
     return <Navigate to={`/news/${matchedNews.slug}`} replace />;
   }
 
   // 3. Check if slug matches video -> Redirect to /videos/:slug
-  const matchedVideo = videos.find(v => v.slug?.toLowerCase() === slug) || (initData.videos || []).find((v: any) => v.slug?.toLowerCase() === slug);
+  const matchedVideo =
+    videos.find(v => v.slug?.toLowerCase() === slug) ||
+    (initData.videos || []).find((v: any) => v.slug?.toLowerCase() === slug) ||
+    (staticDataset?.videos || []).find(v => v.slug?.toLowerCase() === slug);
   if (matchedVideo && matchedVideo.slug) {
     return <Navigate to={`/videos/${matchedVideo.slug}`} replace />;
   }
 
   // 4. Check if slug matches a category -> Redirect to /category/:slug
-  const matchedCategory = apps.some(a => (a.category || '').toLowerCase().replace(/[^a-z0-9]+/g, '-') === slug) || ['all-apps', 'games', 'apps', 'entertainment', 'arcade', 'board', 'casual'].includes(slug);
+  const allCandidateApps = apps.length > 50 ? apps : (staticDataset?.apps || apps);
+  const matchedCategory =
+    allCandidateApps.some(a => (a.category || '').toLowerCase().replace(/[^a-z0-9]+/g, '-') === slug) ||
+    ['all-apps', 'games', 'apps', 'entertainment', 'arcade', 'board', 'casual'].includes(slug);
   if (matchedCategory) {
     return <Navigate to={`/category/${slug}`} replace />;
   }

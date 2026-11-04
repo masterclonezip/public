@@ -9,7 +9,8 @@ import { adminFetch } from '../services/adminAuthService';
 import { safeEncrypt, safeDecrypt } from './cryptoUtils';
 import { structureHtmlFragment } from './safeHtmlPublic';
 import { formatNewsDate, calculateReadingTime, getPlainTextSnippet } from './newsUtils';
-import { formatPageTitle, cleanSettingsMetaTitles } from './seoUtils';
+import { formatPageTitle, cleanSettingsMetaTitles, isPublicReadyApp, isPublicReadyNews, resolvePublicSiteDomain } from './seoUtils';
+export { isPublicReadyApp, isPublicReadyNews, resolvePublicSiteDomain };
 
 export function encryptUrlIfNeeded(url: string, existingCiphertext?: string): string {
   if (!url || typeof url !== 'string') return '';
@@ -297,6 +298,7 @@ export function generateSecureVaultFile(ciphertext: string, encryptedTurnstileSe
   ].join('\n');
 }
 
+
 /**
  * Dynamically generates the content of `src/lib/staticData.ts` based on current state
  */
@@ -307,8 +309,10 @@ export function generateStaticDataFileCode(
   videos: any[] = []
 ): string {
   const siteTitle = typeof settings?.site_title === 'string' ? settings.site_title.trim() : '';
-  // Compile canonical public apps with zero download link leakage (links live exclusively in sealed server vault)
-  const cleanApps = (apps || []).map((app: any) => compileCanonicalApp(app, { stripDownloadLinks: true, siteTitle }));
+  // Compile canonical public apps with zero download link leakage (strictly filter out unpublished/draft apps)
+  const cleanApps = (apps || [])
+    .filter(isPublicReadyApp)
+    .map((app: any) => compileCanonicalApp(app, { stripDownloadLinks: true, siteTitle }));
   const defaultSettings = {
     site_title: "",
     meta_description: "",
@@ -1180,9 +1184,9 @@ export async function commitMultiFilesToGitHub({
 
   onProgress?.(`GitHub Sync: Preparing ${total} files for atomic commit to "${repo}"...`);
 
-  // Upload blobs with concurrency of 2 to balance speed and stability
+  // Upload blobs with concurrency of 6 to drastically accelerate sync while respecting GitHub rate limits
   const queue = [...files];
-  const workers = Array.from({ length: Math.min(2, total) }, async () => {
+  const workers = Array.from({ length: Math.min(6, total) }, async () => {
     while (queue.length > 0) {
       const file = queue.shift();
       if (!file) break;

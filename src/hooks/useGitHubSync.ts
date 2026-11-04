@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { auth, db, isFirebaseReal, readFirestoreDoc, writeFirestoreDoc, handleFirestoreError, OperationType } from '../lib/firebase';
 import { adminFetch, getValidAdminToken, loadSession } from '../services/adminAuthService';
-import { GitConfig, generateStaticDataFileCode, generateCommunityReviewsFileCode, commitFileToGitHub, commitMultiFilesToGitHub, encryptUrlIfNeeded, compileCanonicalApp, compileCanonicalNews, generateSecureVaultFile, sanitizePublicSettings } from '../lib/githubSync';
+import { GitConfig, generateStaticDataFileCode, generateCommunityReviewsFileCode, commitFileToGitHub, commitMultiFilesToGitHub, encryptUrlIfNeeded, compileCanonicalApp, compileCanonicalNews, generateSecureVaultFile, sanitizePublicSettings, isPublicReadyApp, isPublicReadyNews, resolvePublicSiteDomain } from '../lib/githubSync';
 import { getAesSecret, safeDecrypt, safeEncrypt } from '../lib/cryptoUtils';
 import { generateAllSitemaps, normalizeSitemapHost } from '../lib/sitemapGenerator';
 import { ensureDefaultSettings } from '../lib/defaultLegalContent';
@@ -596,10 +596,10 @@ export function useGitHubSync(
       log(`GitHub Sync Notice: Rating harmonization note: ${e?.message || 'bypassed'}`);
     }
 
-    // Filter apps and news based on sync_to_public status (default is true for live public)
-    const publicApps = finalApps.filter((app: any) => app.sync_to_public !== false);
+    // Filter apps and news based on isPublicReadyApp and isPublicReadyNews (strictly excludes draft, unpublished, and unsynced items)
+    const publicApps = finalApps.filter(isPublicReadyApp);
     const publicNews = targetNews
-      .filter((item: any) => item.sync_to_public !== false)
+      .filter(isPublicReadyNews)
       .map((item: any) => compileCanonicalNews(item));
     const unpushedAppsCount = finalApps.length - publicApps.length;
     const unpushedNewsCount = targetNews.length - publicNews.length;
@@ -830,14 +830,9 @@ export function useGitHubSync(
 
       // Generate XML sitemaps, site.webmanifest, and opensearch.xml for instant static hosting and search engine discoverability
       try {
-        const rawPublicDomain = (
-          (finalSettings as any)?.site_domain ||
-          (finalSettings as any)?.domain ||
-          (finalSettings as any)?.public_domain ||
-          (import.meta as any).env?.VITE_PUBLIC_DOMAIN ||
-          (typeof window !== 'undefined' ? window.location.origin : '')
-        ).trim().replace(/^["']+|["']+$/g, '');
-        const publicDomain = rawPublicDomain ? normalizeSitemapHost(rawPublicDomain) : '';
+        const publicDomain = normalizeSitemapHost(
+          resolvePublicSiteDomain(finalSettings, publicApps, publicNews)
+        ) || 'https://yonoappdex.com';
         const sitemaps = generateAllSitemaps(
           {
             apps: publicApps,

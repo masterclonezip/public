@@ -24,3 +24,5 @@ public-api/
 src/sync-meta.json
 public/assets/
 public/assets/aistudio/
+public/*.gz
+functions/api/%5B*

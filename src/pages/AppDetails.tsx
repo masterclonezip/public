@@ -159,21 +159,17 @@ export default function AppDetails() {
     const appId = String(app.id || '');
     const appSlug = String(app.slug || '').toLowerCase().trim();
 
-    // If mockApps is strictly the pre-computed 17-app SSR slice for THIS exact app
-    // (where every non-current item carries _similarOrder for this appSlug),
-    // preserve the exact SSR order so client hydration matches SSR 1:1.
-    const nonCurrentInSlice = mockApps.filter((a: any) => {
+    // Preserve the exact SSR _similarOrder slice for THIS app even after background catalog hydration
+    // expands mockApps from 17 items to 230+ items, guaranteeing zero post-load DOM fluctuation.
+    const ssrSimilarCandidates = mockApps.filter((a: any) => {
       if (!a || a.sync_to_public === false || a.is_Safety_alert === true || a.status === 'flagged') return false;
       const isCurrent = String(a.id) === appId || (a.slug && a.slug.toLowerCase().trim() === appSlug);
-      return !isCurrent;
+      if (isCurrent) return false;
+      return typeof a._similarOrder === 'number' && a._similarForSlug === appSlug;
     });
 
-    if (
-      mockApps.length <= 17 &&
-      nonCurrentInSlice.length > 0 &&
-      nonCurrentInSlice.every((a: any) => typeof a._similarOrder === 'number' && (!a._similarForSlug || a._similarForSlug === appSlug))
-    ) {
-      const ordered = [...nonCurrentInSlice].sort(
+    if (ssrSimilarCandidates.length > 0) {
+      const ordered = [...ssrSimilarCandidates].sort(
         (a: any, b: any) => (typeof a._similarOrder === 'number' ? a._similarOrder : 0) - (typeof b._similarOrder === 'number' ? b._similarOrder : 0)
       );
       const mappedSlice = ordered.slice(0, 16).map((a: any) => ({
@@ -278,9 +274,9 @@ export default function AppDetails() {
       app &&
       !(app as any)._isTrimmed &&
       ((app as any)._isFullApp ||
-        (app.description_html && app.description_html.trim().length > 15 && Array.isArray(app.screenshots) && app.screenshots.length > 0))
+        (app.description_html && app.description_html.trim().length > 15))
     );
-    if (isFullPreRenderedApp && Array.isArray(mockApps) && mockApps.length > 5) {
+    if (isFullPreRenderedApp) {
       setRemoteCheckDoneSlug(slugKey);
       return;
     }
@@ -307,13 +303,26 @@ export default function AppDetails() {
       return;
     }
 
-    // 3. Instant 0ms memory fallback from static dataset (instant FCP/LCP when switching URLs)
+    // 3. Instant 0ms memory fallback from static dataset when switching URLs between apps
     loadFullStaticDataset().then(dataset => {
       if (activeSlugRef.current !== slugKey) return;
-      const match = resolveAppSlug(slugKey, dataset?.apps || []);
-      if (match && match.description_html && match.description_html.trim().length > 10) {
+      const allStaticApps = dataset?.apps || [];
+      const match = resolveAppSlug(slugKey, allStaticApps);
+      if (match) {
         setFetchedApp(match);
         if (updateAppDetail) updateAppDetail(match);
+        // Ensure the new target app's 16 similar apps are available in context without dumping all 230+ apps
+        if (mergeCatalogApps && allStaticApps.length > 0) {
+          const targetCat = String(match.category || '').toLowerCase();
+          const similarSlice = allStaticApps
+            .filter(a => a.slug !== match.slug && String(a.category || '').toLowerCase() === targetCat)
+            .slice(0, 16);
+          if (similarSlice.length > 0) {
+            mergeCatalogApps([match, ...similarSlice]);
+          }
+        }
+        setIsFetchingDetails(false);
+        setRemoteCheckDoneSlug(slugKey);
       }
     }).catch(() => {});
 
@@ -321,21 +330,18 @@ export default function AppDetails() {
       syncAttemptedRef.current[slugKey] = true;
       setIsFetchingDetails(true);
 
-      fetch(`/api/v1/public/app/${encodeURIComponent(slugKey)}`)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+      fetch(`/api/v1/public/app/${encodeURIComponent(slugKey)}`, {
+        signal: controller.signal
+      })
         .then(res => {
           if (res.ok) return res.json();
           throw new Error(`HTTP ${res.status}`);
         })
         .then(data => {
           if (data?.status === 'OK' && data?.app) {
-            if (
-              Array.isArray(data.catalogApps) &&
-              data.catalogApps.length > 0 &&
-              mergeCatalogApps &&
-              (!Array.isArray(mockApps) || mockApps.length < data.catalogApps.length)
-            ) {
-              mergeCatalogApps(data.catalogApps);
-            }
             if (updateAppDetail) updateAppDetail(data.app);
             if (activeSlugRef.current === slugKey) {
               setFetchedApp(data.app);
@@ -346,6 +352,7 @@ export default function AppDetails() {
           // Graceful fallback to static local cache
         })
         .finally(() => {
+          clearTimeout(timeoutId);
           if (activeSlugRef.current === slugKey) {
             setIsFetchingDetails(false);
             setRemoteCheckDoneSlug(slugKey);

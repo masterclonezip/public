@@ -10,7 +10,10 @@ import path from 'path';
 const CRITICAL_SHELL_RULES = `
 @layer base {
   *,::before,::after{box-sizing:border-box;border:0 solid}
-  html{-webkit-text-size-adjust:100%;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased;background-color:#ffffff;color:#09090b;color-scheme:light}
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased;background-color:#ffffff;color:#09090b;color-scheme:light}
+  @media (max-width:639px){html{font-size:14.5px}}
+  @media (max-width:400px){html{font-size:13.75px}}
+  @media (max-width:359px){html{font-size:12.75px}}
   @media (prefers-color-scheme:dark){html:not(.light){background-color:#090d16;color:#f8fafc;color-scheme:dark}}
   html.dark,html[data-theme="dark"]{background-color:#090d16;color:#f8fafc;color-scheme:dark}
   body{margin:0;min-height:100vh;background-color:inherit;color:inherit;overflow-x:hidden}

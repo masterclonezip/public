@@ -29,6 +29,15 @@ export const AppSimilarCarousel: React.FC<AppSimilarCarouselProps> = ({
   totalCategoryCount,
   isLoading = false
 }) => {
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+
+  // Guarantee that on mount or app change, horizontal scroll is strictly at the start (column 1)
+  React.useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollLeft = 0;
+    }
+  }, [relatedApps, specificCategory]);
+
   if ((!relatedApps || relatedApps.length === 0) && !isLoading) return null;
 
   if ((!relatedApps || relatedApps.length === 0) && isLoading) {
@@ -40,7 +49,7 @@ export const AppSimilarCarousel: React.FC<AppSimilarCarouselProps> = ({
           </h2>
           <div className="h-7 w-24 rounded-full bg-zinc-200/70 dark:bg-zinc-800/70 animate-pulse" />
         </div>
-        <div className="grid grid-rows-2 grid-flow-col auto-cols-[calc((100%-1.5rem)/4)] xs:auto-cols-[calc((100%-2.25rem)/4)] sm:auto-cols-[calc((100%-5.25rem)/8)] gap-x-2 xs:gap-x-3 gap-y-3 xs:gap-y-3.5 overflow-hidden pt-2.5 pb-2">
+        <div className="grid grid-rows-2 grid-flow-col auto-cols-[calc((100%-1.75rem)/4.25)] xs:auto-cols-[calc((100%-2.5rem)/4.25)] sm:auto-cols-[calc((100%-5.25rem)/8)] gap-x-2 xs:gap-x-3 gap-y-3 xs:gap-y-3.5 overflow-hidden pt-2.5 pb-2">
           {Array.from({ length: 16 }).map((_, idx) => (
             <div key={idx} className="flex flex-col items-center gap-1.5 w-full shrink-0">
               <div className="w-[58px] h-[58px] xxs:w-[66px] xxs:h-[66px] xs:w-[76px] xs:h-[76px] sm:w-[86px] sm:h-[86px] rounded-[24%] bg-zinc-200/70 dark:bg-zinc-800/70 animate-pulse" />
@@ -80,7 +89,8 @@ export const AppSimilarCarousel: React.FC<AppSimilarCarouselProps> = ({
       </div>
 
       <div 
-        className="grid grid-rows-2 grid-flow-col auto-cols-[calc((100%-1.5rem)/4)] xs:auto-cols-[calc((100%-2.25rem)/4)] sm:auto-cols-[calc((100%-5.25rem)/8)] gap-x-2 xs:gap-x-3 gap-y-3 xs:gap-y-3.5 overflow-x-auto pt-2.5 pb-2 snap-x snap-mandatory touch-pan-y overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        ref={scrollContainerRef}
+        className="grid grid-rows-2 grid-flow-col auto-cols-[calc((100%-1.75rem)/4.25)] xs:auto-cols-[calc((100%-2.5rem)/4.25)] sm:auto-cols-[calc((100%-5.25rem)/8)] gap-x-2 xs:gap-x-3 gap-y-3 xs:gap-y-3.5 overflow-x-auto pt-2.5 pb-2 snap-x snap-mandatory touch-pan-y overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y pan-x', overscrollBehaviorX: 'contain' }}
       >
         {relatedApps.slice(0, 16).map((relatedApp, index) => {

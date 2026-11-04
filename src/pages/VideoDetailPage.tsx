@@ -7,7 +7,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, Navigate, Link } from 'react-router-dom';
 import Meta from '../components/Meta';
 import { useData } from '../contexts/DataContextPublic';
-import { mockVideos as staticMockVideos } from '../lib/lightFallback';
+import { mockVideos as staticMockVideos, loadFullStaticDataset } from '../lib/lightFallback';
 import { ArrowLeft, MessageSquare, Send, Calendar, ShieldAlert } from 'lucide-react';
 import { getCleanCanonicalUrl, normalizeNonWwwDomain } from '../lib/seoUtils';
 
@@ -21,8 +21,10 @@ interface Comment {
 export default function VideoDetailPage() {
   const { videos: mockVideos, settings: mockSettings, loading, videosSyncedWithServer, serverVideosFetched, refreshAll } = useData();
   const { slug } = useParams();
+  const [fetchedVideo, setFetchedVideo] = useState<any | null>(null);
   const videoItem = mockVideos.find(v => v.slug?.toLowerCase() === slug?.toLowerCase() || v.id?.toLowerCase() === slug?.toLowerCase()) ||
-                    staticMockVideos.find(v => v.slug?.toLowerCase() === slug?.toLowerCase() || v.id?.toLowerCase() === slug?.toLowerCase());
+                    staticMockVideos.find(v => v.slug?.toLowerCase() === slug?.toLowerCase() || v.id?.toLowerCase() === slug?.toLowerCase()) ||
+                    (fetchedVideo && (fetchedVideo.slug?.toLowerCase() === slug?.toLowerCase() || fetchedVideo.id?.toLowerCase() === slug?.toLowerCase()) ? fetchedVideo : undefined);
   const [commentText, setCommentText] = useState('');
   
   const [triedRefresh, setTriedRefresh] = useState(false);
@@ -35,21 +37,40 @@ export default function VideoDetailPage() {
     setIsRefreshing(false);
   }, [slug]);
 
-  // Automatically trigger a silent cloud sync if the requested item is not found in local cache
+  // Automatically resolve from static dataset in 0ms or trigger a bounded cloud sync
   useEffect(() => {
     const slugKey = slug?.toLowerCase() || '';
     if (!slugKey) return;
 
     const found = mockVideos.some(v => v.slug?.toLowerCase() === slugKey || v.id?.toLowerCase() === slugKey);
-    if (!found && !syncAttemptedRef.current[slugKey] && !triedRefresh && !isRefreshing) {
+    if (found) {
+      setTriedRefresh(true);
+      setIsRefreshing(false);
+      return;
+    }
+
+    loadFullStaticDataset().then(dataset => {
+      const match = (dataset?.videos || []).find((v: any) =>
+        (v.slug || '').toLowerCase() === slugKey || (v.id || '').toLowerCase() === slugKey
+      );
+      if (match) {
+        setFetchedVideo(match);
+        setTriedRefresh(true);
+        setIsRefreshing(false);
+      }
+    }).catch(() => {});
+
+    if (!syncAttemptedRef.current[slugKey] && !triedRefresh && !isRefreshing) {
       syncAttemptedRef.current[slugKey] = true;
       setIsRefreshing(true);
-      console.info(`[VideoDetail] Video "${slug}" sync initiated for deep-link resolve.`);
+      const timer = setTimeout(() => {
+        setTriedRefresh(true);
+        setIsRefreshing(false);
+      }, 3000);
       refreshAll(true)
-        .catch((e: any) => {
-          console.warn("[VideoDetail] Deep-link video sync notice:", e.message || e);
-        })
+        .catch(() => {})
         .finally(() => {
+          clearTimeout(timer);
           setTriedRefresh(true);
           setIsRefreshing(false);
         });
@@ -206,7 +227,7 @@ export default function VideoDetailPage() {
         breadcrumbSchema={videoBreadcrumbSchema}
       />
       
-      <div className="mb-6 pt-4">
+      <div className="mb-3 sm:mb-5 pt-1 sm:pt-3">
         <Link 
           to="/videos" 
           className="inline-flex items-center gap-2 text-sm font-medium text-blue-500 hover:text-blue-600 transition-colors group"
@@ -218,8 +239,8 @@ export default function VideoDetailPage() {
         </Link>
       </div>
 
-      <div className="bg-zinc-50 dark:bg-zinc-800/30 rounded-[32px] overflow-hidden shadow-sm border border-black/5 dark:border-white/5 relative">
-        <div className="relative w-full bg-black">
+      <div className="bg-transparent sm:bg-zinc-50 sm:dark:bg-zinc-800/30 rounded-none sm:rounded-[32px] overflow-hidden shadow-none sm:shadow-sm border-0 sm:border sm:border-black/5 sm:dark:border-white/5 relative">
+        <div className="relative w-full bg-black rounded-2xl sm:rounded-none overflow-hidden">
            <div className="aspect-video w-full max-w-5xl mx-auto">
               {videoId ? (
                 <iframe 
@@ -236,11 +257,11 @@ export default function VideoDetailPage() {
            </div>
         </div>
         
-        <div className="p-6 sm:p-10">
-            <div className="flex items-center gap-2 mb-4">
+        <div className="py-4 px-0.5 sm:p-10">
+            <div className="flex items-center gap-2 mb-3">
                 <span className="bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400 text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wider">Video Hub</span>
             </div>
-            <h1 className="text-2xl sm:text-4xl font-bold leading-tight mb-4 tracking-tight text-zinc-900 dark:text-zinc-100">
+            <h1 className="text-xl sm:text-4xl font-bold leading-tight mb-3 tracking-tight text-zinc-900 dark:text-zinc-100">
               {videoItem.title}
             </h1>
             

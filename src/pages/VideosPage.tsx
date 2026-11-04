@@ -89,8 +89,8 @@ export default function VideosPage() {
   };
 
   return (
-    <div className="animate-fade-in min-h-screen max-w-[1550px] mx-auto plain-content px-3 sm:px-6 md:px-10 pb-20">
-      <div className="mb-8 pt-4">
+    <div className="animate-fade-in min-h-screen max-w-[1550px] mx-auto pt-1 sm:pt-3 pb-16 px-3 sm:px-6 md:px-10">
+      <div className="mb-3 sm:mb-5">
         <Link 
           to="/" 
           className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline transition-colors group"
@@ -108,17 +108,17 @@ export default function VideosPage() {
         canonical={window.location.origin + "/videos"}
       />
 
-      <div className="mb-10">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="mb-6 sm:mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 sm:mb-6">
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-2xl border border-blue-100 dark:border-blue-500/20 text-blue-600 dark:text-blue-400">
-              <Video className="w-7 h-7" />
+            <div className="p-2.5 sm:p-3 bg-blue-50 dark:bg-blue-900/30 rounded-2xl border border-blue-100 dark:border-blue-500/20 text-blue-600 dark:text-blue-400">
+              <Video className="w-6 h-6 sm:w-7 sm:h-7" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-white m-0">
+              <h1 className="text-xl sm:text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-white m-0">
                 Videos & Guides
               </h1>
-              <p className="text-xs sm:text-sm text-zinc-500 mt-1">
+              <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
                 Verified visual walkthroughs and platform guides
               </p>
             </div>

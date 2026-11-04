@@ -374,21 +374,16 @@ export async function onRequest(context) {
       env?.VITE_FIREBASE_PROJECT_ID ||
       env?.FIREBASE_PROJECT_ID ||
       sa?.project_id ||
-      env?.VITE_COMMUNITY_FIREBASE_PROJECT_ID ||
-      env?.COMMUNITY_FIREBASE_PROJECT_ID ||
       ''
     ).replace(/^["']|["']$/g, '').trim();
     const apiKey = String(
       env?.VITE_FIREBASE_API_KEY ||
       env?.FIREBASE_API_KEY ||
-      env?.VITE_COMMUNITY_FIREBASE_API_KEY ||
-      env?.COMMUNITY_FIREBASE_API_KEY ||
       ''
     ).replace(/^["']|["']$/g, '').trim();
     const databaseId = normalizeEdgeDbId(
       env?.VITE_FIREBASE_DATABASE_ID ||
       env?.FIREBASE_DATABASE_ID ||
-      env?.VITE_COMMUNITY_FIREBASE_DATABASE_ID ||
       '(default)',
       projectId
     );
@@ -688,7 +683,20 @@ export async function onRequest(context) {
     return { exists: true, data: fromEdgeRestDoc(json.fields), status: res.status };
   };
 
-  // Edge Public Catalog & Settings Loader (merges staticData.json with live Firestore store_data chunks & caches for 60s)
+  const isEdgePublicReadyApp = (app) => {
+    if (!app || typeof app !== 'object') return false;
+    if (app.sync_to_public === false || app.sync_to_public === 'false' || app.sync_to_public === 0 || app.sync_to_public === '0') return false;
+    if (app.is_published === false || app.is_published === 'false') return false;
+    if (app.is_draft === true || app.is_draft === 'true') return false;
+    if (app.is_hidden === true || app.is_hidden === 'true') return false;
+    if (typeof app.status === 'string') {
+      const st = app.status.trim().toLowerCase();
+      if (st === 'draft' || st === 'unpublished' || st === 'hidden' || st === 'archived') return false;
+    }
+    return true;
+  };
+
+  // Edge Public Catalog & Settings Loader (uses synced staticData.json as source of truth and filters out unpublished/admin-only apps)
   const loadEdgePublicCatalog = async () => {
     const now = Date.now();
     if (
@@ -698,12 +706,12 @@ export async function onRequest(context) {
       return globalThis.__EDGE_PUBLIC_CATALOG_CACHE__;
     }
 
-    let apps = Array.isArray(staticData?.apps) ? [...staticData.apps] : [];
+    let apps = Array.isArray(staticData?.apps) ? staticData.apps.filter(isEdgePublicReadyApp) : [];
     let settings = { ...(staticData?.settings || {}) };
     let videos = Array.isArray(staticData?.videos) ? [...staticData.videos] : [];
 
     const cfg = getEdgeFirestoreConfig();
-    if (cfg.configured && (apps.length === 0 || !settings.site_name)) {
+    if (cfg.configured && apps.length === 0) {
       try {
         const [c0, c1, c2, setDoc, pubSetDoc, secDoc] = await Promise.all([
           edgeReadDoc('store_data', 'apps_chunk_0').catch(() => ({ exists: false, data: null })),
@@ -721,7 +729,7 @@ export async function onRequest(context) {
           }
         }
         if (fsApps.length > 0) {
-          apps = fsApps;
+          apps = fsApps.filter(isEdgePublicReadyApp);
         }
         if (pubSetDoc?.exists && pubSetDoc.data) {
           settings = { ...settings, ...pubSetDoc.data };
@@ -769,6 +777,15 @@ export async function onRequest(context) {
       } catch (_) {}
     }
 
+    const sanitizedApps = apps.filter(isEdgePublicReadyApp).map((a) => {
+      const copy = { ...a };
+      delete copy.more_information_url;
+      delete copy.download_url;
+      delete copy.encrypted_link;
+      delete copy.encrypted_download_url;
+      return copy;
+    });
+
     const resolvedSiteKey = getEnvOnlyTurnstileSiteKey(env);
     const publicSettings = { ...settings };
     delete publicSettings.turnstile_secret_key;
@@ -780,10 +797,10 @@ export async function onRequest(context) {
     }
 
     const snapshot = {
-      apps,
+      apps: sanitizedApps,
       settings: publicSettings,
       videos,
-      expiresAt: now + (apps.length > 0 ? 60_000 : 10_000),
+      expiresAt: now + (sanitizedApps.length > 0 ? 60_000 : 10_000),
     };
     globalThis.__EDGE_PUBLIC_CATALOG_CACHE__ = snapshot;
     return snapshot;

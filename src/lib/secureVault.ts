@@ -29,6 +29,6 @@ export function generateSecureVaultFile(c: string, ts?: string): string {
   return `export { getEnvSecretKeys, getAesSecret, encryptData, decryptData, safeEncrypt, safeDecrypt } from './cryptoUtils';\nexport const ENCRYPTED_LINKS = ${JSON.stringify(String(c || '').trim())};\nexport const ENCRYPTED_VAULT = ENCRYPTED_LINKS;\nexport const ENCRYPTED_TURNSTILE_SECRET = ${JSON.stringify(String(ts || defTs).trim())};\n`;
 }
 
-export const ENCRYPTED_LINKS = "v2.85PkGmmSqW0GLtI5.J9VimaBiKOAU_bVPkjYecufaJkLdu-eX6QVy9_cKUm-IDivZcv9ZLlhHU90-OtRJVd6WExikIKSbMn4B6kyDCztHYDI_O9uumofkNJC0brqN5DZR410VGP1XfwT8cXuOb1s";
+export const ENCRYPTED_LINKS = "U2FsdGVkX1/+STDmH7uR+GTVmgjs1b6Xdbj9lD0z7xs=";
 export const ENCRYPTED_VAULT = ENCRYPTED_LINKS;
 export const ENCRYPTED_TURNSTILE_SECRET = "";

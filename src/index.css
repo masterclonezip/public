@@ -48,8 +48,29 @@
 
 html {
   scroll-behavior: auto;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
   text-rendering: auto;
+}
+
+/* Proportional compact scaling for small or high-zoom smartphone displays */
+@media (max-width: 639px) {
+  html {
+    font-size: 14.5px;
+  }
+}
+
+@media (max-width: 400px) {
+  html {
+    font-size: 13.75px;
+  }
+}
+
+@media (max-width: 359px) {
+  html {
+    font-size: 12.75px;
+  }
 }
 
 body {
@@ -107,9 +128,21 @@ body {
 .glass-nav {
   @apply sticky top-0 z-50 transition-all duration-300;
   background: var(--ticker-bg) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
   border-bottom: 1px solid var(--glass-border);
+}
+
+@media (min-width: 768px) {
+  .glass-nav {
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  }
+}
+
+@media (max-width: 767px) {
+  [class*="backdrop-blur"] {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
 }
 
 .glass-nav-scrolled {
