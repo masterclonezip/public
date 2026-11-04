@@ -7,7 +7,7 @@ import { ArrowLeft, ShieldAlert } from 'lucide-react';
 import { safeHtml } from '../lib/safeHtmlPublic';
 import { NewsArticleHeader } from '../components/public/newsDetails/NewsArticleHeader';
 import { NewsRelatedAppBox } from '../components/public/newsDetails/NewsRelatedAppBox';
-import { formatNewsDate, calculateReadingTime, getNextNewsChain, getPlainTextSnippet } from '../lib/newsUtils';
+import { formatNewsDate, calculateReadingTime, getNextNewsChain, getPlainTextSnippet, resolveRelatedAppForNews } from '../lib/newsUtils';
 import { getOptimizedImageUrl, normalizeIsoDate } from '../seo/utils';
 import { getCleanCanonicalUrl, normalizeNonWwwDomain } from '../lib/seoUtils';
 
@@ -195,21 +195,7 @@ export default function NewsDetailPage() {
   }, [cleanSlug, hasFullBody]);
 
   const relatedApp = useMemo(() => {
-    if (!newsItem) return null;
-    if (newsItem.related_app_id) {
-      const relLower = String(newsItem.related_app_id).toLowerCase().trim();
-      const found = apps.find(a => String(a.id || '').toLowerCase().trim() === relLower || String(a.slug || '').toLowerCase().trim() === relLower);
-      if (found) return found;
-    }
-    if (newsItem.link) {
-      const cleanLink = newsItem.link.trim();
-      const appSlugFromLink = cleanLink.replace(/^.*\/app\//, '').replace(/\/$/, '').split(/[?#]/)[0].toLowerCase().trim();
-      if (appSlugFromLink) {
-        const found = apps.find(a => String(a.slug || '').toLowerCase().trim() === appSlugFromLink || String(a.id || '').toLowerCase().trim() === appSlugFromLink);
-        if (found) return found;
-      }
-    }
-    return null;
+    return resolveRelatedAppForNews(newsItem, apps);
   }, [newsItem, apps]);
 
   const downloadTarget = useMemo(() => {

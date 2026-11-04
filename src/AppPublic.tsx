@@ -170,14 +170,19 @@ function AppContent() {
   useSEO(settings, apps, news, videos, isAdminPath);
   useFavicon(settings, apps);
 
-  // Lazy-load full 74-app catalog if navigating to Home, Categories, or New Apps from a trimmed app page
+  // Ensure full catalog, news, videos, and settings are hydrated when navigating between routes from a trimmed SSR slice
   useEffect(() => {
     const p = location.pathname.toLowerCase();
+    if (p.startsWith('/moreinfo/')) return;
     const isCatalogRoute = p === '/' || p === '/new-apps' || p.startsWith('/categories') || p.startsWith('/category');
-    if (isCatalogRoute && apps.length > 0 && apps.length < 25 && fetchApps) {
+    if (isCatalogRoute && apps.length < 25 && fetchApps) {
+      fetchApps();
+    } else if ((p === '/news' || p.startsWith('/news/')) && news.length < 5 && fetchApps) {
+      fetchApps();
+    } else if ((p === '/videos' || p.startsWith('/videos/')) && videos.length === 0 && fetchApps) {
       fetchApps();
     }
-  }, [location.pathname, apps.length, fetchApps]);
+  }, [location.pathname, apps.length, news.length, videos.length, fetchApps]);
 
   // Initialize fast user-interaction route preloading (prefetches only on touchstart/pointerover, 0ms idle bandwidth waste)
   useEffect(() => {

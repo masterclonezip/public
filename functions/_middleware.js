@@ -1,3 +1,19 @@
+import staticData from '../src/lib/staticData.json';
+
+function getEdgeSizedLogoUrl(url, size = 192) {
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) return '';
+  if (trimmed.includes('res.cloudinary.com') && trimmed.includes('/upload/')) {
+    const cleanUrl = trimmed.replace(/\/upload\/(?:(?:[a-z]{1,3}_[a-zA-Z0-9_.:-]+,?)+\/)*/, '/upload/');
+    if (size > 0) {
+      return cleanUrl.replace('/upload/', `/upload/f_png,q_auto:best,w_${size},h_${size},c_pad/`);
+    }
+    return cleanUrl.replace('/upload/', '/upload/f_png,q_auto:best/');
+  }
+  return trimmed;
+}
+
 export async function onRequest(context) {
   const url = new URL(context.request.url);
   const rawHost = url.hostname.toLowerCase();
@@ -10,15 +26,136 @@ export async function onRequest(context) {
       status: 301,
       headers: {
         Location: url.toString(),
-        'Cache-Control': 'public, max-age=31536000'
+        'Cache-Control': 'public, max-age=31536000',
+        'Access-Control-Allow-Origin': '*'
       }
     });
+  }
+
+  const pathname = url.pathname;
+  const lowerPath = pathname.toLowerCase();
+
+  // 1b. Edge Brand Icon & Web App Manifest Resolution (Ensures /sitemap*.xml tab icons & PWA manifest always show the high-res brand logo)
+  const isIconOrManifest =
+    lowerPath === '/favicon.ico' ||
+    lowerPath === '/favicon.png' ||
+    lowerPath === '/favicon.svg' ||
+    lowerPath === '/favicon-16x16.png' ||
+    lowerPath === '/favicon-32x32.png' ||
+    lowerPath === '/favicon-48x48.png' ||
+    lowerPath === '/apple-touch-icon.png' ||
+    lowerPath === '/apple-touch-icon-precomposed.png' ||
+    lowerPath === '/android-chrome-192x192.png' ||
+    lowerPath === '/android-chrome-512x512.png' ||
+    lowerPath === '/logo.png' ||
+    lowerPath === '/site.webmanifest';
+
+  if (isIconOrManifest && !rawHost.startsWith('admin.') && !rawHost.startsWith('masterworld.')) {
+    const settings = (staticData && staticData.settings) || {};
+    const envObj = context.env || {};
+    const rawLogo = String(
+      settings.logo_url ||
+        settings.favicon_url ||
+        envObj.VITE_SITE_LOGO_URL ||
+        envObj.VITE_SITE_FAVICON_URL ||
+        ''
+    ).trim();
+    const rawFavicon = String(
+      settings.favicon_url ||
+        settings.logo_url ||
+        envObj.VITE_SITE_FAVICON_URL ||
+        envObj.VITE_SITE_LOGO_URL ||
+        rawLogo
+    ).trim();
+
+    if (lowerPath === '/site.webmanifest') {
+      const siteTitle = String(settings.site_title || envObj.VITE_SITE_NAME || '').trim();
+      const icon48 = getEdgeSizedLogoUrl(rawFavicon, 48) || '/favicon-32x32.png';
+      const icon96 = getEdgeSizedLogoUrl(rawFavicon, 96) || '/apple-touch-icon.png';
+      const icon144 = getEdgeSizedLogoUrl(rawFavicon, 144) || '/apple-touch-icon.png';
+      const icon192 = getEdgeSizedLogoUrl(rawFavicon, 192) || '/android-chrome-192x192.png';
+      const icon512 = getEdgeSizedLogoUrl(rawFavicon, 512) || '/android-chrome-512x512.png';
+      const manifestJson = JSON.stringify(
+        {
+          id: '/',
+          start_url: '/',
+          scope: '/',
+          name: siteTitle,
+          short_name: siteTitle,
+          display: 'standalone',
+          orientation: 'portrait',
+          lang: 'en-IN',
+          icons: [
+            { src: icon48, sizes: '48x48', type: 'image/png', purpose: 'any' },
+            { src: icon96, sizes: '96x96', type: 'image/png', purpose: 'any' },
+            { src: icon144, sizes: '144x144', type: 'image/png', purpose: 'any' },
+            { src: icon192, sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+            { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+          ],
+          theme_color: '#2563eb',
+          background_color: '#ffffff',
+          shortcuts: [{ name: 'News', url: '/news' }]
+        },
+        null,
+        2
+      );
+      return new Response(manifestJson, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/manifest+json; charset=utf-8',
+          'Cache-Control': 'public, max-age=3600, s-maxage=3600',
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
+    }
+
+    if (rawFavicon.startsWith('http://') || rawFavicon.startsWith('https://')) {
+      let size = 192;
+      let sourceUrl = rawFavicon;
+      if (lowerPath === '/favicon-16x16.png') size = 16;
+      else if (lowerPath === '/favicon-32x32.png') size = 32;
+      else if (lowerPath === '/favicon-48x48.png') size = 48;
+      else if (lowerPath === '/apple-touch-icon.png' || lowerPath === '/apple-touch-icon-precomposed.png') size = 180;
+      else if (lowerPath === '/android-chrome-192x192.png' || lowerPath === '/favicon.ico' || lowerPath === '/favicon.png' || lowerPath === '/favicon.svg') size = 192;
+      else if (lowerPath === '/android-chrome-512x512.png') size = 512;
+      else if (lowerPath === '/logo.png') {
+        size = 512;
+        sourceUrl = rawLogo || rawFavicon;
+      }
+
+      const targetIconUrl = getEdgeSizedLogoUrl(sourceUrl, size);
+      if (targetIconUrl) {
+        try {
+          const iconRes = await fetch(targetIconUrl, {
+            cf: { cacheEverything: true, cacheTtl: 86400 }
+          });
+          if (iconRes.ok) {
+            return new Response(iconRes.body, {
+              status: 200,
+              headers: {
+                'Content-Type': 'image/png',
+                'Cache-Control': 'public, max-age=3600, s-maxage=86400',
+                'Access-Control-Allow-Origin': '*',
+                'Timing-Allow-Origin': '*'
+              }
+            });
+          }
+        } catch (_) {}
+        return new Response(null, {
+          status: 302,
+          headers: {
+            Location: targetIconUrl,
+            'Cache-Control': 'public, max-age=3600',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      }
+    }
   }
 
   const response = await context.next();
 
   // Do not rewrite Admin portal responses or API routes
-  const pathname = url.pathname;
   if (
     rawHost.startsWith('admin.') ||
     rawHost.startsWith('masterworld.') ||

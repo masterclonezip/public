@@ -51,6 +51,17 @@ import rawSlugResolverTs from '../lib/slugResolver.ts?raw';
 import rawPublicApiRoutesTs from '../server/routes/publicApiRoutes.ts?raw';
 import rawSecurityRoutesTs from '../server/routes/securityRoutes.ts?raw';
 import rawViteConfigTs from '../../vite.config.ts?raw';
+import rawCriticalCssTs from '../seo/criticalCss.ts?raw';
+import rawHomePageTsx from '../pages/Home.tsx?raw';
+import rawNewsPageTsx from '../pages/NewsPage.tsx?raw';
+import rawNewsDetailPageTsx from '../pages/NewsDetailPage.tsx?raw';
+import rawNewsUtilsTs from '../lib/newsUtils.ts?raw';
+import rawSafeHtmlPublicTs from '../lib/safeHtmlPublic.ts?raw';
+import rawLightFallbackTs from '../lib/lightFallback.ts?raw';
+import rawPlayStoreTabsTsx from '../components/playstore/PlayStoreTabs.tsx?raw';
+import rawAppAboutSectionTsx from '../components/public/AppAboutSection.tsx?raw';
+import rawAppFaqSectionTsx from '../components/public/AppFaqSection.tsx?raw';
+import rawHomeFaqSectionTsx from '../components/public/HomeFaqSection.tsx?raw';
 
 const BUNDLED_PUBLIC_CORE_FILES: Record<string, string> = {
   'functions/_middleware.js': rawMiddlewareJs,
@@ -63,11 +74,15 @@ const BUNDLED_PUBLIC_CORE_FILES: Record<string, string> = {
   'src/lib/sitemapGenerator.ts': rawSitemapGeneratorTs,
   'src/lib/seoUtils.ts': rawSeoUtilsTs,
   'src/lib/slugResolver.ts': rawSlugResolverTs,
+  'src/lib/newsUtils.ts': rawNewsUtilsTs,
+  'src/lib/safeHtmlPublic.ts': rawSafeHtmlPublicTs,
+  'src/lib/lightFallback.ts': rawLightFallbackTs,
   'src/lib/cryptoUtils.ts': rawCryptoUtilsTs,
   'src/server/crypto.ts': rawServerCryptoTs,
   'src/seoHelper.ts': rawSeoHelperTs,
   'src/seo/sync.ts': rawSeoSyncTs,
   'src/seo/utils.ts': rawSeoSubUtilsTs,
+  'src/seo/criticalCss.ts': rawCriticalCssTs,
   'src/seo/preRenderEngine.ts': rawPreRenderEngineTs,
   'src/seo/schemaBuilder.ts': rawSchemaBuilderTs,
   'src/seo/metaBuilder.ts': rawMetaBuilderTs,
@@ -79,9 +94,16 @@ const BUNDLED_PUBLIC_CORE_FILES: Record<string, string> = {
   'src/server/routes/securityRoutes.ts': rawSecurityRoutesTs,
   'src/components/Meta.tsx': rawMetaTsx,
   'src/components/FallbackRouteMatcher.tsx': rawFallbackRouteMatcherTsx,
+  'src/components/playstore/PlayStoreTabs.tsx': rawPlayStoreTabsTsx,
   'src/components/public/AppActionButtons.tsx': rawAppActionButtonsTsx,
+  'src/components/public/AppAboutSection.tsx': rawAppAboutSectionTsx,
+  'src/components/public/AppFaqSection.tsx': rawAppFaqSectionTsx,
+  'src/components/public/HomeFaqSection.tsx': rawHomeFaqSectionTsx,
   'src/components/public/newsDetails/NewsRelatedAppBox.tsx': rawNewsRelatedAppBoxTsx,
   'src/components/public/appDetails/AppSimilarCarousel.tsx': rawAppSimilarCarouselTsx,
+  'src/pages/Home.tsx': rawHomePageTsx,
+  'src/pages/NewsPage.tsx': rawNewsPageTsx,
+  'src/pages/NewsDetailPage.tsx': rawNewsDetailPageTsx,
   'src/pages/AppDetails.tsx': rawAppDetailsPageTsx,
   'src/pages/GatewayPage.tsx': rawGatewayPageTsx,
   'src/AppPublic.tsx': rawAppPublicTsx,

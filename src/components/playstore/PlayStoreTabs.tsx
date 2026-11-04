@@ -24,13 +24,22 @@ export const PlayStoreTabs = React.memo(({ activeTab, onTabChange, hideOnSearch 
   
   const uniqueTabs = React.useMemo(() => {
     const seen = new Set<string>();
-    return tabs.filter(tab => {
-      const lower = tab.toLowerCase();
+    const baseList = [...tabs];
+    const cleanActive = (activeTab || '').trim();
+    if (
+      cleanActive &&
+      !['all', 'all apps', 'home', 'apps'].includes(cleanActive.toLowerCase()) &&
+      !baseList.some(t => t.toLowerCase().trim() === cleanActive.toLowerCase())
+    ) {
+      baseList.push(cleanActive);
+    }
+    return baseList.filter(tab => {
+      const lower = tab.toLowerCase().trim();
       if (seen.has(lower)) return false;
       seen.add(lower);
       return true;
     });
-  }, [tabs]);
+  }, [tabs, activeTab]);
 
   if (hideOnSearch) return null;
   
@@ -49,29 +58,34 @@ export const PlayStoreTabs = React.memo(({ activeTab, onTabChange, hideOnSearch 
     return slug ? `/category/${slug}` : '/';
   };
 
+  const activeLower = (activeTab || '').toLowerCase().trim();
+
   return (
     <div className="mb-2 sticky top-[42px] xxs:top-[46px] xs:top-[50px] sm:top-16 z-40 bg-[var(--bg-primary)] py-1 xxs:py-1.5 xs:py-2 px-0">
       <div className="flex overflow-x-auto no-scrollbar gap-1 xxs:gap-1.5 xs:gap-2">
-        {uniqueTabs.map((tab) => (
-          <a
-            key={tab}
-            href={getTabHref(tab)}
-            onClick={(e) => {
-              if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0) {
-                e.preventDefault();
-                onTabChange(tab);
-              }
-            }}
-            className={cn(
-              "whitespace-nowrap px-2.5 xxs:px-3 xs:px-4 py-1 xxs:py-1.5 xs:py-2 text-[11px] xxs:text-xs xs:text-sm font-medium transition-all rounded-full border no-underline inline-flex items-center cursor-pointer",
-              activeTab === tab 
-                ? "bg-blue-600 text-white border-blue-600 shadow-sm" 
-                : "bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border-zinc-200/80 dark:border-zinc-700/60 hover:bg-zinc-200/80 dark:hover:bg-zinc-700"
-            )}
-          >
-            {tab}
-          </a>
-        ))}
+        {uniqueTabs.map((tab) => {
+          const isSelected = tab.toLowerCase().trim() === activeLower;
+          return (
+            <a
+              key={tab}
+              href={getTabHref(tab)}
+              onClick={(e) => {
+                if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                  e.preventDefault();
+                  onTabChange(tab);
+                }
+              }}
+              className={cn(
+                "whitespace-nowrap px-2.5 xxs:px-3 xs:px-4 py-1 xxs:py-1.5 xs:py-2 text-[11px] xxs:text-xs xs:text-sm font-medium transition-all rounded-full border no-underline inline-flex items-center cursor-pointer",
+                isSelected 
+                  ? "bg-blue-600 text-white border-blue-600 shadow-sm" 
+                  : "bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border-zinc-200/80 dark:border-zinc-700/60 hover:bg-zinc-200/80 dark:hover:bg-zinc-700"
+              )}
+            >
+              {tab}
+            </a>
+          );
+        })}
       </div>
     </div>
   );

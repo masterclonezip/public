@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { HelpCircle, ChevronDown } from 'lucide-react';
 import { safeHtml } from '../../lib/safeHtmlPublic';
 import { cleanFaqQuestion } from '../../lib/seoUtils';
@@ -14,7 +15,26 @@ interface HomeFaqSectionProps {
 }
 
 export default function HomeFaqSection({ faqs, searchTerm }: HomeFaqSectionProps) {
+  const navigate = useNavigate();
+
   if (searchTerm || !faqs || faqs.length === 0) return null;
+
+  const handleFaqClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = (e.target as HTMLElement).closest('a');
+    if (!target) return;
+    const href = target.getAttribute('href');
+    if (!href) return;
+    if (href.startsWith('/') && !href.startsWith('//')) {
+      e.preventDefault();
+      navigate(href);
+    } else if (typeof window !== 'undefined' && href.startsWith(window.location.origin)) {
+      try {
+        const url = new URL(href);
+        e.preventDefault();
+        navigate(url.pathname + url.search + url.hash);
+      } catch (_err) {}
+    }
+  };
 
   return (
     <section 
@@ -41,7 +61,7 @@ export default function HomeFaqSection({ faqs, searchTerm }: HomeFaqSectionProps
         </div>
         
         {/* Semantic Crawler-Ready HTML5 Accordion List */}
-        <div className="space-y-2.5 sm:space-y-3">
+        <div onClick={handleFaqClick} className="space-y-2.5 sm:space-y-3">
           {faqs.map((faq, index) => (
             <details 
               key={`faq-home-${index}`}

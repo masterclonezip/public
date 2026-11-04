@@ -339,6 +339,40 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [apps.length, news.length]);
 
+  const hydrateFromStaticDataset = useCallback((full: any) => {
+    if (!full || typeof full !== 'object') return;
+    if (Array.isArray(full.apps) && full.apps.length > 0) {
+      setApps(prev => mergeUniqueApps(prev, full.apps));
+    }
+    if (Array.isArray(full.news) && full.news.length > 0) {
+      setNews(prev => mergeUniqueNews(prev, full.news));
+    }
+    if (full.settings && typeof full.settings === 'object' && Object.keys(full.settings).length > 0) {
+      setSettings(prev => ({
+        ...mockSettings,
+        ...full.settings,
+        ...prev,
+        banners: (Array.isArray(prev?.banners) && prev.banners.length > 0) ? prev.banners : (full.settings.banners || []),
+        website_faqs: (Array.isArray(prev?.website_faqs) && prev.website_faqs.length > 0) ? prev.website_faqs : (full.settings.website_faqs || []),
+        developers: (Array.isArray((prev as any)?.developers) && (prev as any).developers.length > 0) ? (prev as any).developers : (full.settings.developers || []),
+        hero_title_text: prev?.hero_title_text || full.settings.hero_title_text || '',
+        hero_title_subtitle: prev?.hero_title_subtitle || full.settings.hero_title_subtitle || '',
+        about_content: (prev as any)?.about_content || full.settings.about_content || full.settings.about_us || '',
+        contact_content: (prev as any)?.contact_content || full.settings.contact_content || '',
+        privacy_content: (prev as any)?.privacy_content || full.settings.privacy_content || full.settings.privacy_policy || '',
+        terms_content: (prev as any)?.terms_content || full.settings.terms_content || full.settings.terms_conditions || '',
+        disclaimer_text: (prev as any)?.disclaimer_text || full.settings.disclaimer_text || '',
+        dmca_content: (prev as any)?.dmca_content || full.settings.dmca_content || '',
+        ethics_content: (prev as any)?.ethics_content || full.settings.ethics_content || '',
+        notice_content: (prev as any)?.notice_content || full.settings.notice_content || '',
+        responsibility_content: (prev as any)?.responsibility_content || full.settings.responsibility_content || ''
+      }));
+    }
+    if (Array.isArray(full.videos) && full.videos.length > 0) {
+      setVideos(prev => (prev.length >= full.videos.length ? prev : full.videos));
+    }
+  }, []);
+
   const initialFetchDoneRef = React.useRef(false);
 
   useEffect(() => {
@@ -346,24 +380,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initialFetchDoneRef.current = true;
 
     const p = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
-    const isAppOrGateway = p.startsWith('/app/') || p.startsWith('/moreinfo/');
+    const isGateway = p.startsWith('/moreinfo/');
     const isCatalog = p === '/' || p === '/new-apps' || p.startsWith('/categories') || p.startsWith('/category');
     const isNewsRoute = p === '/news' || p.startsWith('/news/');
 
-    // Keep /app/:slug strictly on its 17-app SSR slice (1 target app + 16 similar apps) for peak performance.
-    // Only pre-warm the full static dataset in background on catalog/news routes or if initial apps state is empty.
+    // Pre-warm the full static dataset (apps, news, settings, videos) in background after initial paint
+    // so client-side navigation from any detail page (/app/:slug or /news/:slug) to any other page renders in 0ms.
     let timer: ReturnType<typeof setTimeout> | undefined;
-    if (!isAppOrGateway || apps.length === 0) {
+    if (!isGateway) {
       timer = setTimeout(() => {
-        loadFullStaticDataset().then(full => {
-          if (full?.apps && full.apps.length > 0) {
-            setApps(prev => mergeUniqueApps(prev, full.apps));
-          }
-          if (full?.news && full.news.length > 0) {
-            setNews(prev => mergeUniqueNews(prev, full.news));
-          }
-        }).catch(() => {});
-      }, 200);
+        loadFullStaticDataset().then(hydrateFromStaticDataset).catch(() => {});
+      }, 150);
     }
 
     if (isNewsRoute) {
@@ -376,31 +403,23 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       if (timer) clearTimeout(timer);
     };
-  }, [apps.length, news.length, fetchBackupData]);
+  }, [apps.length, news.length, fetchBackupData, hydrateFromStaticDataset]);
 
-  // Ensure full catalog is loaded if user navigates from an /app/:slug page to catalog listing routes or opens search
+  // Ensure full catalog is loaded if user navigates from an /app/:slug or /news/:slug page to catalog listing routes or opens search
   const routeFetchDoneRef = React.useRef(false);
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const ensureFullCatalogLoaded = () => {
+      loadFullStaticDataset().then(hydrateFromStaticDataset).catch(() => {});
       if (routeFetchDoneRef.current) return;
       if (apps.length < 50) {
         routeFetchDoneRef.current = true;
-        loadFullStaticDataset().then(full => {
-          if (full?.apps && full.apps.length > 0) {
-            setApps(prev => mergeUniqueApps(prev, full.apps));
-          }
-          if (full?.news && full.news.length > 0) {
-            setNews(prev => mergeUniqueNews(prev, full.news));
-          }
-        }).catch(() => {});
         fetchBackupData(true);
       }
     };
     const checkCatalogRoute = () => {
       const p = window.location.pathname.toLowerCase();
-      const isCatalog = p === '/' || p === '/new-apps' || p.startsWith('/categories') || p.startsWith('/category');
-      if (isCatalog) {
+      if (!p.startsWith('/moreinfo/')) {
         ensureFullCatalogLoaded();
       }
     };
@@ -410,7 +429,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       window.removeEventListener('popstate', checkCatalogRoute);
       window.removeEventListener('open-search-modal', ensureFullCatalogLoaded);
     };
-  }, [apps.length, fetchBackupData]);
+  }, [apps.length, fetchBackupData, hydrateFromStaticDataset]);
 
   const resolvedSettings = React.useMemo(() => {
     const envLogo = String((import.meta as any).env?.VITE_SITE_LOGO_URL || '').trim();
@@ -491,6 +510,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     appsSyncedWithServer: true,
     settingsSyncedWithServer: true,
     newsSyncedWithServer: true,
+    videosSyncedWithServer: true,
     isLive,
     refreshAll: fetchBackupData,
     updateAppDetail,

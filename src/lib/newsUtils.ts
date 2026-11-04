@@ -1,3 +1,5 @@
+import { resolveAppSlug } from './slugResolver';
+
 export function calculateReadingTime(text?: string): string {
   if (!text) return '1 min read';
   const plain = text.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
@@ -102,4 +104,119 @@ export function getNextNewsChain(
 
   return result;
 }
+
+function unwrapVal(item: any, field: string): any {
+  if (!item) return '';
+  if (item[field] !== undefined && item[field] !== null && typeof item[field] !== 'object') return item[field];
+  if (item.fields && item.fields[field]) {
+    const f = item.fields[field];
+    return f.stringValue ?? f.integerValue ?? f.doubleValue ?? f.booleanValue ?? '';
+  }
+  return item[field] ?? '';
+}
+
+/**
+ * Canonical resolver to find the related App for a News article.
+ * Shared across SSR (newsRenderer.ts), Payload Optimizer (initialDataOptimizer.ts), and Client (NewsDetailPage.tsx).
+ */
+export function resolveRelatedAppForNews(newsItem: any, apps: any[]): any | null {
+  if (!newsItem || !Array.isArray(apps) || apps.length === 0) return null;
+
+  // 1. Check explicit related_app_id via fuzzy/slug/id resolver
+  const relId = String(unwrapVal(newsItem, 'related_app_id') || '').trim();
+  if (relId) {
+    const resolvedByRelId = resolveAppSlug(relId, apps);
+    if (resolvedByRelId) return resolvedByRelId;
+  }
+
+  // 2. Check newsItem.link if it points to /app/:slug
+  const rawLink = String(unwrapVal(newsItem, 'link') || '').trim();
+  if (rawLink && rawLink.includes('/app/')) {
+    const linkSlug = rawLink.replace(/^.*\/app\//, '').replace(/\/+$/, '').split(/[?#]/)[0].trim();
+    if (linkSlug) {
+      const resolvedByLink = resolveAppSlug(linkSlug, apps);
+      if (resolvedByLink) return resolvedByLink;
+    }
+  }
+
+  // 3. Check newsItem.tags for an exact app slug or name match
+  if (Array.isArray(newsItem.tags)) {
+    for (const tag of newsItem.tags) {
+      const cleanTag = String(tag || '').trim();
+      if (cleanTag) {
+        const resolvedByTag = resolveAppSlug(cleanTag, apps);
+        if (resolvedByTag) return resolvedByTag;
+      }
+    }
+  }
+
+  // 4. Check if news title explicitly mentions a catalog app name (longest match first)
+  const titleLower = String(unwrapVal(newsItem, 'title') || '').toLowerCase().trim();
+  if (titleLower) {
+    const candidates = apps
+      .filter((a: any) => a && a.sync_to_public !== false && String(unwrapVal(a, 'name') || '').trim().length >= 3)
+      .sort((a: any, b: any) => String(unwrapVal(b, 'name') || '').length - String(unwrapVal(a, 'name') || '').length);
+
+    for (const app of candidates) {
+      const appNameLower = String(unwrapVal(app, 'name') || '').toLowerCase().trim();
+      if (appNameLower && titleLower.includes(appNameLower)) {
+        return app;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Canonical resolver to find all related News articles for an App.
+ * Shared across SSR (appDetailsRenderer.ts), Payload Optimizer (initialDataOptimizer.ts), and Client (AppDetails.tsx).
+ */
+export function getRelatedNewsForApp(app: any, allNews: any[]): any[] {
+  if (!app || !Array.isArray(allNews) || allNews.length === 0) return [];
+
+  const appNameLower = String(unwrapVal(app, 'name') || '').toLowerCase().trim();
+  const appIdLower = String(unwrapVal(app, 'id') || '').toLowerCase().trim();
+  const appSlugLower = String(unwrapVal(app, 'slug') || '').toLowerCase().trim();
+
+  return allNews.filter((n: any) => {
+    if (!n || n.sync_to_public === false) return false;
+
+    const nRelId = String(unwrapVal(n, 'related_app_id') || '').trim();
+    if (nRelId) {
+      const nRelLower = nRelId.toLowerCase();
+      if ((appIdLower && nRelLower === appIdLower) || (appSlugLower && nRelLower === appSlugLower)) {
+        return true;
+      }
+      if (resolveAppSlug(nRelId, [app])) {
+        return true;
+      }
+    }
+
+    const nLink = String(unwrapVal(n, 'link') || '').trim();
+    if (nLink && nLink.includes('/app/')) {
+      const linkSlug = nLink.replace(/^.*\/app\//, '').replace(/\/+$/, '').split(/[?#]/)[0].trim();
+      if (linkSlug && (linkSlug.toLowerCase() === appSlugLower || Boolean(resolveAppSlug(linkSlug, [app])))) {
+        return true;
+      }
+    }
+
+    if (!appNameLower) return false;
+    const nTitle = String(unwrapVal(n, 'title') || '').toLowerCase();
+    const nDesc = String(unwrapVal(n, 'description') || '').toLowerCase();
+    if (nTitle.includes(appNameLower) || nDesc.includes(appNameLower)) {
+      return true;
+    }
+
+    if (Array.isArray(n.tags)) {
+      return n.tags.some((t: any) => {
+        const tStr = String(t || '').toLowerCase().trim();
+        return tStr === appNameLower || tStr === appSlugLower || Boolean(resolveAppSlug(tStr, [app]));
+      });
+    }
+
+    return false;
+  });
+}
+
 

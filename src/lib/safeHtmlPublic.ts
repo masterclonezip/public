@@ -46,12 +46,36 @@ function normalizeEmbeddedHtmlHygiene(html: string): string {
       }
       return `<img${updatedAttrs}>`;
     })
-    // Ensure external links open safely in a new tab while preserving SEO attributes
+    // Normalize internal route links to clean root-relative paths and ensure external links open safely in a new tab
     .replace(/<a\b([^>]*)>/gi, (match, attrs) => {
       const attrStr = String(attrs || '');
       const hrefMatch = attrStr.match(/\bhref\s*=\s*(["'])(.*?)\1/i);
       if (!hrefMatch) return match;
+      const quote = hrefMatch[1];
       const href = hrefMatch[2].trim();
+
+      // Check if an absolute URL points to one of our internal platform routes
+      const internalPathMatch = href.match(
+        /^https?:\/\/(?:www\.)?[a-z0-9.-]+\/(app|news|category|categories|new-apps|videos|developers|about|contact|privacy|terms|disclaimer|ethics|notice|responsibility|report-removal|faq|safety)(\/[^\s"'?#]*)?(\?[^\s"'#]*)?(#[^\s"']*)?$/i
+      );
+
+      if (internalPathMatch) {
+        const rawPath = `/${internalPathMatch[1]}${internalPathMatch[2] || ''}`.replace(/\/+$/, '') || '/';
+        const cleanInternalHref = `${rawPath}${internalPathMatch[3] || ''}${internalPathMatch[4] || ''}`;
+        const newAttrs = attrStr
+          .replace(/\bhref\s*=\s*(["'])(.*?)\1/i, `href=${quote}${cleanInternalHref}${quote}`)
+          .replace(/\s*\btarget\s*=\s*(["'])_blank\1/gi, '');
+        return `<a${newAttrs}>`;
+      }
+
+      if (href.startsWith('/') && !href.startsWith('//')) {
+        const cleanRelHref = href.length > 1 ? href.replace(/\/+(?=[?#]|$)/, '') : href;
+        const newAttrs = attrStr
+          .replace(/\bhref\s*=\s*(["'])(.*?)\1/i, `href=${quote}${cleanRelHref}${quote}`)
+          .replace(/\s*\btarget\s*=\s*(["'])_blank\1/gi, '');
+        return `<a${newAttrs}>`;
+      }
+
       if (/^https?:\/\//i.test(href)) {
         let newAttrs = attrStr;
         if (!/\btarget\s*=/i.test(newAttrs)) {

@@ -662,8 +662,13 @@ export async function injectSeoTags(template: string, urlPath: string, hostUrl?:
     .replace(/<script>window\.(?:__SSR_PATH__|__INITIAL_DATA__)[\s\S]*?<\/script>/gi, '')
     .replace(/<style\s+id=["']server-critical-css["']>[\s\S]*?<\/style>/gi, '');
 
-  const criticalCss = getCriticalCss();
-  const headAdditions = `${seoTags}${criticalCss ? '\n' + criticalCss : ''}`;
+  const hasInlinedViteCss = finalHtml.includes('id="vite-inline-css"');
+  const criticalCss = getCriticalCss(hasInlinedViteCss);
+  if (!hasInlinedViteCss && criticalCss.includes('@layer') && criticalCss.length > 4000) {
+    // Strip external stylesheet link when full compiled CSS is already inlined in server-critical-css
+    finalHtml = finalHtml.replace(/<link\b[^>]*rel=["']stylesheet["'][^>]*href=["']\/?assets\/[^"']+\.css["'][^>]*\/?>/gi, '');
+  }
+  const headAdditions = `${seoTags}${criticalCss ? '\n' + criticalCss : ''}\n${initialDataScript}`;
 
   if (finalHtml.includes('<!--__SEO_HEAD__-->')) {
     finalHtml = finalHtml.replace('<!--__SEO_HEAD__-->', headAdditions);
@@ -693,13 +698,8 @@ export async function injectSeoTags(template: string, urlPath: string, hostUrl?:
     }
   }
 
-  // Inject initialDataScript strictly at the bottom of <body> so it NEVER blocks the initial paint of the DOM!
   if (finalHtml.includes('<!--__SEO_INITIAL_DATA__-->')) {
-    finalHtml = finalHtml.replace('<!--__SEO_INITIAL_DATA__-->', initialDataScript);
-  } else if (finalHtml.includes('</body>')) {
-    finalHtml = finalHtml.replace('</body>', `${initialDataScript}\n</body>`);
-  } else {
-    finalHtml += initialDataScript;
+    finalHtml = finalHtml.replace('<!--__SEO_INITIAL_DATA__-->', '');
   }
 
   return { html: finalHtml, isNotFound, canonicalUrl, pageType, title, description };

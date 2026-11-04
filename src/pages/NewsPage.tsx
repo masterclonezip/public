@@ -22,13 +22,14 @@ export default function NewsPage() {
   const contentTopRef = useRef<HTMLDivElement>(null);
   const [copyToast, setCopyToast] = useState(false);
 
-  // Trigger dedicated news fetch only when full news list is not already in memory from SSR
+  // Trigger dedicated news fetch when full news list is not already in memory (e.g. when navigating from an /app/:slug route)
   useEffect(() => {
     const ssrFullLoaded = typeof window !== 'undefined' && Boolean((window as any).__INITIAL_DATA__?._newsFullListLoaded);
-    if (fetchNews && (!mockNews || mockNews.length === 0 || (!ssrFullLoaded && mockNews.length === 8))) {
+    const hasStubNews = Array.isArray(mockNews) && mockNews.some((n: any) => n && !n.description && !n.content && !n.image_url);
+    if (fetchNews && (!mockNews || mockNews.length === 0 || hasStubNews || (!ssrFullLoaded && mockNews.length <= 8))) {
       fetchNews();
     }
-  }, [fetchNews, mockNews?.length]);
+  }, [fetchNews, mockNews]);
 
   // Instantly prefetch the NewsDetailPage chunk into memory
   // so any news card click opens instantaneously with 0ms latency

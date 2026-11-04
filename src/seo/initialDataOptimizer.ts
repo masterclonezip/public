@@ -1,6 +1,7 @@
 import { getField } from './utils';
 import { structureHtmlFragment } from '../lib/safeHtmlPublic';
-import { getNextNewsChain } from '../lib/newsUtils';
+import { computeSimilarApps, checkAppIsNew, checkAppIsHot } from '../lib/slugResolver';
+import { getNextNewsChain, resolveRelatedAppForNews, getRelatedNewsForApp } from '../lib/newsUtils';
 
 export function optimizeInitialDataForRoute(
   data: any,
@@ -89,91 +90,6 @@ export function optimizeInitialDataForRoute(
   const targetAppId = targetApp ? String(getField(targetApp, 'id') || '').toLowerCase().trim() : '';
   const targetNewsSlug = targetNews ? (getField(targetNews, 'slug') || getField(targetNews, 'id'))?.toLowerCase().trim() : null;
 
-function getSimilarAppsForApp(targetApp: any, baseApps: any[]): { similarApps: any[]; totalCategoryCount: number } {
-  const checkAppIsNew = (item: any): boolean => {
-    if (!item) return false;
-    if (item.is_new === true || item.is_new === 'true' || item.is_new === 1) return true;
-    if (item.isNew === true || item.isNew === 'true' || item.isNew === 1) return true;
-    const isNewVal = String(getField(item, 'is_new', '')).trim().toLowerCase();
-    if (isNewVal === 'true' || isNewVal === '1') return true;
-    const badge = String(getField(item, 'badge', '')).trim().toLowerCase();
-    return badge === 'new' || badge === 'hot';
-  };
-
-  const targetAppSlug = (getField(targetApp, 'slug') || getField(targetApp, 'id') || '').toLowerCase().trim();
-  const targetAppId = String(getField(targetApp, 'id') || '').toLowerCase().trim();
-  const rawCat = getField(targetApp, 'category', 'Card Game');
-  const specificCategory = rawCat ? rawCat.split(',')[0]?.trim() || '' : '';
-  const currentCatLower = (specificCategory && !['all apps', 'all', 'apps', 'general'].includes(specificCategory.toLowerCase()))
-    ? specificCategory.toLowerCase()
-    : 'all apps';
-  const isAll = currentCatLower === 'all apps';
-
-  const newApps: any[] = [];
-  const regularApps: any[] = [];
-  let totalCategoryCount = 0;
-
-  for (let i = 0; i < baseApps.length; i++) {
-    const a = baseApps[i];
-    if (!a || a.sync_to_public === false || a.is_Safety_alert === true || a.status === 'flagged') continue;
-
-    const aSlug = (getField(a, 'slug') || '').toLowerCase().trim();
-    const aId = String(getField(a, 'id') || '').toLowerCase().trim();
-    const isCurrent = (targetAppSlug && (aSlug === targetAppSlug || aId === targetAppSlug)) ||
-                      (targetAppId && (aId === targetAppId || aSlug === targetAppId));
-
-    const aCat = (getField(a, 'category', '') || '').toLowerCase();
-    const matchesCategory = isAll || aCat.includes(currentCatLower) || currentCatLower.includes(aCat);
-
-    if (matchesCategory) {
-      totalCategoryCount++;
-      if (!isCurrent) {
-        if (checkAppIsNew(a)) {
-          newApps.push(a);
-        } else {
-          regularApps.push(a);
-        }
-      }
-    }
-  }
-
-  newApps.sort((a: any, b: any) => (Number(getField(a, 'serial_number')) || 999999) - (Number(getField(b, 'serial_number')) || 999999));
-  regularApps.sort((a: any, b: any) => (Number(getField(a, 'serial_number')) || 999999) - (Number(getField(b, 'serial_number')) || 999999));
-
-  const maxCount = 16;
-  const strSeed = String(targetAppSlug || targetAppId || '');
-  let seedHash = 0;
-  for (let i = 0; i < strSeed.length; i++) seedHash = ((seedHash << 5) - seedHash) + strSeed.charCodeAt(i);
-  const absSeed = Math.abs(seedHash);
-
-  const maxNewSlots = Math.min(newApps.length, 6);
-  const pinnedNew: any[] = [];
-  if (maxNewSlots > 0 && newApps.length > 0) {
-    const newStart = absSeed % newApps.length;
-    for (let s = 0; s < maxNewSlots; s++) {
-      pinnedNew.push(newApps[(newStart + s) % newApps.length]);
-    }
-  }
-  const remainingSlots = maxCount - pinnedNew.length;
-
-  const pickedRegular: any[] = [];
-  if (remainingSlots > 0 && regularApps.length > 0) {
-    let startIndex = absSeed % regularApps.length;
-    const currSerial = Number(getField(targetApp, 'serial_number'));
-    if (!isNaN(currSerial) && currSerial > 0) {
-      const nextIdx = regularApps.findIndex((a: any) => (Number(getField(a, 'serial_number')) || 0) > currSerial);
-      if (nextIdx !== -1) startIndex = nextIdx;
-    }
-
-    const countToPick = Math.min(remainingSlots, regularApps.length);
-    for (let step = 0; step < countToPick; step++) {
-      pickedRegular.push(regularApps[(startIndex + step) % regularApps.length]);
-    }
-  }
-
-  return { similarApps: [...pinnedNew, ...pickedRegular], totalCategoryCount };
-}
-
   // Optimized Apps Payload:
   // - If on an App Details page (/app/:slug): Include ONLY the 1 target app (_isFullApp: true) plus the up to 16 similar apps (_isTrimmed: true) rendered in the carousel (max 17 apps total).
   // - On News Detail or News Index pages: Carry ultra-lean card fields.
@@ -182,7 +98,7 @@ function getSimilarAppsForApp(targetApp: any, baseApps: any[]): { similarApps: a
   let optimizedApps: any[] = [];
 
   if (isAppDetailPage && targetApp) {
-    const { similarApps: similarAppsList, totalCategoryCount } = getSimilarAppsForApp(targetApp, baseApps);
+    const { similarApps: similarAppsList, totalCategoryCount } = computeSimilarApps(targetApp, baseApps, 16);
 
     const structuredFaqs = Array.isArray(targetApp.faqs)
       ? targetApp.faqs.map((f: any) => f && typeof f === 'object' ? {
@@ -238,8 +154,8 @@ function getSimilarAppsForApp(targetApp: any, baseApps: any[]): { similarApps: a
       video_url: targetApp.video_url || '',
       serial_number: targetApp.serial_number !== undefined ? Number(targetApp.serial_number) : 0,
       is_featured: Boolean(targetApp.is_featured),
-      is_new: Boolean(targetApp.is_new),
-      is_hot: Boolean(targetApp.is_hot),
+      is_new: checkAppIsNew(targetApp),
+      is_hot: checkAppIsHot(targetApp),
       is_top_chart: Boolean(targetApp.is_top_chart),
       top_chart_category: targetApp.top_chart_category || '',
       publish_date: targetApp.publish_date || '',
@@ -270,30 +186,24 @@ function getSimilarAppsForApp(targetApp: any, baseApps: any[]): { similarApps: a
         file_size: app.file_size || '45 MB',
         rating: Number(app.rating) || 4.5,
         serial_number: app.serial_number !== undefined ? Number(app.serial_number) : 0,
-        is_new: Boolean(app.is_new),
-        is_hot: Boolean(app.is_hot),
+        is_new: checkAppIsNew(app),
+        is_hot: checkAppIsHot(app),
         popular: Boolean(app.popular),
         active: app.active !== false,
         has_secure_link: hasSimSecureLink,
         link_configured: hasSimSecureLink,
         _similarOrder: idx,
+        _similarForSlug: targetAppSlug || '',
         _isTrimmed: true
       };
     });
 
     optimizedApps = [fullTargetApp, ...trimmedSimilar];
   } else if (isNewsDetailPage && targetNews) {
-    let newsRelatedApp: any = null;
-    const relId = getField(targetNews, 'related_app_id');
-    if (relId && Array.isArray(baseApps)) {
-      newsRelatedApp = baseApps.find((a: any) => (getField(a, 'id') || '').toLowerCase() === String(relId).toLowerCase() || (getField(a, 'slug') || '').toLowerCase() === String(relId).toLowerCase());
-    }
-    if (!newsRelatedApp && getField(targetNews, 'link') && Array.isArray(baseApps)) {
-      const linkSlug = getField(targetNews, 'link').replace(/^.*\/app\//, '').replace(/\/$/, '').split(/[?#]/)[0].toLowerCase();
-      if (linkSlug) {
-        newsRelatedApp = baseApps.find((a: any) => (getField(a, 'slug') || '').toLowerCase() === linkSlug || (getField(a, 'id') || '').toLowerCase() === linkSlug);
-      }
-    }
+    const rawNewsForChain = (Array.isArray(data.news) ? data.news : (Array.isArray(data.mockNews) ? data.mockNews : []))
+      .filter((item: any) => item && item.sync_to_public !== false);
+    const chainKey = (targetNewsSlug || getField(targetNews, 'slug') || getField(targetNews, 'id') || '').toLowerCase().trim();
+    const chainNewsItems = [targetNews, ...getNextNewsChain(chainKey, rawNewsForChain, 6)];
 
     const trimNewsApp = (app: any) => {
       if (!app) return null;
@@ -315,8 +225,8 @@ function getSimilarAppsForApp(targetApp: any, baseApps: any[]): { similarApps: a
         file_size: app.file_size || '45 MB',
         rating: Number(app.rating) || 4.5,
         serial_number: app.serial_number !== undefined ? Number(app.serial_number) : 0,
-        is_new: Boolean(app.is_new),
-        is_hot: Boolean(app.is_hot),
+        is_new: checkAppIsNew(app),
+        is_hot: checkAppIsHot(app),
         popular: Boolean(app.popular),
         active: app.active !== false,
         has_secure_link: hasSimSecureLink,
@@ -325,7 +235,21 @@ function getSimilarAppsForApp(targetApp: any, baseApps: any[]): { similarApps: a
       };
     };
 
-    optimizedApps = newsRelatedApp ? [trimNewsApp(newsRelatedApp)].filter(Boolean) : [];
+    const seenAppKeys = new Set<string>();
+    const collectedNewsApps: any[] = [];
+    for (const nItem of chainNewsItems) {
+      const relApp = resolveRelatedAppForNews(nItem, baseApps);
+      if (relApp) {
+        const key = String(getField(relApp, 'slug') || getField(relApp, 'id') || '').toLowerCase().trim();
+        if (key && !seenAppKeys.has(key)) {
+          seenAppKeys.add(key);
+          const trimmed = trimNewsApp(relApp);
+          if (trimmed) collectedNewsApps.push(trimmed);
+        }
+      }
+    }
+
+    optimizedApps = collectedNewsApps;
   } else {
     optimizedApps = baseApps.map((app: any) => {
       if (!app || app.sync_to_public === false) return null;
@@ -538,25 +462,14 @@ function getSimilarAppsForApp(targetApp: any, baseApps: any[]): { similarApps: a
     const sliceLimit = isHomePage ? 8 : rawNews.length;
     optimizedNews = rawNews.slice(0, sliceLimit).map((item: any) => mapFullNewsItem(item));
   } else if (isAppDetailPage && targetApp) {
-    const appNameLower = String(getField(targetApp, 'name') || '').toLowerCase().trim();
-    const appIdStr = String(getField(targetApp, 'id') || '');
-    optimizedNews = rawNews
-      .filter((n: any) => {
-        if (appIdStr && n.related_app_id === appIdStr) return true;
-        if (!appNameLower) return false;
-        return (
-          n.title?.toLowerCase().includes(appNameLower) ||
-          n.description?.toLowerCase().includes(appNameLower) ||
-          (Array.isArray(n.tags) && n.tags.some((t: string) => String(t).toLowerCase() === appNameLower))
-        );
-      })
-      .map((item: any) => ({
-        id: item.id,
-        slug: item.slug,
-        title: item.title,
-        related_app_id: item.related_app_id || '',
-        tags: Array.isArray(item.tags) ? item.tags : []
-      }));
+    optimizedNews = getRelatedNewsForApp(targetApp, rawNews).map((item: any) => ({
+      id: item.id,
+      slug: item.slug,
+      title: item.title,
+      link: item.link || '',
+      related_app_id: item.related_app_id || '',
+      tags: Array.isArray(item.tags) ? item.tags : []
+    }));
   }
 
   // Optimized Videos: Omit on App Details and News Detail pages to keep initial HTML and JSON.parse ultra-light
@@ -569,14 +482,21 @@ function getSimilarAppsForApp(targetApp: any, baseApps: any[]): { similarApps: a
       id: item.id,
       slug: item.slug,
       title: item.title,
+      description: item.description || item.seo_description || item.meta_description || '',
       seo_title: item.seo_title || '',
       seo_description: item.seo_description || '',
       meta_description: item.meta_description || '',
       og_image_url: item.og_image_url || '',
       thumbnail_url: item.thumbnail_url || '',
-      video_url: item.video_url || '',
+      video_url: item.video_url || item.youtube_url || item.url || '',
+      youtube_url: item.youtube_url || item.video_url || item.url || '',
+      url: item.url || item.youtube_url || item.video_url || '',
       duration: item.duration || '',
-      category: item.category || ''
+      category: item.category || '',
+      app_slug: item.app_slug || '',
+      views: item.views || '',
+      created_at: item.created_at || item.date || '',
+      date: item.date || item.created_at || ''
     };
   }).filter(Boolean);
 

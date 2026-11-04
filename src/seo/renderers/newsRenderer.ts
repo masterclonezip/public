@@ -1,6 +1,6 @@
 import { getField, optimizeImageUrl } from '../utils';
 import { escapeHtml, sanitizeHtml } from './common';
-import { formatNewsDate, calculateReadingTime, getNextNewsChain, getPlainTextSnippet } from '../../lib/newsUtils';
+import { formatNewsDate, calculateReadingTime, getNextNewsChain, getPlainTextSnippet, resolveRelatedAppForNews } from '../../lib/newsUtils';
 
 const RICH_HTML_CONTENT_STYLE = `
   rich-html-boundary w-full text-sm sm:text-base text-zinc-800 dark:text-zinc-200 leading-relaxed
@@ -233,20 +233,9 @@ export function renderNewsDetail(slug: string, news: any[], _settings: any, apps
   // Calculate estimated reading time identically on SSR and client
   const readingTime = calculateReadingTime(rawContent);
 
-  // Find related app only if explicitly linked by related_app_id or link
-  let relatedApp: any = null;
-  const relId = getField(item, 'related_app_id');
-  if (relId && Array.isArray(apps)) {
-    const relLower = String(relId).toLowerCase().trim();
-    relatedApp = apps.find(a => (getField(a, 'id') || '').toLowerCase().trim() === relLower || (getField(a, 'slug') || '').toLowerCase().trim() === relLower);
-  }
+  // Find related app via shared canonical resolver
+  const relatedApp = resolveRelatedAppForNews(item, apps);
   const rawLink = getField(item, 'link') ? String(getField(item, 'link')).trim() : '';
-  if (!relatedApp && rawLink && Array.isArray(apps)) {
-    const linkSlug = rawLink.replace(/^.*\/app\//, '').replace(/\/$/, '').split(/[?#]/)[0].toLowerCase().trim();
-    if (linkSlug) {
-      relatedApp = apps.find(a => (getField(a, 'slug') || '').toLowerCase().trim() === linkSlug || (getField(a, 'id') || '').toLowerCase().trim() === linkSlug);
-    }
-  }
 
   let downloadTarget: { url: string; isInternal: boolean } | null = null;
   if (relatedApp) {

@@ -238,7 +238,7 @@ export function getAllSiteIconUrls(settings?: any, origin = getDefaultOrigin()):
     favicon48: absFavicon ? getSizedLogoUrl(absFavicon, 48, 'png', 'c_pad') : '/favicon.ico',
     favicon32: absFavicon ? getSizedLogoUrl(absFavicon, 32, 'png', 'c_pad') : '/favicon-32x32.png',
     favicon16: absFavicon ? getSizedLogoUrl(absFavicon, 16, 'png', 'c_pad') : '/favicon-16x16.png',
-    faviconIco: absFavicon ? getSizedLogoUrl(absFavicon, 48, 'png', 'c_pad') : '/favicon.ico',
+    faviconIco: absFavicon ? getSizedLogoUrl(absFavicon, 192, 'png', 'c_pad') : '/favicon.ico',
     ogBanner1200: absLogo ? getOgImageUrl(absLogo, origin) : ''
   };
 }

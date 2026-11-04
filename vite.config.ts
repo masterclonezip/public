@@ -986,7 +986,7 @@ export default defineConfig(({mode}) => {
       minify: 'esbuild',
       cssMinify: true,
       sourcemap: false,
-      cssCodeSplit: true,
+      cssCodeSplit: false,
       modulePreload: {
         polyfill: false
       },

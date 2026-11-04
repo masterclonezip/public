@@ -59,7 +59,9 @@ function sendXmlOrGzip(req: Request, res: Response, rawXml: string, maxAgeSecond
   res.send(xml);
 }
 
-// Dynamic Root Brand Icon & Logo Resolution for Browsers, Googlebot Favicon Crawler, and Apple Devices
+const iconBufferCache = new Map<string, { buffer: Buffer; contentType: string; expiresAt: number }>();
+
+// Dynamic Root Brand Icon & Logo Resolution for Browsers, XML Sitemap Viewers, Googlebot Favicon Crawler, and Apple Devices
 seoRouter.get(
   [
     '/favicon.ico',
@@ -76,6 +78,8 @@ seoRouter.get(
   ],
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Timing-Allow-Origin', '*');
       const host = resolveHost(req);
       const data = await getLiveData();
       const settings = data?.settings || {};
@@ -91,8 +95,10 @@ seoRouter.get(
         targetUrl = icons.favicon16;
       } else if (p === '/favicon-32x32.png') {
         targetUrl = icons.favicon32;
-      } else if (p === '/favicon.ico' || p === '/favicon.svg' || p === '/favicon.png' || p === '/favicon-48x48.png') {
-        targetUrl = icons.favicon48 || icons.faviconIco;
+      } else if (p === '/favicon-48x48.png') {
+        targetUrl = icons.favicon48;
+      } else if (p === '/favicon.ico' || p === '/favicon.svg' || p === '/favicon.png') {
+        targetUrl = icons.faviconIco || icons.pwa192 || icons.favicon48;
       } else if (p === '/apple-touch-icon.png' || p === '/apple-touch-icon-precomposed.png') {
         targetUrl = icons.appleTouch180;
       } else if (p === '/android-chrome-192x192.png') {
@@ -100,11 +106,36 @@ seoRouter.get(
       } else if (p === '/android-chrome-512x512.png') {
         targetUrl = icons.pwa512;
       } else if (p === '/logo.png') {
-        targetUrl = icons.masterLogo || icons.searchLogo512;
+        targetUrl = icons.searchLogo512 || icons.masterLogo;
       }
 
       // Avoid self-redirect loops when targetUrl points back to the same local static path
       if (targetUrl && targetUrl !== req.path && !targetUrl.endsWith(req.path)) {
+        if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
+          const cached = iconBufferCache.get(targetUrl);
+          if (cached && cached.expiresAt > Date.now()) {
+            res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400');
+            res.setHeader('Content-Type', cached.contentType);
+            return res.status(200).send(cached.buffer);
+          }
+          try {
+            const upstream = await fetch(targetUrl, { signal: AbortSignal.timeout(4000) });
+            if (upstream.ok) {
+              const buf = Buffer.from(await upstream.arrayBuffer());
+              if (buf.length > 64) {
+                const ct = upstream.headers.get('content-type') || 'image/png';
+                iconBufferCache.set(targetUrl, {
+                  buffer: buf,
+                  contentType: ct,
+                  expiresAt: Date.now() + 3600 * 1000
+                });
+                res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400');
+                res.setHeader('Content-Type', ct);
+                return res.status(200).send(buf);
+              }
+            }
+          } catch (_) {}
+        }
         res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600');
         return res.redirect(302, targetUrl);
       }

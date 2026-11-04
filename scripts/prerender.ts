@@ -4,9 +4,10 @@ import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
 import { injectSeoTags, fetchStoreData, cleanRootContainer } from '../src/seoHelper';
-import { generateAllSitemaps, normalizeSitemapHost } from '../src/lib/sitemapGenerator';
+import { generateAllSitemaps, normalizeSitemapHost, escapeXml } from '../src/lib/sitemapGenerator';
 import { formatPageTitle } from '../src/lib/seoUtils';
 import { safeEncrypt, safeDecrypt, getAesSecret } from '../src/lib/cryptoUtils';
+import { getAllSiteIconUrls } from '../src/seo/utils';
 
 function decodeCandidateUrl(raw: unknown): string {
   if (!raw || typeof raw !== 'string') return '';
@@ -283,6 +284,67 @@ async function syncStaticDataAndSitemaps() {
         fs.writeFileSync(path.join(publicPath, `${filename}.gz`), gzBuffer);
       } catch (e) {}
     }
+
+    // Sync site.webmanifest, opensearch.xml, and binary brand icons into public/ so static builds and XML sitemaps always serve the real brand logo
+    try {
+      const icons = getAllSiteIconUrls(publicSettings, host);
+      const siteTitle = String(publicSettings?.site_title || process.env.VITE_SITE_NAME || '').trim();
+      const manifestObj = {
+        id: '/',
+        start_url: '/',
+        scope: '/',
+        name: siteTitle,
+        short_name: siteTitle,
+        display: 'standalone',
+        orientation: 'portrait',
+        lang: 'en-IN',
+        icons: [
+          { src: icons.favicon48 || '/favicon-32x32.png', sizes: '48x48', type: 'image/png', purpose: 'any' },
+          { src: icons.favicon96 || '/apple-touch-icon.png', sizes: '96x96', type: 'image/png', purpose: 'any' },
+          { src: icons.favicon144 || '/apple-touch-icon.png', sizes: '144x144', type: 'image/png', purpose: 'any' },
+          { src: icons.android192 || '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+          { src: icons.android512 || '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+        ],
+        theme_color: '#2563eb',
+        background_color: '#ffffff',
+        shortcuts: [{ name: 'News', url: '/news' }]
+      };
+      fs.writeFileSync(path.join(publicPath, 'site.webmanifest'), JSON.stringify(manifestObj, null, 2), 'utf-8');
+
+      const openSearchTitle = (siteTitle || 'Search').replace(/[<>&'"]/g, '');
+      const openSearchIcons = [
+        icons.favicon16 ? `  <Image width="16" height="16" type="image/png">${escapeXml(icons.favicon16)}</Image>` : '',
+        icons.favicon32 ? `  <Image width="32" height="32" type="image/png">${escapeXml(icons.favicon32)}</Image>` : '',
+        icons.favicon48 ? `  <Image width="48" height="48" type="image/png">${escapeXml(icons.favicon48)}</Image>` : '',
+        icons.searchLogo512 ? `  <Image width="512" height="512" type="image/png">${escapeXml(icons.searchLogo512)}</Image>` : ''
+      ].filter(Boolean).join('\n');
+      const openSearchXml = `<?xml version="1.0" encoding="UTF-8"?>\n<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">\n  <ShortName>${openSearchTitle}</ShortName>\n  <Description>Search applications</Description>\n  <InputEncoding>UTF-8</InputEncoding>\n${openSearchIcons}\n  <Url type="text/html" template="${host}/?s={searchTerms}"/>\n</OpenSearchDescription>\n`;
+      fs.writeFileSync(path.join(publicPath, 'opensearch.xml'), openSearchXml, 'utf-8');
+
+      // Download and materialize remote Cloudinary/brand icons into public/ root icon files so /favicon.ico on XML sitemaps renders the real logo
+      const iconDownloadTargets: Array<{ url: string; files: string[] }> = [
+        { url: icons.favicon16, files: ['favicon-16x16.png'] },
+        { url: icons.favicon32, files: ['favicon-32x32.png'] },
+        { url: icons.favicon48, files: ['favicon-48x48.png'] },
+        { url: icons.appleTouch180, files: ['apple-touch-icon.png', 'apple-touch-icon-precomposed.png'] },
+        { url: icons.pwa192, files: ['android-chrome-192x192.png', 'favicon.ico', 'favicon.png'] },
+        { url: icons.pwa512, files: ['android-chrome-512x512.png', 'logo.png'] }
+      ];
+      await Promise.all(
+        iconDownloadTargets.map(async ({ url, files }) => {
+          if (!url || (!url.startsWith('https://') && !url.startsWith('http://'))) return;
+          try {
+            const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+            if (!res.ok) return;
+            const buf = Buffer.from(await res.arrayBuffer());
+            if (buf.length < 100) return;
+            for (const fName of files) {
+              fs.writeFileSync(path.join(publicPath, fName), buf);
+            }
+          } catch (_) {}
+        })
+      );
+    } catch (_) {}
   }
 
   return { ...data, apps: publicApps, news: publicNews, settings: publicSettings };
@@ -315,13 +377,16 @@ async function prerender() {
 
     // Inline compiled Vite CSS directly into <head> to eliminate render-blocking CSS network round-trips and prevent FOUC (A1, A2, A10)
     originalTemplate = originalTemplate.replace(
-      /<link\s+rel=["']stylesheet["'][^>]*href=["']\/?assets\/([^"']+\.css)["'][^>]*\/?>/gi,
-      (fullMatch, cssFileName) => {
+      /<link\b[^>]*rel=["']stylesheet["'][^>]*>/gi,
+      (fullMatch) => {
         try {
-          const cssFilePath = path.join(distPath, 'assets', cssFileName);
-          if (fs.existsSync(cssFilePath)) {
-            const cssContent = fs.readFileSync(cssFilePath, 'utf-8');
-            return `<style id="vite-inline-css">${cssContent}</style>`;
+          const hrefMatch = fullMatch.match(/href=["']\/?assets\/([^"']+\.css)["']/i);
+          if (hrefMatch && hrefMatch[1]) {
+            const cssFilePath = path.join(distPath, 'assets', hrefMatch[1]);
+            if (fs.existsSync(cssFilePath)) {
+              const cssContent = fs.readFileSync(cssFilePath, 'utf-8');
+              return `<style id="vite-inline-css">${cssContent}</style>`;
+            }
           }
         } catch (_) {}
         return fullMatch;
@@ -529,6 +594,30 @@ async function prerender() {
     }
     if (fs.existsSync(headersSrc)) {
       fs.copyFileSync(headersSrc, path.join(distPath, '_headers'));
+    }
+
+    // 5. Copy updated site.webmanifest, opensearch.xml, and materialized brand icon files from public/ to dist/
+    const syncedStaticAssets = [
+      'site.webmanifest',
+      'opensearch.xml',
+      'favicon.ico',
+      'favicon.png',
+      'favicon-16x16.png',
+      'favicon-32x32.png',
+      'favicon-48x48.png',
+      'apple-touch-icon.png',
+      'apple-touch-icon-precomposed.png',
+      'android-chrome-192x192.png',
+      'android-chrome-512x512.png',
+      'logo.png'
+    ];
+    for (const assetName of syncedStaticAssets) {
+      const srcAsset = path.join(publicPath, assetName);
+      if (fs.existsSync(srcAsset)) {
+        try {
+          fs.copyFileSync(srcAsset, path.join(distPath, assetName));
+        } catch (_) {}
+      }
     }
 
     console.log('Successfully injected static HTML, metadata, and Cloudflare routing into dist.');

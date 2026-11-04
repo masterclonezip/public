@@ -3,5 +3,9 @@
   <ShortName>Search</ShortName>
   <Description>Search applications</Description>
   <InputEncoding>UTF-8</InputEncoding>
-  <Url type="text/html" template="/?s={searchTerms}"/>
+  <Image width="16" height="16" type="image/png">/favicon-16x16.png</Image>
+  <Image width="32" height="32" type="image/png">/favicon-32x32.png</Image>
+  <Image width="48" height="48" type="image/png">/favicon.ico</Image>
+  <Image width="512" height="512" type="image/png">http://localhost:3000/logo.png</Image>
+  <Url type="text/html" template="http://localhost:3000/?s={searchTerms}"/>
 </OpenSearchDescription>

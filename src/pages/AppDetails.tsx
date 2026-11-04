@@ -13,7 +13,8 @@ import { useLiveAppStats } from '../hooks/useReviews';
 import { getCachedLiveAppStats } from '../lib/communityFirebase';
 
 import { mockApps as staticMockApps, loadFullStaticDataset } from '../lib/lightFallback';
-import { resolveAppSlug } from '../lib/slugResolver';
+import { resolveAppSlug, computeSimilarApps, extractPrimaryCategory, checkAppIsNew, checkAppIsHot } from '../lib/slugResolver';
+import { getRelatedNewsForApp } from '../lib/newsUtils';
 import { getPrefetchedApp } from '../lib/preloadHelper';
 import AppDetailsSkeleton from '../components/public/AppDetailsSkeleton';
 import AppHeader from '../components/public/AppHeader';
@@ -146,9 +147,7 @@ export default function AppDetails() {
   const [shareToast, setShareToast] = useState(false);
 
   const specificCategory = useMemo(() => {
-    if (!app?.category) return 'All Apps';
-    const first = app.category.split(',')[0]?.trim() || '';
-    return (first && !['all apps', 'all', 'apps', 'general'].includes(first.toLowerCase())) ? first : 'All Apps';
+    return extractPrimaryCategory(app?.category);
   }, [app?.category]);
 
   // Single-pass high-performance category metrics and balanced circular internal linking
@@ -158,20 +157,21 @@ export default function AppDetails() {
     }
 
     const appId = String(app.id || '');
-    const appSlug = String(app.slug || '').toLowerCase();
+    const appSlug = String(app.slug || '').toLowerCase().trim();
 
-    // If mockApps is the pre-computed 17-app SSR slice (1 target app + up to 16 pre-ordered similar apps),
-    // preserve the exact SSR order so client hydration matches SSR 1:1 without double-rotating.
+    // If mockApps is strictly the pre-computed 17-app SSR slice for THIS exact app
+    // (where every non-current item carries _similarOrder for this appSlug),
+    // preserve the exact SSR order so client hydration matches SSR 1:1.
     const nonCurrentInSlice = mockApps.filter((a: any) => {
       if (!a || a.sync_to_public === false || a.is_Safety_alert === true || a.status === 'flagged') return false;
-      const isCurrent = String(a.id) === appId || (a.slug && a.slug.toLowerCase() === appSlug);
+      const isCurrent = String(a.id) === appId || (a.slug && a.slug.toLowerCase().trim() === appSlug);
       return !isCurrent;
     });
 
     if (
       mockApps.length <= 17 &&
       nonCurrentInSlice.length > 0 &&
-      nonCurrentInSlice.every((a: any) => typeof a._similarOrder === 'number' || a._isTrimmed === true)
+      nonCurrentInSlice.every((a: any) => typeof a._similarOrder === 'number' && (!a._similarForSlug || a._similarForSlug === appSlug))
     ) {
       const ordered = [...nonCurrentInSlice].sort(
         (a: any, b: any) => (typeof a._similarOrder === 'number' ? a._similarOrder : 0) - (typeof b._similarOrder === 'number' ? b._similarOrder : 0)
@@ -181,101 +181,27 @@ export default function AppDetails() {
         name: a.name,
         slug: a.slug,
         icon_url: a.icon_url,
-        is_new: Boolean(a.is_new === true || a.is_new === 'true' || a.isNew || a.badge?.toLowerCase() === 'new'),
-        is_hot: Boolean(a.is_hot === true || a.is_hot === 'true' || a.isHot || a.badge?.toLowerCase() === 'hot'),
+        is_new: checkAppIsNew(a),
+        is_hot: checkAppIsHot(a),
         serial_number: a.serial_number
       }));
       const precomputedCatTotal = Number((app as any)._totalCategoryCount) || (mappedSlice.length + 1);
       return { relatedApps: mappedSlice, totalCategoryAppsCount: precomputedCatTotal };
     }
 
-    const currentCatLower = specificCategory.toLowerCase();
-    const isAll = currentCatLower === 'all apps';
-
-    const newApps: any[] = [];
-    const regularApps: any[] = [];
-    let totalCatCount = 0;
-
-    for (let i = 0; i < mockApps.length; i++) {
-      const a = mockApps[i] as any;
-      if (!a || a.sync_to_public === false || a.is_Safety_alert === true || a.status === 'flagged') continue;
-
-      const isCurrent = String(a.id) === appId || (a.slug && a.slug.toLowerCase() === appSlug);
-      const aCat = (a.category || '').toLowerCase();
-      const matchesCategory = isAll || aCat.includes(currentCatLower) || currentCatLower.includes(aCat);
-
-      if (matchesCategory) {
-        totalCatCount++;
-        if (!isCurrent) {
-          const rawItem = a as any;
-          const badgeStr = typeof rawItem.badge === 'string' ? rawItem.badge.trim().toUpperCase() : '';
-          const tagsArr = Array.isArray(rawItem.tags) ? rawItem.tags : [];
-          const isNew = Boolean(
-            rawItem.is_new === true || rawItem.is_new === 'true' || rawItem.is_new === 1 ||
-            rawItem.isNew === true || rawItem.isNew === 'true' || rawItem.isNew === 1 ||
-            badgeStr === 'NEW' || badgeStr.includes('NEW') ||
-            tagsArr.some((t: any) => String(t).toUpperCase().includes('NEW'))
-          );
-          if (isNew) {
-            newApps.push(a);
-          } else {
-            regularApps.push(a);
-          }
-        }
-      }
-    }
-
-    // 1. Sort new apps strictly by serial_number ascending
-    newApps.sort((a, b) => (Number(a.serial_number) || 999999) - (Number(b.serial_number) || 999999));
-
-    // 2. Sort regular apps strictly by serial_number ascending
-    regularApps.sort((a, b) => (Number(a.serial_number) || 999999) - (Number(b.serial_number) || 999999));
-
-    const maxCount = 16;
-    const strSeed = String(app.slug || app.id || '');
-    let seedHash = 0;
-    for (let i = 0; i < strSeed.length; i++) seedHash = ((seedHash << 5) - seedHash) + strSeed.charCodeAt(i);
-    const absSeed = Math.abs(seedHash);
-
-    const maxNewSlots = Math.min(newApps.length, 6);
-    const pinnedNew: any[] = [];
-    if (maxNewSlots > 0 && newApps.length > 0) {
-      const newStart = absSeed % newApps.length;
-      for (let s = 0; s < maxNewSlots; s++) {
-        pinnedNew.push(newApps[(newStart + s) % newApps.length]);
-      }
-    }
-    const remainingSlots = maxCount - pinnedNew.length;
-
-    // Balanced Circular Internal Linking:
-    // Stagger regular apps circularly starting right after current app's position
-    const pickedRegular: any[] = [];
-    if (remainingSlots > 0 && regularApps.length > 0) {
-      let startIndex = absSeed % regularApps.length;
-      const currSerial = Number(app.serial_number);
-      if (!isNaN(currSerial) && currSerial > 0) {
-        const nextIdx = regularApps.findIndex(a => (Number(a.serial_number) || 0) > currSerial);
-        if (nextIdx !== -1) startIndex = nextIdx;
-      }
-
-      const countToPick = Math.min(remainingSlots, regularApps.length);
-      for (let step = 0; step < countToPick; step++) {
-        pickedRegular.push(regularApps[(startIndex + step) % regularApps.length]);
-      }
-    }
-
-    const mapped = [...pinnedNew, ...pickedRegular].map((a: any) => ({
+    const { similarApps, totalCategoryCount } = computeSimilarApps(app, mockApps, 16);
+    const mapped = similarApps.map((a: any) => ({
       id: a.id,
       name: a.name,
       slug: a.slug,
       icon_url: a.icon_url,
-      is_new: Boolean(a.is_new === true || a.is_new === 'true' || a.isNew || a.badge?.toLowerCase() === 'new'),
-      is_hot: Boolean(a.is_hot === true || a.is_hot === 'true' || a.isHot || a.badge?.toLowerCase() === 'hot'),
+      is_new: checkAppIsNew(a),
+      is_hot: checkAppIsHot(a),
       serial_number: a.serial_number
     }));
 
-    return { relatedApps: mapped, totalCategoryAppsCount: totalCatCount };
-  }, [mockApps, app, specificCategory]);
+    return { relatedApps: mapped, totalCategoryAppsCount: totalCategoryCount };
+  }, [mockApps, app]);
 
   useEffect(() => {
     if (!app?.is_coming_soon || !app?.publish_date) {
@@ -498,24 +424,11 @@ export default function AppDetails() {
   };
 
   const relatedNewsArticles = useMemo(() => {
-    if (!mockNews || !Array.isArray(mockNews)) return [];
-    const nameLower = (app?.name || '').toLowerCase().trim();
-    const appId = app?.id;
-    const appSlugLower = (app?.slug || '').toLowerCase().trim();
-    return mockNews.filter(n => {
-      if (!n || n.sync_to_public === false) return false;
-      if (appId && (n.related_app_id === appId || String(n.related_app_id).toLowerCase() === appSlugLower)) return true;
-      if (!nameLower) return false;
-      return (
-        n.title?.toLowerCase().includes(nameLower) ||
-        n.description?.toLowerCase().includes(nameLower) ||
-        (Array.isArray(n.tags) && n.tags.some((t: string) => t.toLowerCase() === nameLower))
-      );
-    });
-  }, [mockNews, app?.name, app?.id, app?.slug]);
+    return getRelatedNewsForApp(app, mockNews);
+  }, [mockNews, app]);
 
   const relatedNewsCount = relatedNewsArticles.length;
-  const primaryNewsSlug = relatedNewsArticles.length > 0 ? relatedNewsArticles[0]?.slug : undefined;
+  const primaryNewsSlug = relatedNewsArticles.length > 0 ? (relatedNewsArticles[0]?.slug || relatedNewsArticles[0]?.id) : undefined;
 
   return (
     <div className="w-full">

@@ -1,5 +1,6 @@
 import { getField, optimizeImageUrl, stripHtml, cleanFaqQuestion, generateNaturalStarDistribution } from '../utils';
-import { resolveAppSlug } from '../../lib/slugResolver';
+import { resolveAppSlug, computeSimilarApps, checkAppIsNew, checkAppIsHot, extractPrimaryCategory } from '../../lib/slugResolver';
+import { getRelatedNewsForApp } from '../../lib/newsUtils';
 import communityCatalogStats from '../../lib/communityCatalogStats.json';
 import { formatReviewDate } from '../../lib/communityFirebase';
 import { escapeHtml, sanitizeHtml } from './common';
@@ -30,7 +31,7 @@ const RICH_HTML_CONTENT_STYLE = `
   [&_h3]:text-xs sm:[&_h3]:text-lg [&_h3]:font-bold [&_h3]:tracking-tight [&_h3]:text-zinc-900 dark:[&_h3]:text-zinc-100 [&_h3]:mt-3.5 [&_h3]:mb-1.5
   [&_h4]:text-[11px] sm:[&_h4]:text-base [&_h4]:font-semibold [&_h4]:tracking-tight [&_h4]:text-zinc-900 dark:[&_h4]:text-zinc-100 [&_h4]:mt-3 [&_h4]:mb-1
   [&_ul]:my-2.5 [&_ul]:space-y-1 [&_ul]:list-disc [&_ul]:pl-4 xs:[&_ul]:pl-5
-  [&_ol]:my-2.5 [&_ol]:space-y-1 [&_ol]:list-decimal [&_ol]:pl-4 xs:[&_ol]:pl-5
+  [&_ol]:my-2.5 [&_ol]:space-y-1 [&_ol]:list-decimal [&_ol]:pl-4 xs:[&_ul]:pl-5
   [&_li]:leading-relaxed [&_li]:pl-1 [&_li::marker]:text-blue-600 dark:[&_li::marker]:text-blue-400 [&_li::marker]:font-bold
   [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500 [&_blockquote]:pl-3.5 [&_blockquote]:py-1.5 [&_blockquote]:my-3 [&_blockquote]:bg-blue-50/50 dark:[&_blockquote]:bg-blue-950/20 [&_blockquote]:rounded-r-xl [&_blockquote]:italic
 `.trim().replace(/\s+/g, ' ');
@@ -46,23 +47,9 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
   const size = getField(app, 'file_size', 'Variable');
   const developer = getField(app, 'developer', 'Verified Developer');
   const cleanId = String(getField(app, 'id')).toLowerCase().trim();
-  const appIdExact = getField(app, 'id');
 
-  // Compute relatedNewsArticles identically to AppDetails.tsx
-  const nameLower = (name || '').toLowerCase().trim();
-  const relatedNewsArticles = Array.isArray(news)
-    ? news.filter((n: any) => {
-        if (!n || n.sync_to_public === false) return false;
-        const nRelId = getField(n, 'related_app_id');
-        if (nRelId && (nRelId === appIdExact || String(nRelId).toLowerCase() === cleanSlug)) return true;
-        if (!nameLower) return false;
-        return (
-          getField(n, 'title')?.toLowerCase().includes(nameLower) ||
-          getField(n, 'description')?.toLowerCase().includes(nameLower) ||
-          (Array.isArray(n.tags) && n.tags.some((t: string) => String(t).toLowerCase() === nameLower))
-        );
-      })
-    : [];
+  // Compute relatedNewsArticles identically to AppDetails.tsx & initialDataOptimizer.ts
+  const relatedNewsArticles = getRelatedNewsForApp(app, news);
   const relatedNewsCount = relatedNewsArticles.length;
   const primaryNewsSlug = (relatedNewsArticles.length > 0 && (getField(relatedNewsArticles[0], 'slug') || getField(relatedNewsArticles[0], 'id')))
     ? String(getField(relatedNewsArticles[0], 'slug') || getField(relatedNewsArticles[0], 'id')).trim()
@@ -125,7 +112,7 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
   const features = (rawFeatures && stripHtml(rawFeatures).toLowerCase() !== stripHtml(desc).toLowerCase()) ? rawFeatures : '';
 
   // Breadcrumbs category
-  const mainCat = cat.split(',')[0].trim() || 'General';
+  const mainCat = extractPrimaryCategory(cat);
 
   // Safety Advisory Messages
   const hasRed = Boolean(app.red_box_msg && app.red_box_msg.trim() !== '.' && app.red_box_msg.trim() !== '');
@@ -415,81 +402,13 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
     `;
   }
 
-  // 16 Similar Applications: 2-Row Horizontal Scroll Grid (Matching AppSimilarCarousel.tsx)
-  const checkAppIsNew = (item: any): boolean => {
-    if (!item) return false;
-    if (item.is_new === true || item.is_new === 'true' || item.is_new === 1) return true;
-    if (item.isNew === true || item.isNew === 'true' || item.isNew === 1) return true;
-    const isNewVal = String(getField(item, 'is_new', '')).trim().toLowerCase();
-    if (isNewVal === 'true' || isNewVal === '1') return true;
-    const badge = String(getField(item, 'badge', '')).trim().toLowerCase();
-    return badge === 'new' || badge === 'hot';
-  };
-
-  const mainCatClean = (mainCat || 'All Apps').toLowerCase();
-  const isAllCat = mainCatClean === 'all' || mainCatClean === 'all apps';
-
-  const newApps: any[] = [];
-  const regularApps: any[] = [];
-  let totalCatCount = 0;
-
-  for (let i = 0; i < apps.length; i++) {
-    const a = apps[i];
-    if (!a || a.sync_to_public === false || a.is_Safety_alert === true || a.status === 'flagged') continue;
-
-    const aSlug = getField(a, 'slug').toLowerCase();
-    const isCurrent = aSlug === cleanSlug;
-    const aCat = getField(a, 'category', '').toLowerCase();
-    const matches = isAllCat || aCat.includes(mainCatClean) || mainCatClean.includes(aCat);
-
-    if (matches) {
-      totalCatCount++;
-      if (!isCurrent) {
-        if (checkAppIsNew(a)) {
-          newApps.push(a);
-        } else {
-          regularApps.push(a);
-        }
-      }
-    }
-  }
-
-  newApps.sort((a: any, b: any) => (Number(getField(a, 'serial_number')) || 999999) - (Number(getField(b, 'serial_number')) || 999999));
-  regularApps.sort((a: any, b: any) => (Number(getField(a, 'serial_number')) || 999999) - (Number(getField(b, 'serial_number')) || 999999));
-
-  const maxCount = 16;
-  const strSeed = String(cleanSlug || getField(app, 'id') || '');
-  let seedHash = 0;
-  for (let i = 0; i < strSeed.length; i++) seedHash = ((seedHash << 5) - seedHash) + strSeed.charCodeAt(i);
-  const absSeed = Math.abs(seedHash);
-
-  const maxNewSlots = Math.min(newApps.length, 6);
-  const pinnedNew: any[] = [];
-  if (maxNewSlots > 0 && newApps.length > 0) {
-    const newStart = absSeed % newApps.length;
-    for (let s = 0; s < maxNewSlots; s++) {
-      pinnedNew.push(newApps[(newStart + s) % newApps.length]);
-    }
-  }
-  const remainingSlots = maxCount - pinnedNew.length;
-
-  const pickedRegular: any[] = [];
-  if (remainingSlots > 0 && regularApps.length > 0) {
-    let startIndex = absSeed % regularApps.length;
-    const currSerial = Number(getField(app, 'serial_number'));
-    if (!isNaN(currSerial) && currSerial > 0) {
-      const nextIdx = regularApps.findIndex((a: any) => (Number(getField(a, 'serial_number')) || 0) > currSerial);
-      if (nextIdx !== -1) startIndex = nextIdx;
-    }
-
-    const countToPick = Math.min(remainingSlots, regularApps.length);
-    for (let step = 0; step < countToPick; step++) {
-      const idx = (startIndex + step) % regularApps.length;
-      pickedRegular.push(regularApps[idx]);
-    }
-  }
-
-  const displaySimilarApps = [...pinnedNew, ...pickedRegular];
+  // 16 Similar Applications: 2-Row Horizontal Scroll Grid (Matching AppSimilarCarousel.tsx 1:1)
+  const {
+    similarApps: displaySimilarApps,
+    totalCategoryCount: totalCatCount,
+    specificCategory: resolvedSimilarCat
+  } = computeSimilarApps(app, apps, 16);
+  const similarHeaderCat = resolvedSimilarCat || mainCat;
   let recommendedAppsHtml = '';
 
   if (displaySimilarApps.length > 0) {
@@ -499,10 +418,10 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
           <div class="flex items-center gap-2 min-w-0">
             <h2 id="related-apps-heading" class="text-base xs:text-lg sm:text-xl font-bold flex items-center gap-1.5 xs:gap-2 text-zinc-900 dark:text-zinc-100 truncate">
               <span>Similar Applications</span>
-              ${mainCat && mainCat !== 'All Apps' ? `<span class="text-[10px] xs:text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 xs:px-2.5 py-0.5 rounded-full border border-blue-200/50 dark:border-blue-800/50 truncate">${escapeHtml(mainCat)}</span>` : ''}
+              ${similarHeaderCat && similarHeaderCat !== 'All Apps' ? `<span class="text-[10px] xs:text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 xs:px-2.5 py-0.5 rounded-full border border-blue-200/50 dark:border-blue-800/50 truncate">${escapeHtml(similarHeaderCat)}</span>` : ''}
             </h2>
           </div>
-          <a href="/?tab=${encodeURIComponent(mainCat)}" class="inline-flex items-center gap-1.5 px-3 py-1 xs:px-3.5 xs:py-1.5 rounded-full bg-blue-50 hover:bg-blue-100 active:scale-95 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 font-bold text-xs xs:text-xs transition-all border border-blue-200/70 dark:border-blue-800/70 shadow-2xs group shrink-0 no-underline" title="Explore all ${totalCatCount} ${escapeHtml(mainCat)} apps">
+          <a href="/?tab=${encodeURIComponent(similarHeaderCat)}" class="inline-flex items-center gap-1.5 px-3 py-1 xs:px-3.5 xs:py-1.5 rounded-full bg-blue-50 hover:bg-blue-100 active:scale-95 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 font-bold text-xs xs:text-xs transition-all border border-blue-200/70 dark:border-blue-800/70 shadow-2xs group shrink-0 no-underline" title="Explore all ${totalCatCount} ${escapeHtml(similarHeaderCat)} apps">
             <span>View all (${totalCatCount})</span>
             <svg class="w-3 h-3 xs:w-3.5 xs:h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
           </a>
@@ -512,7 +431,7 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
             const simName = getField(sim, 'name');
             const simSlug = getField(sim, 'slug');
             const simIcon = optimizeImageUrl(getField(sim, 'icon_url') || '', 96);
-            const simIsHot = sim.is_hot === true || (sim.is_hot && sim.is_hot.booleanValue === true);
+            const simIsHot = checkAppIsHot(sim);
             const simIsNew = checkAppIsNew(sim);
             const imgSrc = escapeHtml(simIcon);
             return `

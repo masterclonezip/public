@@ -34,13 +34,26 @@ export async function loadFullStaticDataset(): Promise<{
 }> {
   try {
     const mod = await import('./staticData');
+    if (Array.isArray(mod.mockApps) && mod.mockApps.length > 0) {
+      return {
+        apps: mod.mockApps,
+        settings: mod.mockSettings || mockSettings,
+        news: mod.mockNews || [],
+        videos: mod.mockVideos || []
+      };
+    }
+  } catch (_e) {}
+
+  try {
+    const jsonMod: any = await import('./staticData.json');
+    const raw = jsonMod?.default || jsonMod || {};
     return {
-      apps: mod.mockApps || [],
-      settings: mod.mockSettings || mockSettings,
-      news: mod.mockNews || [],
-      videos: mod.mockVideos || []
+      apps: Array.isArray(raw.apps) ? raw.apps : [],
+      settings: raw.settings || mockSettings,
+      news: Array.isArray(raw.news) ? raw.news : [],
+      videos: Array.isArray(raw.videos) ? raw.videos : []
     };
-  } catch (e) {
+  } catch (_err) {
     return {
       apps: [],
       settings: mockSettings,

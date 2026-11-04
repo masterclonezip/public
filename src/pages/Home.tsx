@@ -26,7 +26,25 @@ export default function Home() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'All Apps');
+  const [activeTab, setActiveTab] = useState(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam) return tabParam;
+    const pLower = location.pathname.toLowerCase().replace(/\/+$/, '') || '/';
+    if (pLower === '/categories') return 'Categories';
+    if (categoryParam) {
+      const rawCat = categoryParam.toLowerCase().replace(/[-_]+/g, ' ').trim();
+      const allKnownCats = (mockSettings?.categories && mockSettings.categories.length > 0)
+        ? mockSettings.categories
+        : ['All Apps', 'Games', 'Apps', 'Entertainment'];
+      const matched = allKnownCats.find(c =>
+        c.toLowerCase().trim() === rawCat ||
+        c.toLowerCase().replace(/[-_\s]+/g, '') === rawCat.replace(/\s+/g, '') ||
+        rawCat.includes(c.toLowerCase().trim())
+      );
+      return matched || rawCat.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    }
+    return 'All Apps';
+  });
   const [ratingFilter, setRatingFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('default');
 
@@ -125,12 +143,17 @@ export default function Home() {
 
   useEffect(() => {
     const q = searchParams.get('q');
-    if (q !== null && q !== searchTerm) {
-      setSearchTerm(q);
+    if (q !== null) {
+      if (q !== searchTerm) setSearchTerm(q);
+    } else if (searchTerm !== '') {
+      setSearchTerm('');
     }
     const tab = searchParams.get('tab');
+    const pathLower = location.pathname.toLowerCase().replace(/\/+$/, '') || '/';
     if (tab) {
       setActiveTab(tab);
+    } else if (pathLower === '/categories') {
+      setActiveTab('Categories');
     } else if (categoryParam) {
       const rawCat = categoryParam.toLowerCase().replace(/[-_]+/g, ' ').trim();
       const allKnownCats = (mockSettings?.categories && mockSettings.categories.length > 0)
@@ -149,8 +172,30 @@ export default function Home() {
         const capitalized = rawCat.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
         setActiveTab(capitalized);
       }
+    } else if (pathLower === '/' || pathLower === '/new-apps') {
+      setActiveTab('All Apps');
     }
-  }, [searchParams, categoryParam, location, mockSettings.categories]);
+  }, [searchParams, categoryParam, location.pathname, mockSettings.categories]);
+
+  const handleTabSelect = (nextTab: string) => {
+    setActiveTab(nextTab);
+    const lower = (nextTab || '').toLowerCase().trim();
+    const pathLower = location.pathname.toLowerCase().replace(/\/+$/, '') || '/';
+    const hasTabQuery = searchParams.has('tab');
+    const isSubRoute = pathLower.startsWith('/category/') || pathLower === '/categories' || pathLower === '/new-apps' || hasTabQuery;
+
+    if (!isSubRoute) return;
+
+    if (lower === 'all apps' || lower === 'all' || lower === 'home' || lower === 'apps') {
+      navigate('/', { replace: true });
+    } else if (lower === 'categories') {
+      navigate('/categories', { replace: true });
+    } else if (lower === 'top charts') {
+      navigate('/?tab=Top%20Charts', { replace: true });
+    } else {
+      navigate(`/?tab=${encodeURIComponent(nextTab)}`, { replace: true });
+    }
+  };
 
   const isInitialFilterMount = useRef(true);
   useEffect(() => {
@@ -257,14 +302,22 @@ export default function Home() {
                     activeTabLower === 'home' || 
                     activeTabLower === 'apps';
 
+  const cleanPathForFilter = location.pathname.toLowerCase().replace(/\/+$/, '') || '/';
+  const isNewAppsFilterRoute = cleanPathForFilter === '/new-apps';
+
   const tabFilteredApps = useMemo(() => {
-    if (deferredSearchTerm || isHomeTab) return filteredApps;
+    if (deferredSearchTerm) return filteredApps;
+    if (isNewAppsFilterRoute && isHomeTab) {
+      const newOrHot = filteredApps.filter((app: any) => Boolean(app.is_new || app.is_hot));
+      return newOrHot.length > 0 ? newOrHot : filteredApps;
+    }
+    if (isHomeTab) return filteredApps;
     if (activeTabLower === 'top charts' || activeTabLower === 'categories') return filteredApps;
     return filteredApps.filter(app => {
       const appCategories = app.category ? app.category.toLowerCase().split(',').map(c => c.trim()) : [];
       return appCategories.some(cat => cat === activeTabLower || cat.includes(activeTabLower) || activeTabLower.includes(cat));
     });
-  }, [filteredApps, deferredSearchTerm, isHomeTab, activeTabLower]);
+  }, [filteredApps, deferredSearchTerm, isHomeTab, activeTabLower, isNewAppsFilterRoute]);
 
   const hasMore = visibleCount < tabFilteredApps.length;
 
@@ -346,7 +399,7 @@ export default function Home() {
         <NewAdditions loading={false} apps={filteredApps} />
       )}
 
-      <PlayStoreTabs activeTab={activeTab} onTabChange={setActiveTab} hideOnSearch={!!deferredSearchTerm} />
+      <PlayStoreTabs activeTab={activeTab} onTabChange={handleTabSelect} hideOnSearch={!!deferredSearchTerm} />
 
       <HomeFilterBar 
         ratingFilter={ratingFilter}
@@ -410,7 +463,7 @@ export default function Home() {
       })()}
 
       {deferredActiveTab.toLowerCase() === 'categories' && (
-        <HomeCategoryGrid categories={mockSettings.categories || []} setActiveTab={setActiveTab} />
+        <HomeCategoryGrid categories={mockSettings.categories || []} setActiveTab={handleTabSelect} />
       )}
 
       {(() => {
