@@ -1,7 +1,6 @@
 // src/lib/sitemapGenerator.ts
 // Standardized XML Sitemap Generation
 import { resolveSiteLogoUrl, getOptimizedImageUrl } from '../seo/utils';
-import { resolvePublicSiteDomain, isValidPublicProductionDomain } from './seoUtils';
 
 export interface SitemapGenOptions {
   host?: string;
@@ -36,7 +35,20 @@ export const enforceNonWwwXml = (xml: string): string => {
 };
 
 const getDefaultSitemapHost = (): string => {
-  return normalizeSitemapHost(resolvePublicSiteDomain());
+  if (typeof process !== 'undefined' && process.env) {
+    const d = (
+      process.env.PUBLIC_DOMAIN ||
+      process.env.VITE_PUBLIC_DOMAIN ||
+      process.env.SITE_DOMAIN ||
+      process.env.DOMAIN ||
+      ''
+    ).trim();
+    if (d) return normalizeSitemapHost(d);
+  }
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return normalizeSitemapHost(window.location.origin);
+  }
+  return '';
 };
 
 export const escapeXml = (unsafe: any): string => {
@@ -117,38 +129,11 @@ export const resolveItemTimestamp = (item: any, fallbackDate: string = STABLE_BA
   return formatSitemapDate(raw, fallbackDate);
 };
 
-export const isSitemapPublicApp = (a: any): boolean => {
-  if (!a || typeof a !== 'object') return false;
-  if (!a.slug && !a.id) return false;
-  if (a.sync_to_public === false || a.sync_to_public === 'false' || a.sync_to_public === 0 || a.sync_to_public === '0') return false;
-  if (a.is_published === false || a.is_published === 'false') return false;
-  if (a.is_draft === true || a.is_draft === 'true') return false;
-  if (a.is_hidden === true || a.is_hidden === 'true') return false;
-  if (typeof a.status === 'string') {
-    const st = a.status.trim().toLowerCase();
-    if (st === 'draft' || st === 'unpublished' || st === 'hidden' || st === 'archived') return false;
-  }
-  return true;
-};
-
-export const isSitemapPublicNews = (n: any): boolean => {
-  if (!n || typeof n !== 'object') return false;
-  if (!n.slug && !n.id) return false;
-  if (n.sync_to_public === false || n.sync_to_public === 'false' || n.sync_to_public === 0 || n.sync_to_public === '0') return false;
-  if (n.is_published === false || n.is_published === 'false') return false;
-  if (n.is_draft === true || n.is_draft === 'true') return false;
-  if (typeof n.status === 'string') {
-    const st = n.status.trim().toLowerCase();
-    if (st === 'draft' || st === 'unpublished' || st === 'hidden' || st === 'archived') return false;
-  }
-  return true;
-};
-
 export const getLatestItemDate = (items: any[], fallbackDate: string = STABLE_BASELINE_DATE): string => {
   if (!Array.isArray(items) || items.length === 0) return fallbackDate;
   let maxTs = 0;
   for (const item of items) {
-    if (!item || !isSitemapPublicApp(item)) continue;
+    if (!item || item.sync_to_public === false) continue;
     const raw = item.updated_at || item.published_at || item.publish_date || item.created_at || item.added_date || item.date;
     if (raw) {
       const d = new Date(formatSitemapDate(raw, fallbackDate)).getTime();
@@ -211,7 +196,7 @@ export function generateAppsSitemapXml(
   const brandTitle = siteTitle || 'Official Brand Logo';
 
   // Filter public-ready apps
-  const publicApps = apps.filter(isSitemapPublicApp);
+  const publicApps = apps.filter((a: any) => a && (a.slug || a.id) && a.sync_to_public !== false);
   
   // Sort latest updated first
   publicApps.sort((a, b) => {
@@ -293,7 +278,7 @@ export function generateNewsSitemapXml(
   const cleanHost = normalizeSitemapHost(host);
   const fallbackLogo = normalizeSitemapImageUrl(siteLogo, cleanHost, 512);
   const brandTitle = siteTitle || 'News & Updates';
-  const publicNews = news.filter(isSitemapPublicNews);
+  const publicNews = news.filter((n: any) => n && n.slug && n.sync_to_public !== false);
 
   publicNews.sort((a, b) => {
     const ta = new Date(formatSitemapDate(a.updated_at || a.published_at || a.publish_date || a.created_at || a.date, STABLE_BASELINE_DATE)).getTime();
@@ -553,10 +538,13 @@ export function generateAllSitemaps(
   const settingsDate = formatSitemapDate(settings?.last_updated || settings?.updated_at, STABLE_BASELINE_DATE);
   const latestDevDate = getLatestItemDate(developers, STABLE_BASELINE_DATE);
 
-  const candidateHost = isValidPublicProductionDomain(host)
-    ? host
-    : resolvePublicSiteDomain(settings, apps, news);
-  const resolvedHost = normalizeSitemapHost(candidateHost || 'https://yonoappdex.com');
+  const resolvedHost = normalizeSitemapHost(
+    host ||
+    settings?.site_domain ||
+    settings?.domain ||
+    settings?.public_domain ||
+    getDefaultSitemapHost()
+  );
 
   return {
     'sitemap.xml': enforceNonWwwXml(generateMasterSitemapXml(apps, news, videos, resolvedHost, settings)),

@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { getRawFirebaseConfig, parseFirestoreDoc } from './firebaseConfig';
-import { formatPageTitle, cleanSettingsMetaTitles, isPublicReadyApp, isPublicReadyNews } from '../lib/seoUtils';
+import { formatPageTitle, cleanSettingsMetaTitles } from '../lib/seoUtils';
 
 function cleanItemSeo(item: any): any {
   if (!item || typeof item !== 'object') return item;
@@ -247,10 +247,9 @@ export async function syncFromFirestore(): Promise<any> {
       const settings = cleanSettingsMetaTitles(mergedRawSettings);
 
       const newsParsed = newsRes?.fields ? parseFirestoreDoc(newsRes.fields) : null;
-      const rawNewsList = Array.isArray(newsParsed?.items)
+      const news = Array.isArray(newsParsed?.items)
         ? newsParsed.items.map((n: any) => cleanItemSeo({ ...n }))
-        : (fallbackData.news || []);
-      const news = rawNewsList.filter(isPublicReadyNews);
+        : fallbackData.news;
 
       const videosParsed = videosRes?.fields ? parseFirestoreDoc(videosRes.fields) : null;
       const videos = Array.isArray(videosParsed?.items) ? videosParsed.items : fallbackData.videos;
@@ -259,9 +258,9 @@ export async function syncFromFirestore(): Promise<any> {
       const secureLinks = secLinksParsed?.items || secLinksParsed?.links || secLinksParsed || null;
 
       const fromFirestore = Boolean(metaExists || anyChunkFound);
-      const mergedApps = (fromFirestore
+      const mergedApps = fromFirestore
         ? remoteApps
-        : (fallbackData.apps || [])).filter(isPublicReadyApp);
+        : (fallbackData.apps || []);
 
       return {
         apps: mergedApps,
@@ -277,10 +276,6 @@ export async function syncFromFirestore(): Promise<any> {
     // REST API failed, return fallbackData
   }
 
-  return {
-    ...fallbackData,
-    apps: (fallbackData.apps || []).filter(isPublicReadyApp),
-    news: (fallbackData.news || []).filter(isPublicReadyNews),
-  };
+  return fallbackData;
 }
 

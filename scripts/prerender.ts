@@ -5,9 +5,9 @@ import path from 'path';
 import zlib from 'zlib';
 import { injectSeoTags, fetchStoreData, cleanRootContainer } from '../src/seoHelper';
 import { generateAllSitemaps, normalizeSitemapHost, escapeXml } from '../src/lib/sitemapGenerator';
-import { formatPageTitle, isPublicReadyApp, isPublicReadyNews, resolvePublicSiteDomain } from '../src/lib/seoUtils';
+import { formatPageTitle } from '../src/lib/seoUtils';
+import { safeEncrypt, safeDecrypt, getAesSecret } from '../src/lib/cryptoUtils';
 import { getAllSiteIconUrls } from '../src/seo/utils';
-import { safeDecrypt, safeEncrypt, getAesSecret } from '../src/lib/cryptoUtils';
 
 function decodeCandidateUrl(raw: unknown): string {
   if (!raw || typeof raw !== 'string') return '';
@@ -24,25 +24,39 @@ function decodeCandidateUrl(raw: unknown): string {
   return '';
 }
 
-function resolveBuildHost(settings?: any, apps?: any[], news?: any[]): string {
-  const resolved = resolvePublicSiteDomain(settings, apps, news);
-  if (resolved && !resolved.includes('localhost') && !resolved.includes('127.0.0.1')) {
-    return normalizeSitemapHost(resolved) || 'https://yonoappdex.com';
+function resolveBuildHost(settings?: any): string {
+  const envCandidate = (
+    process.env.PUBLIC_DOMAIN ||
+    process.env.VITE_PUBLIC_DOMAIN ||
+    process.env.SITE_DOMAIN ||
+    process.env.DOMAIN ||
+    settings?.site_domain ||
+    settings?.domain ||
+    settings?.public_domain ||
+    ''
+  )
+    .trim()
+    .replace(/^["']+|["']+$/g, '');
+
+  if (envCandidate) {
+    const normalized = normalizeSitemapHost(envCandidate);
+    if (normalized) return normalized;
   }
 
+  // Fallback: inspect existing public/sitemap.xml or public/robots.txt if previously synced from Admin
   try {
     const publicSitemapPath = path.resolve(process.cwd(), 'public/sitemap.xml');
     if (fs.existsSync(publicSitemapPath)) {
       const xml = fs.readFileSync(publicSitemapPath, 'utf8');
       const m = xml.match(/<loc>\s*(https?:\/\/[^/<]+)\/sitemap-apps\.xml\s*<\/loc>/i);
-      if (m && m[1] && !m[1].includes('localhost') && !m[1].includes('127.0.0.1') && !m[1].includes('.pages.dev')) {
+      if (m && m[1] && !m[1].includes('localhost') && !m[1].includes('127.0.0.1')) {
         const normalized = normalizeSitemapHost(m[1]);
         if (normalized) return normalized;
       }
     }
   } catch {}
 
-  return 'https://yonoappdex.com';
+  return 'http://localhost:3000';
 }
 
 function sanitizePublicApp(app: any): any {
@@ -211,10 +225,10 @@ async function syncStaticDataAndSitemaps() {
   }
 
   const publicApps = (data.apps || [])
-    .filter(isPublicReadyApp)
+    .filter((a: any) => a && a.sync_to_public !== false)
     .map((a: any) => sanitizePublicApp(a));
   const publicNews = (data.news || [])
-    .filter(isPublicReadyNews)
+    .filter((n: any) => n && n.sync_to_public !== false)
     .map((n: any) => sanitizePublicNews(n));
 
   const publicSettings = { ...(data.settings || {}) };
@@ -259,38 +273,19 @@ async function syncStaticDataAndSitemaps() {
     }
   }
 
-  const host = resolveBuildHost(publicSettings, publicApps, publicNews);
-  const distPath = path.resolve(process.cwd(), 'dist');
+  const host = resolveBuildHost(publicSettings);
   if (fs.existsSync(publicPath)) {
     const sitemaps = generateAllSitemaps({ ...data, apps: publicApps, news: publicNews, settings: publicSettings }, host);
     for (const [filename, xmlContent] of Object.entries(sitemaps)) {
       const xmlStr = xmlContent as string;
       try {
+        const gzBuffer = zlib.gzipSync(Buffer.from(xmlStr, 'utf-8'), { level: 9 });
         fs.writeFileSync(path.join(publicPath, filename), xmlStr, 'utf-8');
-        if (fs.existsSync(distPath)) {
-          const gzBuffer = zlib.gzipSync(Buffer.from(xmlStr, 'utf-8'), { level: 9 });
-          fs.writeFileSync(path.join(distPath, filename), xmlStr, 'utf-8');
-          fs.writeFileSync(path.join(distPath, `${filename}.gz`), gzBuffer);
-        }
+        fs.writeFileSync(path.join(publicPath, `${filename}.gz`), gzBuffer);
       } catch (e) {}
     }
 
-    try {
-      const robotsPath = path.join(publicPath, 'robots.txt');
-      if (fs.existsSync(robotsPath)) {
-        let robotsTxt = fs.readFileSync(robotsPath, 'utf-8');
-        robotsTxt = robotsTxt
-          .replace(/Sitemap:\s*(?:https?:\/\/[^/\s]+)?\/sitemap-categories\.xml/gi, `Sitemap: ${host}/sitemap-developers.xml`)
-          .replace(/^Sitemap:\s*\/([^\s]+)$/gm, `Sitemap: ${host}/$1`)
-          .replace(/^Sitemap:\s*https?:\/\/localhost(?::\d+)?\/([^\s]+)$/gm, `Sitemap: ${host}/$1`);
-        fs.writeFileSync(robotsPath, robotsTxt, 'utf-8');
-        if (fs.existsSync(distPath)) {
-          fs.writeFileSync(path.join(distPath, 'robots.txt'), robotsTxt, 'utf-8');
-        }
-      }
-    } catch {}
-
-    // Sync site.webmanifest, opensearch.xml, and binary brand icons into public/ and dist/ so static builds and XML sitemaps always serve the real brand logo
+    // Sync site.webmanifest, opensearch.xml, and binary brand icons into public/ so static builds and XML sitemaps always serve the real brand logo
     try {
       const icons = getAllSiteIconUrls(publicSettings, host);
       const siteTitle = String(publicSettings?.site_title || process.env.VITE_SITE_NAME || '').trim();
@@ -315,9 +310,6 @@ async function syncStaticDataAndSitemaps() {
         shortcuts: [{ name: 'News', url: '/news' }]
       };
       fs.writeFileSync(path.join(publicPath, 'site.webmanifest'), JSON.stringify(manifestObj, null, 2), 'utf-8');
-      if (fs.existsSync(distPath)) {
-        fs.writeFileSync(path.join(distPath, 'site.webmanifest'), JSON.stringify(manifestObj, null, 2), 'utf-8');
-      }
 
       const openSearchTitle = (siteTitle || 'Search').replace(/[<>&'"]/g, '');
       const openSearchIcons = [
@@ -328,9 +320,6 @@ async function syncStaticDataAndSitemaps() {
       ].filter(Boolean).join('\n');
       const openSearchXml = `<?xml version="1.0" encoding="UTF-8"?>\n<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">\n  <ShortName>${openSearchTitle}</ShortName>\n  <Description>Search applications</Description>\n  <InputEncoding>UTF-8</InputEncoding>\n${openSearchIcons}\n  <Url type="text/html" template="${host}/?s={searchTerms}"/>\n</OpenSearchDescription>\n`;
       fs.writeFileSync(path.join(publicPath, 'opensearch.xml'), openSearchXml, 'utf-8');
-      if (fs.existsSync(distPath)) {
-        fs.writeFileSync(path.join(distPath, 'opensearch.xml'), openSearchXml, 'utf-8');
-      }
 
       // Download and materialize remote Cloudinary/brand icons into public/ root icon files so /favicon.ico on XML sitemaps renders the real logo
       const iconDownloadTargets: Array<{ url: string; files: string[] }> = [
@@ -351,9 +340,6 @@ async function syncStaticDataAndSitemaps() {
             if (buf.length < 100) return;
             for (const fName of files) {
               fs.writeFileSync(path.join(publicPath, fName), buf);
-              if (fs.existsSync(distPath)) {
-                fs.writeFileSync(path.join(distPath, fName), buf);
-              }
             }
           } catch (_) {}
         })
@@ -580,6 +566,7 @@ async function prerender() {
       if (fs.existsSync(publicPath)) {
         try {
           fs.writeFileSync(path.join(publicPath, filename), xmlStr, 'utf-8');
+          fs.writeFileSync(path.join(publicPath, `${filename}.gz`), gzBuffer);
         } catch (e) {}
       }
     }
@@ -609,23 +596,10 @@ async function prerender() {
       fs.copyFileSync(headersSrc, path.join(distPath, '_headers'));
     }
 
-    // 5. Copy updated site.webmanifest, opensearch.xml, sitemaps, robots.txt, and materialized brand icon files from public/ to dist/
+    // 5. Copy updated site.webmanifest, opensearch.xml, and materialized brand icon files from public/ to dist/
     const syncedStaticAssets = [
       'site.webmanifest',
       'opensearch.xml',
-      'robots.txt',
-      'sitemap.xml',
-      'sitemap.xml.gz',
-      'sitemap-apps.xml',
-      'sitemap-apps.xml.gz',
-      'sitemap-news.xml',
-      'sitemap-news.xml.gz',
-      'sitemap-static.xml',
-      'sitemap-static.xml.gz',
-      'sitemap-videos.xml',
-      'sitemap-videos.xml.gz',
-      'sitemap-developers.xml',
-      'sitemap-developers.xml.gz',
       'favicon.ico',
       'favicon.png',
       'favicon-16x16.png',

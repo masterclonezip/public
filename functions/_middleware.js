@@ -7,9 +7,9 @@ function getEdgeSizedLogoUrl(url, size = 192) {
   if (trimmed.includes('res.cloudinary.com') && trimmed.includes('/upload/')) {
     const cleanUrl = trimmed.replace(/\/upload\/(?:(?:[a-z]{1,3}_[a-zA-Z0-9_.:-]+,?)+\/)*/, '/upload/');
     if (size > 0) {
-      return cleanUrl.replace('/upload/', `/upload/f_png,q_auto,w_${size},h_${size},c_fit/`);
+      return cleanUrl.replace('/upload/', `/upload/f_png,q_auto:best,w_${size},h_${size},c_pad/`);
     }
-    return cleanUrl.replace('/upload/', '/upload/f_png,q_auto/');
+    return cleanUrl.replace('/upload/', '/upload/f_png,q_auto:best/');
   }
   return trimmed;
 }
@@ -141,6 +141,14 @@ export async function onRequest(context) {
             });
           }
         } catch (_) {}
+        return new Response(null, {
+          status: 302,
+          headers: {
+            Location: targetIconUrl,
+            'Cache-Control': 'public, max-age=3600',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
       }
     }
   }
@@ -298,104 +306,38 @@ export async function onRequest(context) {
     pathname === '/ai-catalog.json' ||
     pathname === '/.well-known/ai-catalog.json';
 
-  if (isSeoAsset) {
-    let text = '';
-    let status = response.status;
-    let contentTypeHeader = 'application/xml; charset=utf-8';
-    const apps = (staticData?.apps || []).filter(
-      (a) => a && a.sync_to_public !== false && a.sync_to_public !== 'false' && a.is_published !== false && a.is_draft !== true && a.is_hidden !== true
+  if (isSeoAsset && response.ok) {
+    let text = await response.text();
+    const hostVariantRegex = new RegExp(
+      `https?:\\/\\/(?:www\\.|admin\\.|masterworld\\.)*${escapedBareHost}`,
+      'gi'
     );
-    const news = (staticData?.news || []).filter(
-      (n) => n && n.sync_to_public !== false && n.sync_to_public !== 'false' && n.is_published !== false && n.is_draft !== true
-    );
-    const latestDate = new Date().toISOString().replace(/\.\d{3}Z$/, '+00:00');
-
-    if (response.ok) {
-      text = await response.text();
-    }
-
-    // Self-heal if static file was missing OR if sitemap-apps.xml was built with 0 apps while staticData.apps is populated
-    if (!text || (lowerPath === '/sitemap-apps.xml' && apps.length > 0 && !text.includes('/app/'))) {
-      if (lowerPath === '/sitemap.xml') {
-        text = `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <sitemap><loc>${canonicalOrigin}/sitemap-apps.xml</loc><lastmod>${latestDate}</lastmod></sitemap>\n  <sitemap><loc>${canonicalOrigin}/sitemap-static.xml</loc><lastmod>${latestDate}</lastmod></sitemap>\n  <sitemap><loc>${canonicalOrigin}/sitemap-news.xml</loc><lastmod>${latestDate}</lastmod></sitemap>\n  <sitemap><loc>${canonicalOrigin}/sitemap-videos.xml</loc><lastmod>${latestDate}</lastmod></sitemap>\n  <sitemap><loc>${canonicalOrigin}/sitemap-developers.xml</loc><lastmod>${latestDate}</lastmod></sitemap>\n</sitemapindex>`;
-        status = 200;
-      } else if (lowerPath === '/sitemap-apps.xml') {
-        const urlEntries = apps.map(a => {
-          const s = a.slug || a.id;
-          const img = a.og_image_url || a.icon_url || `${canonicalOrigin}/logo.png`;
-          const title = (a.seo_title || a.name || '').replace(/[<>&'"]/g, '');
-          return `  <url>\n    <loc>${canonicalOrigin}/app/${s}</loc>\n    <lastmod>${a.updated_at || latestDate}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.9</priority>\n    <image:image>\n      <image:loc>${img.replace(/&/g, '&amp;')}</image:loc>\n      <image:title>${title}</image:title>\n    </image:image>\n  </url>`;
-        }).join('\n');
-        text = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n${urlEntries}\n</urlset>`;
-        status = 200;
-      } else if (lowerPath === '/sitemap-news.xml') {
-        const urlEntries = news.map(n => {
-          const s = n.slug || n.id;
-          const img = n.og_image_url || n.image_url || n.logo_url || `${canonicalOrigin}/logo.png`;
-          const title = (n.title || '').replace(/[<>&'"]/g, '');
-          return `  <url>\n    <loc>${canonicalOrigin}/news/${s}</loc>\n    <lastmod>${n.updated_at || latestDate}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.8</priority>\n    <image:image>\n      <image:loc>${img.replace(/&/g, '&amp;')}</image:loc>\n      <image:title>${title}</image:title>\n    </image:image>\n  </url>`;
-        }).join('\n');
-        text = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n${urlEntries}\n</urlset>`;
-        status = 200;
-      } else if (lowerPath === '/sitemap-static.xml') {
-        const staticPages = ['', 'news', 'videos', 'categories', 'new-apps', 'developers', 'about', 'contact', 'privacy', 'terms', 'disclaimer', 'faq'];
-        const urlEntries = staticPages.map(p => {
-          const loc = p ? `${canonicalOrigin}/${p}` : canonicalOrigin;
-          return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${latestDate}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>${p === '' ? '1.0' : '0.7'}</priority>\n  </url>`;
-        }).join('\n');
-        text = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urlEntries}\n</urlset>`;
-        status = 200;
-      } else if (lowerPath === '/sitemap-videos.xml') {
-        text = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>${canonicalOrigin}/videos</loc><lastmod>${latestDate}</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>\n</urlset>`;
-        status = 200;
-      } else if (lowerPath === '/sitemap-developers.xml') {
-        text = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>${canonicalOrigin}/developers</loc><lastmod>${latestDate}</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>\n</urlset>`;
-        status = 200;
-      } else if (lowerPath === '/robots.txt') {
-        text = `User-agent: *\nAllow: /\nAllow: /api/v1/public/\nDisallow: /api/\nDisallow: /admin/\nDisallow: /login/\nDisallow: /masterworld/\nDisallow: /moreinfo/\nDisallow: /moreinfo/*\nSitemap: ${canonicalOrigin}/sitemap.xml\nSitemap: ${canonicalOrigin}/sitemap-apps.xml\nSitemap: ${canonicalOrigin}/sitemap-news.xml\nSitemap: ${canonicalOrigin}/sitemap-static.xml\nSitemap: ${canonicalOrigin}/sitemap-videos.xml\nSitemap: ${canonicalOrigin}/sitemap-developers.xml\n`;
-        contentTypeHeader = 'text/plain; charset=utf-8';
-        status = 200;
-      }
-    }
-
-    if (text) {
-      const hostVariantRegex = new RegExp(
-        `https?:\\/\\/(?:www\\.|admin\\.|masterworld\\.)*${escapedBareHost}`,
-        'gi'
+    text = text
+      .replace(hostVariantRegex, canonicalOrigin)
+      .replace(/https?:\/\/localhost(?::\d+)?/gi, canonicalOrigin)
+      .replace(
+        /(<(?:loc|image:loc|video:thumbnail_loc)>\s*https?:\/\/)(?:www\.|admin\.|masterworld\.)+([^<\s]+\s*<\/(?:loc|image:loc|video:thumbnail_loc)>)/gi,
+        '$1$2'
       );
-      text = text
-        .replace(/^\uFEFF?\s+/, '')
-        .replace(hostVariantRegex, canonicalOrigin)
-        .replace(/https?:\/\/localhost(?::\d+)?/gi, canonicalOrigin)
-        .replace(/https?:\/\/127\.0\.0\.1(?::\d+)?/gi, canonicalOrigin)
-        .replace(/<loc>\s*https?:\/\/[^/<]+(\/[^<]*)?<\/loc>/gi, (_, p) => `<loc>${canonicalOrigin}${p || ''}</loc>`)
-        .replace(
-          /(<(?:loc|image:loc|video:thumbnail_loc)>\s*https?:\/\/)(?:www\.|admin\.|masterworld\.)+([^<\s]+\s*<\/(?:loc|image:loc|video:thumbnail_loc)>)/gi,
-          '$1$2'
-        );
 
-      if (pathname === '/robots.txt') {
-        text = text
-          .replace(/^Sitemap:\s*https?:\/\/[^/\s]+\/([^\s]+)$/gm, `Sitemap: ${canonicalOrigin}/$1`)
-          .replace(/^Sitemap:\s*\/([^\s]+)$/gm, `Sitemap: ${canonicalOrigin}/$1`);
-      } else if (pathname === '/opensearch.xml') {
-        text = text.replace(/template="(?:https?:\/\/[^/"]+)?\/\?s=\{searchTerms\}"/g, `template="${canonicalOrigin}/?s={searchTerms}"`);
-      }
-
-      const headers = new Headers();
-      headers.set('Content-Type', pathname.endsWith('.xml') ? 'application/xml; charset=utf-8' : contentTypeHeader);
-      headers.set('Cache-Control', 'public, max-age=0, s-maxage=60, must-revalidate');
-      headers.set('CDN-Cache-Control', 'public, max-age=60, must-revalidate');
-      headers.set('Cloudflare-CDN-Cache-Control', 'public, max-age=60, must-revalidate');
-      headers.set('X-Robots-Tag', 'all');
-      headers.set('Access-Control-Allow-Origin', '*');
-
-      return new Response(text, {
-        status: 200,
-        statusText: 'OK',
-        headers
-      });
+    if (pathname === '/robots.txt') {
+      text = text.replace(/^Sitemap:\s*\/([^\s]+)$/gm, `Sitemap: ${canonicalOrigin}/$1`);
+    } else if (pathname === '/opensearch.xml') {
+      text = text.replace(/template="\/\?s=\{searchTerms\}"/g, `template="${canonicalOrigin}/?s={searchTerms}"`);
     }
+
+    const headers = new Headers(response.headers);
+    headers.set('Cache-Control', 'public, max-age=0, s-maxage=60, must-revalidate');
+    headers.set('CDN-Cache-Control', 'public, max-age=60, must-revalidate');
+    headers.set('Cloudflare-CDN-Cache-Control', 'public, max-age=60, must-revalidate');
+    headers.delete('content-length');
+    headers.delete('content-encoding');
+
+    return new Response(text, {
+      status: response.status,
+      statusText: response.statusText,
+      headers
+    });
   }
 
   // 3. Dynamic Edge Normalization for HTML Canonical, OpenGraph & JSON-LD Schema URLs
