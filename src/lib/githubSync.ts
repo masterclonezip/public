@@ -637,13 +637,15 @@ export async function uploadBlobToGitHub({
   repo,
   token,
   path: filePath,
-  content
+  content,
+  encoding = 'utf-8'
 }: {
   owner: string;
   repo: string;
   token?: string;
   path: string;
   content: string;
+  encoding?: 'utf-8' | 'base64';
 }): Promise<{ path: string; sha: string }> {
   const cleanPath = filePath.replace(/^\/+/g, '');
   let lastError: any = null;
@@ -660,7 +662,7 @@ export async function uploadBlobToGitHub({
             : `Bearer ${cleanToken}`;
 
           // Always prefer base64 encoding for blobs: avoids utf8 parsing failures and corrupted emojis
-          const b64 = b64EncodeUnicode(content || '');
+          const b64 = encoding === 'base64' ? (content || '') : b64EncodeUnicode(content || '');
 
           const directRes = await fetch(
             `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/blobs`,
@@ -736,7 +738,8 @@ export async function uploadBlobToGitHub({
             repo,
             token,
             path: cleanPath,
-            content
+            content,
+            encoding
           })
         });
 
@@ -997,6 +1000,8 @@ export async function commitTreeToGitHub({
                 t.path === 'src/lib/public_backup.json' ||
                 t.path === 'src/sync-meta.json' ||
                 t.path === 'bun.lock' ||
+                t.path === 'public/favicon.webp' ||
+                (t.path.startsWith('public/') && t.path.endsWith('.gz')) ||
                 t.path.startsWith('public/assets/aistudio/') ||
                 t.path.startsWith('.aistudio/')
               )
@@ -1171,7 +1176,7 @@ export async function commitMultiFilesToGitHub({
   repo: string;
   token?: string;
   branch: string;
-  files: Array<{ path: string; content: string }>;
+  files: Array<{ path: string; content: string; encoding?: 'utf-8' | 'base64' }>;
   message: string;
   onProgress?: (msg: string) => void;
 }) {
@@ -1198,7 +1203,8 @@ export async function commitMultiFilesToGitHub({
         repo,
         token,
         path: file.path,
-        content: file.content
+        content: file.content,
+        encoding: file.encoding
       });
       tree.push(blob);
       onProgress?.(`GitHub Sync: ✅ ${fileName} blob verified.`);

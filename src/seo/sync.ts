@@ -203,8 +203,11 @@ export async function syncFromFirestore(): Promise<any> {
         fetch(`${baseUrl}/secure_links${apiKeyParam}`).then(r => r.ok ? r.json() : null).catch(() => null)
       ]);
 
-      const settingsDoc = pubSettingsRes?.fields ? pubSettingsRes : (rawSettingsRes?.fields ? rawSettingsRes : null);
-      const remoteSettings = settingsDoc?.fields ? parseFirestoreDoc(settingsDoc.fields) : {};
+      const pubParsed = pubSettingsRes?.fields ? parseFirestoreDoc(pubSettingsRes.fields) : {};
+      const rawParsed = rawSettingsRes?.fields ? parseFirestoreDoc(rawSettingsRes.fields) : {};
+      const remoteSettings: Record<string, any> = { ...rawParsed, ...pubParsed };
+      if (!remoteSettings.logo_url && rawParsed.logo_url) remoteSettings.logo_url = rawParsed.logo_url;
+      if (!remoteSettings.favicon_url && rawParsed.favicon_url) remoteSettings.favicon_url = rawParsed.favicon_url;
       delete remoteSettings.turnstile_secret_key;
       delete remoteSettings.turnstile_site_key;
       delete remoteSettings.cloudinary_api_secret;
@@ -233,10 +236,17 @@ export async function syncFromFirestore(): Promise<any> {
         .map(sanitizeSiteKey)
         .find((k) => /^0x4[A-Za-z0-9_-]{16,25}$/.test(k));
 
+      const baseStaticSettings = fallbackData.settings || {};
       const mergedRawSettings =
         remoteSettings && Object.keys(remoteSettings).length > 0
-          ? { ...(fallbackData.settings || {}), ...remoteSettings }
-          : { ...(fallbackData.settings || {}) };
+          ? { ...baseStaticSettings, ...remoteSettings }
+          : { ...baseStaticSettings };
+      if (!mergedRawSettings.logo_url && baseStaticSettings.logo_url) {
+        mergedRawSettings.logo_url = baseStaticSettings.logo_url;
+      }
+      if (!mergedRawSettings.favicon_url && baseStaticSettings.favicon_url) {
+        mergedRawSettings.favicon_url = baseStaticSettings.favicon_url;
+      }
 
       if (envTurnstileSiteKey) {
         mergedRawSettings.turnstile_site_key = envTurnstileSiteKey;

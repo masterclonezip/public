@@ -66,11 +66,9 @@ const AppOptionsMenu = ({ app, onMenuToggle }: { app: any; onMenuToggle?: (isOpe
     e.stopPropagation();
     const appUrl = app.canonical_url || `${window.location.origin}/app/${app.slug}`;
     const shareTitle = app.seo_title || app.meta_title || app.name;
-    const shareText = app.seo_description || app.meta_description || app.short_description || `Download ${app.name}`;
     if (navigator.share) {
       navigator.share({
         title: shareTitle,
-        text: shareText,
         url: appUrl,
       })
       .then(() => {

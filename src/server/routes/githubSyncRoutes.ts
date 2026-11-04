@@ -260,7 +260,7 @@ githubSyncRouter.post('/api/github-sync/test', async (req, res) => {
 // POST /api/github-sync/create-blob
 githubSyncRouter.post('/api/github-sync/create-blob', async (req, res) => {
   try {
-    const { owner, repo, token, path: filePath, content } = req.body || {};
+    const { owner, repo, token, path: filePath, content, encoding } = req.body || {};
     const cleanOwner = String(owner || '').trim();
     const cleanRepo = String(repo || '').trim();
     const cleanToken = String(token || '').trim();
@@ -273,8 +273,8 @@ githubSyncRouter.post('/api/github-sync/create-blob', async (req, res) => {
       ? `token ${cleanToken}`
       : `Bearer ${cleanToken}`;
 
-    // Use base64 encoding to support all characters and avoid utf8 decoding errors on GitHub
-    const b64 = Buffer.from(content || '', 'utf8').toString('base64');
+    // Use base64 encoding to support all characters and binary assets on GitHub
+    const b64 = encoding === 'base64' ? String(content || '') : Buffer.from(content || '', 'utf8').toString('base64');
 
     const ghRes = await fetch(
       `https://api.github.com/repos/${encodeURIComponent(cleanOwner)}/${encodeURIComponent(cleanRepo)}/git/blobs`,

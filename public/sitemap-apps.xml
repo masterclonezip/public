@@ -1,73 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
-    <loc>https://yonoappdex.com/app/jaiho-play</loc>
-    <lastmod>2026-11-04T08:16:20+00:00</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
+    <loc>https://yonoappdex.com/</loc>
+    <lastmod>2026-09-01T00:00:00+00:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
     <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793601579/inl1rn1gsuffv8cafixu.webp</image:loc>
-      <image:title>JAIHO PLAY</image:title>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://yonoappdex.com/app/spin-winner</loc>
-    <lastmod>2026-11-04T08:13:00+00:00</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793598636/yxihfx2fq1q2g3rzqn03.png</image:loc>
-      <image:title>SPIN WINNER</image:title>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://yonoappdex.com/app/777-game</loc>
-    <lastmod>2026-11-04T08:09:33+00:00</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793597622/yzjijduiceeuy1gngztc.webp</image:loc>
-      <image:title>777 GAME</image:title>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://yonoappdex.com/app/789-jackports</loc>
-    <lastmod>2026-11-04T08:05:57+00:00</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793593515/fuaaradfu1aup1ybfohi.webp</image:loc>
-      <image:title>789 JACKPORTS</image:title>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://yonoappdex.com/app/slots-winner</loc>
-    <lastmod>2026-11-04T07:57:56+00:00</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793553811/see8zebidhgqfnb1rz3l.png</image:loc>
-      <image:title>SLOTS WINNER</image:title>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://yonoappdex.com/app/every-77</loc>
-    <lastmod>2026-11-04T07:52:43+00:00</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793546491/vtwuonharlo6opxo1nsm.webp</image:loc>
-      <image:title>EVER 777</image:title>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://yonoappdex.com/app/yono-slots</loc>
-    <lastmod>2026-11-04T05:21:35+00:00</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793768026/l3byxkcrru5fzvm8jfgu.webp</image:loc>
-      <image:title>YONO SLOTS</image:title>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_512/v1793499107/vvqemcm3gkjsko5m6unw.png</image:loc>
+      <image:title>Official Brand Logo</image:title>
     </image:image>
   </url>
 </urlset>

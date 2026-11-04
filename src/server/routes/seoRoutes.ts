@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import zlib from 'zlib';
 import staticData from '../../lib/staticData.json';
 import { fetchStoreData } from '../../seoHelper';
-import { getAllSiteIconUrls, resolveSiteLogoUrl } from '../../seo/utils';
+import { getAllSiteIconUrls, resolveSiteLogoUrl, wrapPngsInIco } from '../../seo/utils';
 import {
   generateMasterSitemapXml,
   generateAppsSitemapXml,
@@ -70,6 +70,8 @@ seoRouter.get(
     '/favicon-16x16.png',
     '/favicon-32x32.png',
     '/favicon-48x48.png',
+    '/favicon-96x96.png',
+    '/favicon-144x144.png',
     '/apple-touch-icon.png',
     '/apple-touch-icon-precomposed.png',
     '/android-chrome-192x192.png',
@@ -95,10 +97,14 @@ seoRouter.get(
         targetUrl = icons.favicon16;
       } else if (p === '/favicon-32x32.png') {
         targetUrl = icons.favicon32;
-      } else if (p === '/favicon-48x48.png') {
+      } else if (p === '/favicon-48x48.png' || p === '/favicon.ico') {
         targetUrl = icons.favicon48;
-      } else if (p === '/favicon.ico' || p === '/favicon.svg' || p === '/favicon.png') {
-        targetUrl = icons.faviconIco || icons.pwa192 || icons.favicon48;
+      } else if (p === '/favicon-96x96.png') {
+        targetUrl = icons.favicon96;
+      } else if (p === '/favicon-144x144.png') {
+        targetUrl = icons.favicon144;
+      } else if (p === '/favicon.svg' || p === '/favicon.png') {
+        targetUrl = icons.pwa192 || icons.favicon48;
       } else if (p === '/apple-touch-icon.png' || p === '/apple-touch-icon-precomposed.png') {
         targetUrl = icons.appleTouch180;
       } else if (p === '/android-chrome-192x192.png') {
@@ -112,7 +118,8 @@ seoRouter.get(
       // Avoid self-redirect loops when targetUrl points back to the same local static path
       if (targetUrl && targetUrl !== req.path && !targetUrl.endsWith(req.path)) {
         if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
-          const cached = iconBufferCache.get(targetUrl);
+          const cacheKey = `${p}::${targetUrl}`;
+          const cached = iconBufferCache.get(cacheKey);
           if (cached && cached.expiresAt > Date.now()) {
             res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400');
             res.setHeader('Content-Type', cached.contentType);
@@ -121,17 +128,25 @@ seoRouter.get(
           try {
             const upstream = await fetch(targetUrl, { signal: AbortSignal.timeout(4000) });
             if (upstream.ok) {
-              const buf = Buffer.from(await upstream.arrayBuffer());
-              if (buf.length > 64) {
-                const ct = upstream.headers.get('content-type') || 'image/png';
-                iconBufferCache.set(targetUrl, {
-                  buffer: buf,
+              const rawPng = new Uint8Array(await upstream.arrayBuffer());
+              if (rawPng.byteLength > 64) {
+                let outBuf: Buffer;
+                let ct: string;
+                if (p === '/favicon.ico') {
+                  outBuf = Buffer.from(wrapPngsInIco([{ size: 48, png: rawPng }]));
+                  ct = 'image/x-icon';
+                } else {
+                  outBuf = Buffer.from(rawPng);
+                  ct = upstream.headers.get('content-type') || 'image/png';
+                }
+                iconBufferCache.set(cacheKey, {
+                  buffer: outBuf,
                   contentType: ct,
                   expiresAt: Date.now() + 3600 * 1000
                 });
                 res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400');
                 res.setHeader('Content-Type', ct);
-                return res.status(200).send(buf);
+                return res.status(200).send(outBuf);
               }
             }
           } catch (_) {}
@@ -148,11 +163,9 @@ seoRouter.get(
 );
 
 seoRouter.get('/site.webmanifest', async (req, res) => {
-  const host = resolveHost(req);
   const data = await getLiveData();
   const settings = data?.settings || {};
   const siteTitle = String(settings.site_title || process.env.VITE_SITE_NAME || '').trim();
-  const icons = getAllSiteIconUrls(settings, host);
 
   res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600');
   res.type('application/manifest+json');
@@ -167,31 +180,31 @@ seoRouter.get('/site.webmanifest', async (req, res) => {
     lang: 'en-IN',
     icons: [
       {
-        src: icons.favicon48 || '/favicon-32x32.png',
+        src: '/favicon-48x48.png',
         sizes: '48x48',
         type: 'image/png',
         purpose: 'any'
       },
       {
-        src: icons.favicon96 || '/apple-touch-icon.png',
+        src: '/favicon-96x96.png',
         sizes: '96x96',
         type: 'image/png',
         purpose: 'any'
       },
       {
-        src: icons.favicon144 || '/apple-touch-icon.png',
+        src: '/favicon-144x144.png',
         sizes: '144x144',
         type: 'image/png',
         purpose: 'any'
       },
       {
-        src: icons.android192 || '/android-chrome-192x192.png',
+        src: '/android-chrome-192x192.png',
         sizes: '192x192',
         type: 'image/png',
         purpose: 'any maskable'
       },
       {
-        src: icons.android512 || '/android-chrome-512x512.png',
+        src: '/android-chrome-512x512.png',
         sizes: '512x512',
         type: 'image/png',
         purpose: 'any maskable'
@@ -213,13 +226,13 @@ seoRouter.get('/opensearch.xml', async (req, res) => {
   const data = await getLiveData();
   const settings = data?.settings || {};
   const siteTitle = String(settings.site_title || process.env.VITE_SITE_NAME || 'Search').trim() || 'Search';
-  const icons = getAllSiteIconUrls(settings, host);
   const iconTags = [
-    icons.favicon16 ? `  <Image width="16" height="16" type="image/png">${escapeXml(icons.favicon16)}</Image>` : '',
-    icons.favicon32 ? `  <Image width="32" height="32" type="image/png">${escapeXml(icons.favicon32)}</Image>` : '',
-    icons.favicon48 ? `  <Image width="48" height="48" type="image/png">${escapeXml(icons.favicon48)}</Image>` : '',
-    icons.searchLogo512 ? `  <Image width="512" height="512" type="image/png">${escapeXml(icons.searchLogo512)}</Image>` : ''
-  ].filter(Boolean).join('\n');
+    `  <Image width="16" height="16" type="image/x-icon">${escapeXml(host)}/favicon.ico</Image>`,
+    `  <Image width="16" height="16" type="image/png">${escapeXml(host)}/favicon-16x16.png</Image>`,
+    `  <Image width="32" height="32" type="image/png">${escapeXml(host)}/favicon-32x32.png</Image>`,
+    `  <Image width="48" height="48" type="image/png">${escapeXml(host)}/favicon-48x48.png</Image>`,
+    `  <Image width="512" height="512" type="image/png">${escapeXml(host)}/logo.png</Image>`
+  ].join('\n');
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
@@ -237,6 +250,8 @@ seoRouter.get('/robots.txt', (req, res) => {
   res.type('text/plain');
   const namedAgents = [
     'Googlebot',
+    'Googlebot-Image',
+    'Google-Favicon',
     'Bingbot',
     'Applebot',
     'DuckDuckBot',

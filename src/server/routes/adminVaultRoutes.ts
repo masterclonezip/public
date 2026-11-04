@@ -373,7 +373,6 @@ function writeMergedData(data: any) {
         }
       }
 
-      const icons = getAllSiteIconUrls(publicSettings);
       const manifestSiteTitle = String(publicSettings?.site_title || process.env.VITE_SITE_NAME || '').trim();
       const manifestObj = {
         id: '/',
@@ -386,13 +385,31 @@ function writeMergedData(data: any) {
         lang: 'en-IN',
         icons: [
           {
-            src: icons.android192 || '/android-chrome-192x192.png',
+            src: '/favicon-48x48.png',
+            sizes: '48x48',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: '/favicon-96x96.png',
+            sizes: '96x96',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: '/favicon-144x144.png',
+            sizes: '144x144',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: '/android-chrome-192x192.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any maskable'
           },
           {
-            src: icons.android512 || '/android-chrome-512x512.png',
+            src: '/android-chrome-512x512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable'

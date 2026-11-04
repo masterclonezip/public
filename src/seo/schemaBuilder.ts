@@ -361,12 +361,33 @@ export async function buildJsonLdSchema(params: BuildSchemaParams): Promise<stri
       ]
     });
   } else if (params.pageType === 'collection') {
+    const sameOriginLogo = hostOrigin ? `${hostOrigin}/logo.png` : (params.logoUrl || '/logo.png');
     const collectionSchema: any = {
       "@context": "https://schema.org",
       "@type": "CollectionPage",
+      "@id": `${params.url}#webpage`,
       "name": params.title,
       "description": params.description,
-      "url": params.url
+      "url": params.url,
+      "inLanguage": "en",
+      "isPartOf": {
+        "@type": "WebSite",
+        "@id": `${hostOrigin}/#website`,
+        "name": params.siteTitle,
+        "url": hostOrigin
+      },
+      "publisher": {
+        "@type": "Organization",
+        "@id": `${hostOrigin}/#organization`,
+        "name": params.siteTitle,
+        "url": hostOrigin,
+        "logo": {
+          "@type": "ImageObject",
+          "url": sameOriginLogo,
+          "width": 512,
+          "height": 512
+        }
+      }
     };
 
     if (params.collectionItems && params.collectionItems.length > 0) {
@@ -400,6 +421,7 @@ export async function buildJsonLdSchema(params: BuildSchemaParams): Promise<stri
       });
     }
   } else if (params.pageType === 'home') {
+    const sameOriginLogo = hostOrigin ? `${hostOrigin}/logo.png` : (params.logoUrl || '/logo.png');
     schemas.push({
       "@context": "https://schema.org",
       "@type": "WebSite",
@@ -419,7 +441,7 @@ export async function buildJsonLdSchema(params: BuildSchemaParams): Promise<stri
         "url": hostOrigin,
         "logo": {
           "@type": "ImageObject",
-          "url": params.logoUrl,
+          "url": sameOriginLogo,
           "width": 512,
           "height": 512
         }
@@ -433,10 +455,10 @@ export async function buildJsonLdSchema(params: BuildSchemaParams): Promise<stri
       "@id": `${hostOrigin}/#organization`,
       "name": params.siteTitle || '',
       "url": hostOrigin,
-      "image": params.logoUrl || `${hostOrigin}/logo.png`,
+      "image": sameOriginLogo,
       "logo": {
         "@type": "ImageObject",
-        "url": params.logoUrl || `${hostOrigin}/logo.png`,
+        "url": sameOriginLogo,
         "width": 512,
         "height": 512
       },
@@ -444,7 +466,8 @@ export async function buildJsonLdSchema(params: BuildSchemaParams): Promise<stri
     });
   } else {
     // Static pages (/about, /contact, /terms, /privacy, /faq, /developers, /videos, etc.):
-    // Emit WebPage schema with exact page title/headline
+    // Emit WebPage schema linked to WebSite and Organization so Google Search associates site name and brand logo
+    const sameOriginLogo = hostOrigin ? `${hostOrigin}/logo.png` : (params.logoUrl || '/logo.png');
     schemas.push({
       "@context": "https://schema.org",
       "@type": "WebPage",
@@ -453,7 +476,25 @@ export async function buildJsonLdSchema(params: BuildSchemaParams): Promise<stri
       "name": params.title,
       "headline": params.title,
       "description": params.description,
-      "inLanguage": "en"
+      "inLanguage": "en",
+      "isPartOf": {
+        "@type": "WebSite",
+        "@id": `${hostOrigin}/#website`,
+        "name": params.siteTitle,
+        "url": hostOrigin
+      },
+      "publisher": {
+        "@type": "Organization",
+        "@id": `${hostOrigin}/#organization`,
+        "name": params.siteTitle,
+        "url": hostOrigin,
+        "logo": {
+          "@type": "ImageObject",
+          "url": sameOriginLogo,
+          "width": 512,
+          "height": 512
+        }
+      }
     });
 
     // On /about, also emit the Organization schema for brand verification
@@ -464,10 +505,10 @@ export async function buildJsonLdSchema(params: BuildSchemaParams): Promise<stri
         "@id": `${hostOrigin}/#organization`,
         "name": params.siteTitle || '',
         "url": hostOrigin,
-        "image": params.logoUrl || `${hostOrigin}/logo.png`,
+        "image": sameOriginLogo,
         "logo": {
           "@type": "ImageObject",
-          "url": params.logoUrl || `${hostOrigin}/logo.png`,
+          "url": sameOriginLogo,
           "width": 512,
           "height": 512
         },

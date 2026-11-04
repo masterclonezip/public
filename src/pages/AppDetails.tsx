@@ -407,7 +407,8 @@ export default function AppDetails() {
   const faqSchema = buildFaqSchema(app);
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(window.location.href)
+    const shareUrl = getCleanCanonicalUrl(app.canonical_url, `/app/${app.slug}`);
+    navigator.clipboard.writeText(shareUrl || window.location.href)
       .then(() => {
         setShareToast(true);
         setTimeout(() => setShareToast(false), 2050);
@@ -418,10 +419,9 @@ export default function AppDetails() {
   const handleShare = async () => {
     const shareUrl = getCleanCanonicalUrl(app.canonical_url, `/app/${app.slug}`);
     const shareTitle = title;
-    const shareText = desc;
     if (navigator.share) {
       try {
-        await navigator.share({ title: shareTitle, text: shareText, url: shareUrl });
+        await navigator.share({ title: shareTitle, url: shareUrl });
       } catch (err) {
         if ((err as Error).name !== 'AbortError') copyToClipboard();
       }

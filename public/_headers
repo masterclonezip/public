@@ -9,26 +9,43 @@
   Access-Control-Allow-Origin: *
   Timing-Allow-Origin: *
 
-# 2. Static Images & Icons
+# 2. Static Images & Brand Icons (1h browser cache + 24h edge revalidation so admin logo updates propagate rapidly)
+/favicon.ico
+  Content-Type: image/x-icon
+  Cache-Control: public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400
+  CDN-Cache-Control: public, max-age=86400, stale-while-revalidate=86400
+  Cloudflare-CDN-Cache-Control: public, max-age=86400, stale-while-revalidate=86400
+  Access-Control-Allow-Origin: *
+  Timing-Allow-Origin: *
+
 /*.png
-  Cache-Control: public, max-age=2592000, stale-while-revalidate=604800
-  CDN-Cache-Control: public, max-age=2592000, stale-while-revalidate=604800
-  Cloudflare-CDN-Cache-Control: public, max-age=2592000, stale-while-revalidate=604800
+  Cache-Control: public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400
+  CDN-Cache-Control: public, max-age=86400, stale-while-revalidate=86400
+  Cloudflare-CDN-Cache-Control: public, max-age=86400, stale-while-revalidate=86400
+  Access-Control-Allow-Origin: *
+  Timing-Allow-Origin: *
 
 /*.webp
-  Cache-Control: public, max-age=2592000, stale-while-revalidate=604800
-  CDN-Cache-Control: public, max-age=2592000, stale-while-revalidate=604800
-  Cloudflare-CDN-Cache-Control: public, max-age=2592000, stale-while-revalidate=604800
+  Cache-Control: public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400
+  CDN-Cache-Control: public, max-age=86400, stale-while-revalidate=86400
+  Cloudflare-CDN-Cache-Control: public, max-age=86400, stale-while-revalidate=86400
+  Access-Control-Allow-Origin: *
+  Timing-Allow-Origin: *
 
 /*.svg
-  Cache-Control: public, max-age=2592000, stale-while-revalidate=604800
-  CDN-Cache-Control: public, max-age=2592000, stale-while-revalidate=604800
-  Cloudflare-CDN-Cache-Control: public, max-age=2592000, stale-while-revalidate=604800
+  Cache-Control: public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400
+  CDN-Cache-Control: public, max-age=86400, stale-while-revalidate=86400
+  Cloudflare-CDN-Cache-Control: public, max-age=86400, stale-while-revalidate=86400
+  Access-Control-Allow-Origin: *
+  Timing-Allow-Origin: *
 
 /*.ico
-  Cache-Control: public, max-age=2592000, stale-while-revalidate=604800
-  CDN-Cache-Control: public, max-age=2592000, stale-while-revalidate=604800
-  Cloudflare-CDN-Cache-Control: public, max-age=2592000, stale-while-revalidate=604800
+  Content-Type: image/x-icon
+  Cache-Control: public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400
+  CDN-Cache-Control: public, max-age=86400, stale-while-revalidate=86400
+  Cloudflare-CDN-Cache-Control: public, max-age=86400, stale-while-revalidate=86400
+  Access-Control-Allow-Origin: *
+  Timing-Allow-Origin: *
 
 # 3. Web Crawler Acceleration (Sitemaps, RSS & Robots.txt)
 /*.xml

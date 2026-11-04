@@ -170,7 +170,7 @@ export function getSizedLogoUrl(
   rawUrl?: string,
   size = 512,
   format: 'png' | 'webp' | 'auto' = 'png',
-  cropMode: 'c_fill' | 'c_fit' | 'c_pad' = 'c_fit'
+  cropMode: 'c_fill' | 'c_fit' | 'c_pad' = 'c_pad'
 ): string {
   if (!rawUrl || typeof rawUrl !== 'string') return '';
   const trimmed = rawUrl.trim();
@@ -181,8 +181,8 @@ export function getSizedLogoUrl(
     if (size <= 0) {
       return cleanUrl.replace('/upload/', `/upload/${fmt},q_auto:best/`);
     }
-    const safeMode = cropMode === 'c_pad' ? 'c_fit' : cropMode;
-    return cleanUrl.replace('/upload/', `/upload/${fmt},q_auto:best,w_${size},h_${size},${safeMode}/`);
+    const modeTransform = cropMode === 'c_pad' ? 'c_pad,b_transparent' : cropMode;
+    return cleanUrl.replace('/upload/', `/upload/${fmt},q_auto:best,w_${size},h_${size},${modeTransform}/`);
   }
   if (trimmed.includes('images.unsplash.com')) {
     const fmt = format === 'png' ? 'png' : 'webp';
@@ -192,6 +192,46 @@ export function getSizedLogoUrl(
     return `${trimmed}${trimmed.includes('?') ? '&' : '?'}fm=${fmt}&q=92&w=${size}&h=${size}&fit=max`;
   }
   return trimmed;
+}
+
+/**
+ * Wraps one or more PNG buffers (e.g. 48x48, 32x32, 16x16) into a spec-compliant
+ * Microsoft .ICO container binary (00 00 01 00 header + 16-byte ICONDIRENTRY per image).
+ */
+export function wrapPngsInIco(entries: Array<{ size: number; png: Uint8Array }>): Uint8Array {
+  const valid = entries.filter(e => e && e.png && e.png.byteLength > 64);
+  if (valid.length === 0) return new Uint8Array(0);
+
+  const count = valid.length;
+  const headerSize = 6 + count * 16;
+  const totalPayload = valid.reduce((acc, e) => acc + e.png.byteLength, 0);
+  const ico = new Uint8Array(headerSize + totalPayload);
+  const view = new DataView(ico.buffer, ico.byteOffset, ico.byteLength);
+
+  // ICONDIR (6 bytes): Reserved=0, Type=1 (ICO), Count=count
+  view.setUint16(0, 0, true);
+  view.setUint16(2, 1, true);
+  view.setUint16(4, count, true);
+
+  let currentOffset = headerSize;
+  for (let i = 0; i < count; i++) {
+    const { size, png } = valid[i];
+    const entryPos = 6 + i * 16;
+    const dim = size >= 256 || size <= 0 ? 0 : size;
+    ico[entryPos] = dim; // Width
+    ico[entryPos + 1] = dim; // Height
+    ico[entryPos + 2] = 0; // ColorCount (0 for >=8bpp)
+    ico[entryPos + 3] = 0; // Reserved
+    view.setUint16(entryPos + 4, 1, true); // Color planes = 1
+    view.setUint16(entryPos + 6, 32, true); // Bits per pixel = 32
+    view.setUint32(entryPos + 8, png.byteLength, true); // BytesInRes
+    view.setUint32(entryPos + 12, currentOffset, true); // ImageOffset
+
+    ico.set(png, currentOffset);
+    currentOffset += png.byteLength;
+  }
+
+  return ico;
 }
 
 export interface SiteIconSet {
@@ -220,25 +260,25 @@ export function getAllSiteIconUrls(settings?: any, origin = getDefaultOrigin()):
   const absLogo = rawLogo ? ensureAbsoluteUrl(rawLogo, origin) : '';
   const absFavicon = rawFavicon ? ensureAbsoluteUrl(rawFavicon, origin) : absLogo;
 
-  const pwa512Url = absFavicon ? getSizedLogoUrl(absFavicon, 512, 'png', 'c_fit') : '/android-chrome-512x512.png';
-  const pwa192Url = absFavicon ? getSizedLogoUrl(absFavicon, 192, 'png', 'c_fit') : '/android-chrome-192x192.png';
+  const pwa512Url = absFavicon ? getSizedLogoUrl(absFavicon, 512, 'png', 'c_pad') : ensureAbsoluteUrl('/android-chrome-512x512.png', origin);
+  const pwa192Url = absFavicon ? getSizedLogoUrl(absFavicon, 192, 'png', 'c_pad') : ensureAbsoluteUrl('/android-chrome-192x192.png', origin);
 
   return {
     masterLogo: absLogo ? getSizedLogoUrl(absLogo, 0, 'auto', 'c_fit') : '',
-    masterFavicon: absFavicon ? getSizedLogoUrl(absFavicon, 0, 'png', 'c_fit') : '',
+    masterFavicon: absFavicon ? getSizedLogoUrl(absFavicon, 0, 'png', 'c_pad') : '',
     headerLogo: absLogo ? getSizedLogoUrl(absLogo, 240, 'auto', 'c_fit') : '',
-    searchLogo512: absFavicon ? getSizedLogoUrl(absFavicon, 512, 'png', 'c_fit') : ensureAbsoluteUrl('/logo.png', origin),
+    searchLogo512: absFavicon ? getSizedLogoUrl(absFavicon, 512, 'png', 'c_pad') : ensureAbsoluteUrl('/logo.png', origin),
     pwa512: pwa512Url,
     pwa192: pwa192Url,
     android512: pwa512Url,
     android192: pwa192Url,
-    appleTouch180: absFavicon ? getSizedLogoUrl(absFavicon, 180, 'png', 'c_fit') : '/apple-touch-icon.png',
-    favicon144: absFavicon ? getSizedLogoUrl(absFavicon, 144, 'png', 'c_fit') : '/favicon.png',
-    favicon96: absFavicon ? getSizedLogoUrl(absFavicon, 96, 'png', 'c_fit') : '/favicon.png',
-    favicon48: absFavicon ? getSizedLogoUrl(absFavicon, 48, 'png', 'c_fit') : '/favicon.ico',
-    favicon32: absFavicon ? getSizedLogoUrl(absFavicon, 32, 'png', 'c_fit') : '/favicon-32x32.png',
-    favicon16: absFavicon ? getSizedLogoUrl(absFavicon, 16, 'png', 'c_fit') : '/favicon-16x16.png',
-    faviconIco: absFavicon ? getSizedLogoUrl(absFavicon, 192, 'png', 'c_fit') : '/favicon.ico',
+    appleTouch180: absFavicon ? getSizedLogoUrl(absFavicon, 180, 'png', 'c_pad') : ensureAbsoluteUrl('/apple-touch-icon.png', origin),
+    favicon144: absFavicon ? getSizedLogoUrl(absFavicon, 144, 'png', 'c_pad') : ensureAbsoluteUrl('/favicon-144x144.png', origin),
+    favicon96: absFavicon ? getSizedLogoUrl(absFavicon, 96, 'png', 'c_pad') : ensureAbsoluteUrl('/favicon-96x96.png', origin),
+    favicon48: absFavicon ? getSizedLogoUrl(absFavicon, 48, 'png', 'c_pad') : ensureAbsoluteUrl('/favicon-48x48.png', origin),
+    favicon32: absFavicon ? getSizedLogoUrl(absFavicon, 32, 'png', 'c_pad') : ensureAbsoluteUrl('/favicon-32x32.png', origin),
+    favicon16: absFavicon ? getSizedLogoUrl(absFavicon, 16, 'png', 'c_pad') : ensureAbsoluteUrl('/favicon-16x16.png', origin),
+    faviconIco: ensureAbsoluteUrl('/favicon.ico', origin),
     ogBanner1200: absLogo ? getOgImageUrl(absLogo, origin) : ''
   };
 }
@@ -255,17 +295,39 @@ export function getOgImageUrl(url?: string, origin = getDefaultOrigin(), isNews 
   if (!url) return '';
   let absUrl = ensureAbsoluteUrl(url, origin);
   if (absUrl.includes('res.cloudinary.com') && absUrl.includes('/upload/')) {
-    if (absUrl.includes('w_1200') && absUrl.includes('h_630') && (isNews ? !absUrl.includes('c_pad') : true)) {
-      return absUrl;
+    // Strip existing transformations cleanly
+    let cleanUrl = absUrl.replace(/\/upload\/(?:(?:[a-z]{1,3}_[a-zA-Z0-9_.:-]+,?)+\/)*/, '/upload/');
+    // Social crawlers (WhatsApp, Facebook, Twitter, iMessage) strictly require .jpg or .png extension in URL
+    if (/\.(webp|png|jpeg|gif|avif)$/i.test(cleanUrl)) {
+      cleanUrl = cleanUrl.replace(/\.(webp|png|jpeg|gif|avif)$/i, '.jpg');
+    } else if (!cleanUrl.toLowerCase().endsWith('.jpg')) {
+      cleanUrl = `${cleanUrl}.jpg`;
     }
-    const cleanUrl = absUrl.replace(/\/upload\/(?:(?:[a-z]{1,3}_[a-zA-Z0-9_.:-]+,?)+\/)*/, '/upload/');
     if (isNews) {
-      return cleanUrl.replace('/upload/', '/upload/f_auto,q_auto,w_1200,h_630,c_fill/');
+      return cleanUrl.replace('/upload/', '/upload/w_1200,h_630,c_fill,f_jpg,q_auto:good/');
     }
-    return cleanUrl.replace('/upload/', '/upload/f_jpg,q_auto,w_1200,h_630,c_pad,b_auto/');
+    return cleanUrl.replace('/upload/', '/upload/w_1200,h_630,c_pad,b_auto,f_jpg,q_auto:good/');
   }
   if (absUrl.includes('images.unsplash.com')) {
     return `${absUrl}${absUrl.includes('?') ? '&' : '?'}fm=jpg&q=85&w=1200&h=630&fit=crop`;
+  }
+  return absUrl;
+}
+
+export function getOgSquareImageUrl(url?: string, origin = getDefaultOrigin()): string {
+  if (!url) return '';
+  let absUrl = ensureAbsoluteUrl(url, origin);
+  if (absUrl.includes('res.cloudinary.com') && absUrl.includes('/upload/')) {
+    let cleanUrl = absUrl.replace(/\/upload\/(?:(?:[a-z]{1,3}_[a-zA-Z0-9_.:-]+,?)+\/)*/, '/upload/');
+    if (/\.(webp|png|jpeg|gif|avif)$/i.test(cleanUrl)) {
+      cleanUrl = cleanUrl.replace(/\.(webp|png|jpeg|gif|avif)$/i, '.jpg');
+    } else if (!cleanUrl.toLowerCase().endsWith('.jpg')) {
+      cleanUrl = `${cleanUrl}.jpg`;
+    }
+    return cleanUrl.replace('/upload/', '/upload/w_600,h_600,c_pad,b_auto,f_jpg,q_auto:good/');
+  }
+  if (absUrl.includes('images.unsplash.com')) {
+    return `${absUrl}${absUrl.includes('?') ? '&' : '?'}fm=jpg&q=85&w=600&h=600&fit=crop`;
   }
   return absUrl;
 }

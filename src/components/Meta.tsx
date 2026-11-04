@@ -124,43 +124,41 @@ const Meta: React.FC<MetaProps> = ({
     setMetaTag('name', 'bingbot', robotsDirective);
 
     // 2b. Synchronize Favicon, Apple Touch Icon, and Google Search Result Multi-Size Icons in <head>
-    if (iconSet.masterFavicon || iconSet.masterLogo) {
-      document.head.querySelectorAll('link[rel="icon"][type="image/svg+xml"]').forEach(el => el.remove());
-      const upsertIconLink = (rel: string, sizes: string | null, type: string | null, href: string) => {
-        if (!href) return;
-        const selector = sizes
-          ? `link[rel="${rel}"][sizes="${sizes}"]`
-          : `link[rel="${rel}"]:not([sizes])`;
-        let linkEl = document.head.querySelector(selector) as HTMLLinkElement | null;
-        if (!linkEl) {
-          linkEl = document.createElement('link');
-          linkEl.setAttribute('rel', rel);
-          document.head.appendChild(linkEl);
-        }
-        if (sizes) {
-          linkEl.setAttribute('sizes', sizes);
-        } else {
-          linkEl.removeAttribute('sizes');
-        }
-        if (type) {
-          linkEl.setAttribute('type', type);
-        } else {
-          linkEl.removeAttribute('type');
-        }
-        linkEl.setAttribute('href', href);
-      };
-      const primaryIconType = iconSet.faviconIco.endsWith('.ico') ? 'image/x-icon' : 'image/png';
-      upsertIconLink('icon', null, primaryIconType, iconSet.faviconIco);
-      upsertIconLink('shortcut icon', null, primaryIconType, iconSet.faviconIco);
-      upsertIconLink('icon', '48x48', 'image/png', iconSet.favicon48);
-      upsertIconLink('icon', '96x96', 'image/png', iconSet.favicon96);
-      upsertIconLink('icon', '144x144', 'image/png', iconSet.favicon144);
-      upsertIconLink('icon', '192x192', 'image/png', iconSet.pwa192);
-      upsertIconLink('icon', '512x512', 'image/png', iconSet.pwa512);
-      upsertIconLink('icon', '32x32', 'image/png', iconSet.favicon32);
-      upsertIconLink('icon', '16x16', 'image/png', iconSet.favicon16);
-      upsertIconLink('apple-touch-icon', '180x180', 'image/png', iconSet.appleTouch180);
-    }
+    document.head.querySelectorAll('link[rel="icon"][type="image/svg+xml"], link[rel="icon"]:not([sizes])').forEach(el => el.remove());
+    const upsertIconLink = (rel: string, sizes: string | null, type: string | null, href: string) => {
+      if (!href) return;
+      const selector = sizes
+        ? `link[rel="${rel}"][sizes="${sizes}"][type="${type || ''}"]`
+        : `link[rel="${rel}"]:not([sizes])`;
+      let linkEl = document.head.querySelector(selector) as HTMLLinkElement | null;
+      if (!linkEl) {
+        linkEl = document.createElement('link');
+        linkEl.setAttribute('rel', rel);
+        document.head.appendChild(linkEl);
+      }
+      if (sizes) {
+        linkEl.setAttribute('sizes', sizes);
+      } else {
+        linkEl.removeAttribute('sizes');
+      }
+      if (type) {
+        linkEl.setAttribute('type', type);
+      } else {
+        linkEl.removeAttribute('type');
+      }
+      linkEl.setAttribute('href', href);
+    };
+    const sameOriginPrefix = origin || '';
+    upsertIconLink('icon', '48x48', 'image/x-icon', `${sameOriginPrefix}/favicon.ico`);
+    upsertIconLink('icon', '48x48', 'image/png', `${sameOriginPrefix}/favicon-48x48.png`);
+    upsertIconLink('icon', '96x96', 'image/png', `${sameOriginPrefix}/favicon-96x96.png`);
+    upsertIconLink('icon', '144x144', 'image/png', `${sameOriginPrefix}/favicon-144x144.png`);
+    upsertIconLink('icon', '192x192', 'image/png', `${sameOriginPrefix}/android-chrome-192x192.png`);
+    upsertIconLink('icon', '512x512', 'image/png', `${sameOriginPrefix}/android-chrome-512x512.png`);
+    upsertIconLink('icon', '32x32', 'image/png', `${sameOriginPrefix}/favicon-32x32.png`);
+    upsertIconLink('icon', '16x16', 'image/png', `${sameOriginPrefix}/favicon-16x16.png`);
+    upsertIconLink('shortcut icon', null, 'image/x-icon', `${sameOriginPrefix}/favicon.ico`);
+    upsertIconLink('apple-touch-icon', '180x180', 'image/png', `${sameOriginPrefix}/apple-touch-icon.png`);
 
     if (!isIndexable) {
       setMetaTag('name', 'slurp', robotsDirective);
@@ -209,7 +207,6 @@ const Meta: React.FC<MetaProps> = ({
         linkEl.remove();
       }
     });
-    const isAppPage = currentPath.startsWith('/app/');
     const resolvedSiteName = siteTitle || '';
 
     if (squareThumbnail) {
@@ -232,16 +229,15 @@ const Meta: React.FC<MetaProps> = ({
     setMetaTag('property', 'og:description', metaDescription);
     setMetaTag('property', 'og:image', metaImage);
     setMetaTag('property', 'og:image:secure_url', metaImage);
-    setMetaTag('property', 'og:image:type', metaImage.includes('.jpg') || metaImage.includes('f_jpg') ? 'image/jpeg' : 'image/png');
+    setMetaTag('property', 'og:image:type', 'image/jpeg');
     const ogWidth = metaImage.includes('w_600') ? '600' : '1200';
     const ogHeight = metaImage.includes('w_600') ? '600' : '630';
     setMetaTag('property', 'og:image:width', ogWidth);
     setMetaTag('property', 'og:image:height', ogHeight);
-    if (cleanPathLower === '/') {
+    setMetaTag('property', 'og:image:alt', fullTitle);
+    if (resolvedSiteName) {
       setMetaTag('property', 'og:site_name', resolvedSiteName);
       setMetaTag('name', 'application-name', resolvedSiteName);
-    } else {
-      document.head.querySelectorAll('meta[property="og:site_name" i], meta[name="og:site_name" i], meta[name="application-name" i], meta[property="application-name" i]').forEach(el => el.remove());
     }
     setMetaTag('property', 'og:locale', 'en_IN');
 

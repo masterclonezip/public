@@ -1,4 +1,4 @@
-import { escapeHtml, getOptimizedImageUrl, normalizeIsoDate, getAllSiteIconUrls } from './utils';
+import { escapeHtml, getOptimizedImageUrl, normalizeIsoDate, getAllSiteIconUrls, getOgSquareImageUrl } from './utils';
 
 export interface MetaBuilderParams {
   title: string;
@@ -51,15 +51,16 @@ export function buildMetaTags(params: MetaBuilderParams): string {
     } catch (_) {}
   }
   const iconSet = getAllSiteIconUrls(settings, origin);
-  const resolvedFaviconIco = iconSet.masterFavicon ? iconSet.faviconIco : faviconIco;
-  const resolvedFavicon16 = iconSet.masterFavicon ? iconSet.favicon16 : favicon16;
-  const resolvedFavicon32 = iconSet.masterFavicon ? iconSet.favicon32 : favicon32;
-  const resolvedFavicon48 = iconSet.masterFavicon ? iconSet.favicon48 : favicon32;
-  const resolvedFavicon96 = iconSet.masterFavicon ? iconSet.favicon96 : favicon180;
-  const resolvedFavicon144 = iconSet.masterFavicon ? iconSet.favicon144 : favicon180;
-  const resolvedFavicon180 = iconSet.masterFavicon ? iconSet.appleTouch180 : favicon180;
-  const resolvedFavicon192 = iconSet.masterFavicon ? iconSet.pwa192 : favicon180;
-  const resolvedFavicon512 = iconSet.masterFavicon ? iconSet.pwa512 : favicon180;
+  const sameOriginPrefix = origin || '';
+  const resolvedFaviconIco = `${sameOriginPrefix}/favicon.ico`;
+  const resolvedFavicon16 = `${sameOriginPrefix}/favicon-16x16.png`;
+  const resolvedFavicon32 = `${sameOriginPrefix}/favicon-32x32.png`;
+  const resolvedFavicon48 = `${sameOriginPrefix}/favicon-48x48.png`;
+  const resolvedFavicon96 = `${sameOriginPrefix}/favicon-96x96.png`;
+  const resolvedFavicon144 = `${sameOriginPrefix}/favicon-144x144.png`;
+  const resolvedFavicon180 = `${sameOriginPrefix}/apple-touch-icon.png`;
+  const resolvedFavicon192 = `${sameOriginPrefix}/android-chrome-192x192.png`;
+  const resolvedFavicon512 = `${sameOriginPrefix}/android-chrome-512x512.png`;
 
   const escapedTitle = escapeHtml(title);
   const escapedDesc = escapeHtml(description);
@@ -76,6 +77,7 @@ export function buildMetaTags(params: MetaBuilderParams): string {
   const searchThumbnail = rawTargetIcon
     ? getOptimizedImageUrl(rawTargetIcon, 512)
     : (rawNewsHero ? getOptimizedImageUrl(rawNewsHero, 1200) : (iconSet.masterLogo ? iconSet.searchLogo512 : pageOgImage));
+  const ogSquareImage = rawTargetIcon ? getOgSquareImageUrl(rawTargetIcon, origin) : '';
 
   const articleMetaTags = (() => {
     if (pageType !== 'news' || !targetNews) return '';
@@ -95,10 +97,8 @@ export function buildMetaTags(params: MetaBuilderParams): string {
     ].filter(Boolean).join('\n    ');
   })();
 
-  const primaryIconMime = resolvedFaviconIco.endsWith('.ico') ? 'image/x-icon' : 'image/png';
   const iconLinksHtml = `
-    <link data-rh="true" rel="icon" type="${primaryIconMime}" href="${escapeHtml(resolvedFaviconIco)}">
-    <link data-rh="true" rel="shortcut icon" type="${primaryIconMime}" href="${escapeHtml(resolvedFaviconIco)}">
+    <link data-rh="true" rel="icon" type="image/x-icon" sizes="48x48" href="${escapeHtml(resolvedFaviconIco)}">
     <link data-rh="true" rel="icon" type="image/png" sizes="48x48" href="${escapeHtml(resolvedFavicon48)}">
     <link data-rh="true" rel="icon" type="image/png" sizes="96x96" href="${escapeHtml(resolvedFavicon96)}">
     <link data-rh="true" rel="icon" type="image/png" sizes="144x144" href="${escapeHtml(resolvedFavicon144)}">
@@ -106,6 +106,7 @@ export function buildMetaTags(params: MetaBuilderParams): string {
     <link data-rh="true" rel="icon" type="image/png" sizes="512x512" href="${escapeHtml(resolvedFavicon512)}">
     <link data-rh="true" rel="icon" type="image/png" sizes="32x32" href="${escapeHtml(resolvedFavicon32)}">
     <link data-rh="true" rel="icon" type="image/png" sizes="16x16" href="${escapeHtml(resolvedFavicon16)}">
+    <link data-rh="true" rel="shortcut icon" type="image/x-icon" href="${escapeHtml(resolvedFaviconIco)}">
     <link data-rh="true" rel="apple-touch-icon" type="image/png" sizes="180x180" href="${escapeHtml(resolvedFavicon180)}">
     <link data-rh="true" rel="manifest" href="/site.webmanifest">`;
 
@@ -129,13 +130,11 @@ export function buildMetaTags(params: MetaBuilderParams): string {
   `;
   }
 
-  const isHomePage = pageType === 'home';
-
   return `
     <title>${escapedTitle}</title>
     <meta name="description" content="${escapedDesc}">
     ${keywords ? `<meta name="keywords" content="${escapedKeywords}">` : ''}
-    ${isHomePage && resolvedSiteName ? `<meta data-rh="true" name="application-name" content="${resolvedSiteName}">` : ''}
+    ${resolvedSiteName ? `<meta data-rh="true" name="application-name" content="${resolvedSiteName}">` : ''}
     <meta data-rh="true" name="color-scheme" content="light dark">
     <meta data-rh="true" name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
     <meta data-rh="true" name="theme-color" media="(prefers-color-scheme: dark)" content="#090d16">
@@ -143,7 +142,7 @@ export function buildMetaTags(params: MetaBuilderParams): string {
       ? `<meta data-rh="true" name="robots" content="noindex, nofollow, noarchive, nosnippet">`
       : `<meta data-rh="true" name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">`
     }
-    ${isHomePage && resolvedSiteName ? `<meta data-rh="true" property="og:site_name" content="${resolvedSiteName}">` : ''}
+    ${resolvedSiteName ? `<meta data-rh="true" property="og:site_name" content="${resolvedSiteName}">` : ''}
     <meta data-rh="true" property="og:locale" content="en_IN">
     <meta data-rh="true" property="og:title" content="${escapedTitle}">
     <meta data-rh="true" property="og:description" content="${escapedDesc}">
@@ -151,9 +150,17 @@ export function buildMetaTags(params: MetaBuilderParams): string {
     <meta data-rh="true" property="og:url" content="${canonicalUrl}">
     <meta data-rh="true" property="og:image" content="${pageOgImage}">
     <meta data-rh="true" property="og:image:secure_url" content="${pageOgImage}">
-    <meta data-rh="true" property="og:image:type" content="${pageOgImage.includes('.jpg') || pageOgImage.includes('f_jpg') ? 'image/jpeg' : 'image/png'}">
+    <meta data-rh="true" property="og:image:type" content="image/jpeg">
     <meta data-rh="true" property="og:image:width" content="${ogImageWidth}">
     <meta data-rh="true" property="og:image:height" content="${ogImageHeight}">
+    <meta data-rh="true" property="og:image:alt" content="${escapedTitle}">
+    ${ogSquareImage && ogSquareImage !== pageOgImage ? `
+    <meta data-rh="true" property="og:image" content="${ogSquareImage}">
+    <meta data-rh="true" property="og:image:secure_url" content="${ogSquareImage}">
+    <meta data-rh="true" property="og:image:type" content="image/jpeg">
+    <meta data-rh="true" property="og:image:width" content="600">
+    <meta data-rh="true" property="og:image:height" content="600">
+    <meta data-rh="true" property="og:image:alt" content="${escapedTitle}">` : ''}
     ${articleMetaTags}
     <meta data-rh="true" name="twitter:card" content="summary_large_image">
     <meta data-rh="true" name="twitter:url" content="${canonicalUrl}">
@@ -161,9 +168,9 @@ export function buildMetaTags(params: MetaBuilderParams): string {
     <meta data-rh="true" name="twitter:description" content="${escapedDesc}">
     <meta data-rh="true" name="twitter:image" content="${pageOgImage}">
     <meta data-rh="true" name="thumbnail" content="${searchThumbnail}">
-    <meta data-rh="true" itemprop="image" content="${searchThumbnail}">
+    <meta data-rh="true" itemprop="image" content="${pageOgImage}">
     <meta data-rh="true" itemprop="thumbnailUrl" content="${searchThumbnail}">
-    <link data-rh="true" rel="image_src" href="${searchThumbnail}">
+    <link data-rh="true" rel="image_src" href="${pageOgImage}">
     ${!isNotFound ? `<link data-rh="true" rel="canonical" href="${canonicalUrl}">` : ''}
     ${iconLinksHtml}
     ${(() => {

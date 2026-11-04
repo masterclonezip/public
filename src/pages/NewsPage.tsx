@@ -139,7 +139,6 @@ export default function NewsPage() {
     if (navigator.share) {
       navigator.share({
         title: item.title,
-        text: getPlainTextSnippet(item.description).slice(0, 100),
         url: url,
       }).catch(() => {});
     } else {

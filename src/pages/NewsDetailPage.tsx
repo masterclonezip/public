@@ -224,9 +224,8 @@ export default function NewsDetailPage() {
   const handleShare = () => {
     const url = getCleanCanonicalUrl(newsItem?.canonical_url, `/news/${newsItem?.slug || newsItem?.id || ''}`);
     const shareTitle = newsItem?.seo_title || newsItem?.title || 'News Article';
-    const shareText = newsItem?.seo_description || newsItem?.description || '';
     if (navigator.share) {
-      navigator.share({ title: shareTitle, text: shareText, url }).catch(() => {});
+      navigator.share({ title: shareTitle, url }).catch(() => {});
     } else {
       navigator.clipboard.writeText(url).then(() => {
         setCopied(true);

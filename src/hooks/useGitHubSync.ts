@@ -785,7 +785,7 @@ export function useGitHubSync(
       }
 
       // 2. Assemble ALL primary files together for 1 single atomic commit
-      const primaryBatchFiles: { path: string; content: string }[] = [
+      const primaryBatchFiles: { path: string; content: string; encoding?: 'utf-8' | 'base64' }[] = [
         {
           path: 'src/lib/staticData.ts',
           content: activeUpdatedCode
@@ -850,7 +850,7 @@ export function useGitHubSync(
         });
       }
 
-      // Generate XML sitemaps, site.webmanifest, and opensearch.xml for instant static hosting and search engine discoverability
+      // Generate XML sitemaps, site.webmanifest, opensearch.xml, and materialize binary brand icons for instant static hosting and Google Search favicon discoverability
       try {
         const publicDomain = normalizeSitemapHost(
           resolvePublicSiteDomain(finalSettings, publicApps, publicNews)
@@ -874,13 +874,13 @@ export function useGitHubSync(
         const sitemapLines = publicDomain
           ? `\nSitemap: ${publicDomain}/sitemap.xml\nSitemap: ${publicDomain}/sitemap-news.xml\nSitemap: ${publicDomain}/sitemap-apps.xml\nSitemap: ${publicDomain}/sitemap-static.xml\nSitemap: ${publicDomain}/sitemap-videos.xml\nSitemap: ${publicDomain}/sitemap-developers.xml\n`
           : '';
-        const robotsContent = `User-agent: *\nAllow: /\nAllow: /api/v1/public/\nDisallow: /api/\nDisallow: /admin/\nDisallow: /login/\nDisallow: /masterworld/\nDisallow: /moreinfo/\nDisallow: /moreinfo/*\n${sitemapLines}`;
+        const robotsContent = `User-agent: Googlebot\nAllow: /\nAllow: /api/v1/public/\nDisallow: /api/\nDisallow: /admin/\nDisallow: /login/\nDisallow: /masterworld/\nDisallow: /moreinfo/\nDisallow: /moreinfo/*\n\nUser-agent: Googlebot-Image\nAllow: /\n\nUser-agent: Google-Favicon\nAllow: /\n\nUser-agent: *\nAllow: /\nAllow: /api/v1/public/\nDisallow: /api/\nDisallow: /admin/\nDisallow: /login/\nDisallow: /masterworld/\nDisallow: /moreinfo/\nDisallow: /moreinfo/*\n${sitemapLines}`;
         primaryBatchFiles.push({
           path: 'public/robots.txt',
           content: robotsContent
         });
 
-        const { getAllSiteIconUrls } = await import('../seo/utils');
+        const { getAllSiteIconUrls, wrapPngsInIco } = await import('../seo/utils');
         const icons = getAllSiteIconUrls(finalSettings, publicDomain);
         const siteTitle = String(finalSettings?.site_title || (import.meta as any).env?.VITE_SITE_NAME || '').trim();
         const manifestContent = JSON.stringify({
@@ -894,31 +894,31 @@ export function useGitHubSync(
           lang: 'en-IN',
           icons: [
             {
-              src: icons.favicon48 || '/favicon-32x32.png',
+              src: '/favicon-48x48.png',
               sizes: '48x48',
               type: 'image/png',
               purpose: 'any'
             },
             {
-              src: icons.favicon96 || '/apple-touch-icon.png',
+              src: '/favicon-96x96.png',
               sizes: '96x96',
               type: 'image/png',
               purpose: 'any'
             },
             {
-              src: icons.favicon144 || '/apple-touch-icon.png',
+              src: '/favicon-144x144.png',
               sizes: '144x144',
               type: 'image/png',
               purpose: 'any'
             },
             {
-              src: icons.android192 || '/android-chrome-192x192.png',
+              src: '/android-chrome-192x192.png',
               sizes: '192x192',
               type: 'image/png',
               purpose: 'any maskable'
             },
             {
-              src: icons.android512 || '/android-chrome-512x512.png',
+              src: '/android-chrome-512x512.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any maskable'
@@ -939,17 +939,80 @@ export function useGitHubSync(
         });
 
         const openSearchTitle = (siteTitle || 'Search').replace(/[<>&'"]/g, '');
+        const escapedHost = (publicDomain || '').replace(/&/g, '&amp;');
         const openSearchIcons = [
-          icons.favicon16 ? `  <Image width="16" height="16" type="image/png">${icons.favicon16.replace(/&/g, '&amp;')}</Image>` : '',
-          icons.favicon32 ? `  <Image width="32" height="32" type="image/png">${icons.favicon32.replace(/&/g, '&amp;')}</Image>` : '',
-          icons.favicon48 ? `  <Image width="48" height="48" type="image/png">${icons.favicon48.replace(/&/g, '&amp;')}</Image>` : '',
-          icons.searchLogo512 ? `  <Image width="512" height="512" type="image/png">${icons.searchLogo512.replace(/&/g, '&amp;')}</Image>` : ''
-        ].filter(Boolean).join('\n');
+          `  <Image width="16" height="16" type="image/x-icon">${escapedHost}/favicon.ico</Image>`,
+          `  <Image width="16" height="16" type="image/png">${escapedHost}/favicon-16x16.png</Image>`,
+          `  <Image width="32" height="32" type="image/png">${escapedHost}/favicon-32x32.png</Image>`,
+          `  <Image width="48" height="48" type="image/png">${escapedHost}/favicon-48x48.png</Image>`,
+          `  <Image width="512" height="512" type="image/png">${escapedHost}/logo.png</Image>`
+        ].join('\n');
         const openSearchXml = `<?xml version="1.0" encoding="UTF-8"?>\n<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">\n  <ShortName>${openSearchTitle}</ShortName>\n  <Description>Search applications</Description>\n  <InputEncoding>UTF-8</InputEncoding>\n${openSearchIcons}\n  <Url type="text/html" template="${publicDomain || ''}/?s={searchTerms}"/>\n</OpenSearchDescription>\n`;
         primaryBatchFiles.push({
           path: 'public/opensearch.xml',
           content: openSearchXml
         });
+
+        // Materialize binary brand icons into public/ so static edge hosting and XML sitemaps always serve the real brand logo
+        if (icons.masterFavicon || icons.masterLogo) {
+          const uint8ToBase64 = (bytes: Uint8Array): string => {
+            let binary = '';
+            const chunkSize = 0x8000;
+            for (let i = 0; i < bytes.length; i += chunkSize) {
+              binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunkSize)));
+            }
+            return btoa(binary);
+          };
+
+          const iconTargets: Array<{ size: number; url: string; paths: string[] }> = [
+            { size: 16, url: icons.favicon16, paths: ['public/favicon-16x16.png'] },
+            { size: 32, url: icons.favicon32, paths: ['public/favicon-32x32.png'] },
+            { size: 48, url: icons.favicon48, paths: ['public/favicon-48x48.png'] },
+            { size: 96, url: icons.favicon96, paths: ['public/favicon-96x96.png'] },
+            { size: 144, url: icons.favicon144, paths: ['public/favicon-144x144.png'] },
+            { size: 180, url: icons.appleTouch180, paths: ['public/apple-touch-icon.png', 'public/apple-touch-icon-precomposed.png'] },
+            { size: 192, url: icons.pwa192, paths: ['public/android-chrome-192x192.png', 'public/favicon.png'] },
+            { size: 512, url: icons.pwa512, paths: ['public/android-chrome-512x512.png', 'public/logo.png'] }
+          ];
+
+          const downloadedPngs = new Map<number, Uint8Array>();
+          await Promise.all(
+            iconTargets.map(async ({ size, url, paths }) => {
+              if (!url || (!url.startsWith('https://') && !url.startsWith('http://'))) return;
+              try {
+                const res = await fetch(url);
+                if (!res.ok) return;
+                const bytes = new Uint8Array(await res.arrayBuffer());
+                if (bytes.byteLength < 100) return;
+                downloadedPngs.set(size, bytes);
+                const b64 = uint8ToBase64(bytes);
+                for (const p of paths) {
+                  primaryBatchFiles.push({
+                    path: p,
+                    content: b64,
+                    encoding: 'base64'
+                  });
+                }
+              } catch (_) {}
+            })
+          );
+
+          const icoEntries: Array<{ size: number; png: Uint8Array }> = [];
+          for (const sz of [48, 32, 16]) {
+            const pngBytes = downloadedPngs.get(sz);
+            if (pngBytes) icoEntries.push({ size: sz, png: pngBytes });
+          }
+          if (icoEntries.length > 0) {
+            const icoBytes = wrapPngsInIco(icoEntries);
+            if (icoBytes.byteLength > 100) {
+              primaryBatchFiles.push({
+                path: 'public/favicon.ico',
+                content: uint8ToBase64(icoBytes),
+                encoding: 'base64'
+              });
+            }
+          }
+        }
       } catch (sitemapErr) {
         log(`GitHub Sync Warning: Could not auto-generate public XML sitemaps: ${(sitemapErr as any)?.message}`);
       }

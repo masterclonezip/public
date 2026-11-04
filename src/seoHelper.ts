@@ -93,6 +93,12 @@ async function doFetchStoreData() {
     ...rawStaticSettings,
     ...rawLiveSettings
   };
+  if (!mergedSettings.logo_url && rawStaticSettings.logo_url) {
+    mergedSettings.logo_url = rawStaticSettings.logo_url;
+  }
+  if (!mergedSettings.favicon_url && rawStaticSettings.favicon_url) {
+    mergedSettings.favicon_url = rawStaticSettings.favicon_url;
+  }
   delete mergedSettings.turnstile_secret_key;
 
   const sanitizeSiteKey = (raw: unknown): string => {
@@ -226,8 +232,8 @@ export function cleanRootContainer(html: string): string {
   return html.replace(/<div id="root">[\s\S]*?<\/div>(\s*(?:<script\b|<\/body>))/i, '<div id="root"></div>$1');
 }
 
-export async function injectSeoTags(template: string, urlPath: string, hostUrl?: string, userAgent: string = ''): Promise<SeoInjectionResult> {
-  let data = await fetchStoreData();
+export async function injectSeoTags(template: string, urlPath: string, hostUrl?: string, userAgent: string = '', providedData?: any): Promise<SeoInjectionResult> {
+  let data = providedData || await fetchStoreData();
   if (!data || !data.settings) return { html: template, isNotFound: false };
 
   let apps = (data.apps || []).filter((a: any) => a && a.sync_to_public !== false);
@@ -668,14 +674,30 @@ export async function injectSeoTags(template: string, urlPath: string, hostUrl?:
     // Strip external stylesheet link when full compiled CSS is already inlined in server-critical-css
     finalHtml = finalHtml.replace(/<link\b[^>]*rel=["']stylesheet["'][^>]*href=["']\/?assets\/[^"']+\.css["'][^>]*\/?>/gi, '');
   }
-  const headAdditions = `${seoTags}${criticalCss ? '\n' + criticalCss : ''}\n${initialDataScript}`;
 
-  if (finalHtml.includes('<!--__SEO_HEAD__-->')) {
-    finalHtml = finalHtml.replace('<!--__SEO_HEAD__-->', headAdditions);
-  } else if (finalHtml.includes('</head>')) {
-    finalHtml = finalHtml.replace('</head>', `${headAdditions}\n</head>`);
+  // Inject seoTags (title, description, and critical OpenGraph/Twitter tags) at the VERY TOP of <head>
+  // so social crawlers (WhatsApp, Facebook, Twitter, Telegram, Discord, iMessage) encounter og:image within the first 1-2 KB.
+  if (finalHtml.includes('<!--SEO_META_TAGS-->')) {
+    finalHtml = finalHtml.replace('<!--SEO_META_TAGS-->', seoTags);
+  } else if (finalHtml.includes('<!--__SEO_HEAD__-->')) {
+    finalHtml = finalHtml.replace('<!--__SEO_HEAD__-->', seoTags);
   } else {
-    finalHtml = `${headAdditions}\n${finalHtml}`;
+    const viewportMatch = finalHtml.match(/<meta[^>]*name=["']viewport["'][^>]*\/?>/i);
+    if (viewportMatch) {
+      finalHtml = finalHtml.replace(viewportMatch[0], `${viewportMatch[0]}\n    ${seoTags}`);
+    } else if (finalHtml.includes('<head>')) {
+      finalHtml = finalHtml.replace('<head>', `<head>\n    ${seoTags}`);
+    }
+  }
+
+  // Inject critical CSS and initialDataScript near the end of <head> so styles & payloads never block OpenGraph parsing
+  const trailingHeadPayload = `${criticalCss ? criticalCss + '\n    ' : ''}${initialDataScript}`;
+  if (finalHtml.includes('<!--INITIAL_DATA_SCRIPT-->')) {
+    finalHtml = finalHtml.replace('<!--INITIAL_DATA_SCRIPT-->', trailingHeadPayload);
+  } else if (finalHtml.includes('</head>')) {
+    finalHtml = finalHtml.replace('</head>', `${trailingHeadPayload}\n  </head>`);
+  } else {
+    finalHtml = `${trailingHeadPayload}\n${finalHtml}`;
   }
 
   // High-performance server-side visible HTML shell injection:

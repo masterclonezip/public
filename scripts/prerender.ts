@@ -6,7 +6,7 @@ import zlib from 'zlib';
 import { injectSeoTags, fetchStoreData, cleanRootContainer } from '../src/seoHelper';
 import { generateAllSitemaps, normalizeSitemapHost, escapeXml } from '../src/lib/sitemapGenerator';
 import { formatPageTitle, isPublicReadyApp, isPublicReadyNews, resolvePublicSiteDomain } from '../src/lib/seoUtils';
-import { getAllSiteIconUrls } from '../src/seo/utils';
+import { getAllSiteIconUrls, wrapPngsInIco } from '../src/seo/utils';
 import { safeDecrypt, safeEncrypt, getAesSecret } from '../src/lib/cryptoUtils';
 
 function decodeCandidateUrl(raw: unknown): string {
@@ -304,11 +304,11 @@ async function syncStaticDataAndSitemaps() {
         orientation: 'portrait',
         lang: 'en-IN',
         icons: [
-          { src: icons.favicon48 || '/favicon-32x32.png', sizes: '48x48', type: 'image/png', purpose: 'any' },
-          { src: icons.favicon96 || '/apple-touch-icon.png', sizes: '96x96', type: 'image/png', purpose: 'any' },
-          { src: icons.favicon144 || '/apple-touch-icon.png', sizes: '144x144', type: 'image/png', purpose: 'any' },
-          { src: icons.android192 || '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-          { src: icons.android512 || '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+          { src: '/favicon-48x48.png', sizes: '48x48', type: 'image/png', purpose: 'any' },
+          { src: '/favicon-96x96.png', sizes: '96x96', type: 'image/png', purpose: 'any' },
+          { src: '/favicon-144x144.png', sizes: '144x144', type: 'image/png', purpose: 'any' },
+          { src: '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+          { src: '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
         ],
         theme_color: '#2563eb',
         background_color: '#ffffff',
@@ -321,34 +321,39 @@ async function syncStaticDataAndSitemaps() {
 
       const openSearchTitle = (siteTitle || 'Search').replace(/[<>&'"]/g, '');
       const openSearchIcons = [
-        icons.favicon16 ? `  <Image width="16" height="16" type="image/png">${escapeXml(icons.favicon16)}</Image>` : '',
-        icons.favicon32 ? `  <Image width="32" height="32" type="image/png">${escapeXml(icons.favicon32)}</Image>` : '',
-        icons.favicon48 ? `  <Image width="48" height="48" type="image/png">${escapeXml(icons.favicon48)}</Image>` : '',
-        icons.searchLogo512 ? `  <Image width="512" height="512" type="image/png">${escapeXml(icons.searchLogo512)}</Image>` : ''
-      ].filter(Boolean).join('\n');
+        `  <Image width="16" height="16" type="image/x-icon">${escapeXml(host)}/favicon.ico</Image>`,
+        `  <Image width="16" height="16" type="image/png">${escapeXml(host)}/favicon-16x16.png</Image>`,
+        `  <Image width="32" height="32" type="image/png">${escapeXml(host)}/favicon-32x32.png</Image>`,
+        `  <Image width="48" height="48" type="image/png">${escapeXml(host)}/favicon-48x48.png</Image>`,
+        `  <Image width="512" height="512" type="image/png">${escapeXml(host)}/logo.png</Image>`
+      ].join('\n');
       const openSearchXml = `<?xml version="1.0" encoding="UTF-8"?>\n<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">\n  <ShortName>${openSearchTitle}</ShortName>\n  <Description>Search applications</Description>\n  <InputEncoding>UTF-8</InputEncoding>\n${openSearchIcons}\n  <Url type="text/html" template="${host}/?s={searchTerms}"/>\n</OpenSearchDescription>\n`;
       fs.writeFileSync(path.join(publicPath, 'opensearch.xml'), openSearchXml, 'utf-8');
       if (fs.existsSync(distPath)) {
         fs.writeFileSync(path.join(distPath, 'opensearch.xml'), openSearchXml, 'utf-8');
       }
 
-      // Download and materialize remote Cloudinary/brand icons into public/ root icon files so /favicon.ico on XML sitemaps renders the real logo
-      const iconDownloadTargets: Array<{ url: string; files: string[] }> = [
-        { url: icons.favicon16, files: ['favicon-16x16.png'] },
-        { url: icons.favicon32, files: ['favicon-32x32.png'] },
-        { url: icons.favicon48, files: ['favicon-48x48.png'] },
-        { url: icons.appleTouch180, files: ['apple-touch-icon.png', 'apple-touch-icon-precomposed.png'] },
-        { url: icons.pwa192, files: ['android-chrome-192x192.png', 'favicon.ico', 'favicon.png'] },
-        { url: icons.pwa512, files: ['android-chrome-512x512.png', 'logo.png'] }
+      // Download and materialize remote Cloudinary/brand icons into public/ and dist/ root icon files so /favicon.ico on XML sitemaps and Google Search renders the real logo
+      const iconDownloadTargets: Array<{ size: number; url: string; files: string[] }> = [
+        { size: 16, url: icons.favicon16, files: ['favicon-16x16.png'] },
+        { size: 32, url: icons.favicon32, files: ['favicon-32x32.png'] },
+        { size: 48, url: icons.favicon48, files: ['favicon-48x48.png'] },
+        { size: 96, url: icons.favicon96, files: ['favicon-96x96.png'] },
+        { size: 144, url: icons.favicon144, files: ['favicon-144x144.png'] },
+        { size: 180, url: icons.appleTouch180, files: ['apple-touch-icon.png', 'apple-touch-icon-precomposed.png'] },
+        { size: 192, url: icons.pwa192, files: ['android-chrome-192x192.png', 'favicon.png'] },
+        { size: 512, url: icons.pwa512, files: ['android-chrome-512x512.png', 'logo.png'] }
       ];
+      const downloadedPngBySize = new Map<number, Uint8Array>();
       await Promise.all(
-        iconDownloadTargets.map(async ({ url, files }) => {
+        iconDownloadTargets.map(async ({ size, url, files }) => {
           if (!url || (!url.startsWith('https://') && !url.startsWith('http://'))) return;
           try {
-            const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+            const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
             if (!res.ok) return;
             const buf = Buffer.from(await res.arrayBuffer());
             if (buf.length < 100) return;
+            downloadedPngBySize.set(size, new Uint8Array(buf));
             for (const fName of files) {
               fs.writeFileSync(path.join(publicPath, fName), buf);
               if (fs.existsSync(distPath)) {
@@ -358,6 +363,22 @@ async function syncStaticDataAndSitemaps() {
           } catch (_) {}
         })
       );
+
+      // Build spec-compliant Microsoft .ICO container wrapping 48x48, 32x32, and 16x16 PNGs
+      const icoEntries: Array<{ size: number; png: Uint8Array }> = [];
+      for (const sz of [48, 32, 16]) {
+        const pngBytes = downloadedPngBySize.get(sz);
+        if (pngBytes) icoEntries.push({ size: sz, png: pngBytes });
+      }
+      if (icoEntries.length > 0) {
+        const icoBuf = Buffer.from(wrapPngsInIco(icoEntries));
+        if (icoBuf.length > 100) {
+          fs.writeFileSync(path.join(publicPath, 'favicon.ico'), icoBuf);
+          if (fs.existsSync(distPath)) {
+            fs.writeFileSync(path.join(distPath, 'favicon.ico'), icoBuf);
+          }
+        }
+      }
     } catch (_) {}
   }
 
@@ -418,7 +439,7 @@ async function prerender() {
     const generateRoute = async (routePath: string) => {
       console.log(`Prerendering route: ${routePath}`);
       // Prerender static HTML with clean #root for instantaneous React mount and rich noscript semantic crawler fallback
-      const seoRes = await injectSeoTags(originalTemplate, routePath, HOST, '');
+      const seoRes = await injectSeoTags(originalTemplate, routePath, HOST, '', data);
       const template = typeof seoRes === 'string' ? seoRes : seoRes.html;
       
       const cleanRoute = (routePath.startsWith('/') ? routePath.substring(1) : routePath).trim().replace(/\/+$/, '');
@@ -439,7 +460,7 @@ async function prerender() {
     };
 
     // 1. Generate Home Route
-    const homeRes = await injectSeoTags(originalTemplate, '/', HOST, '');
+    const homeRes = await injectSeoTags(originalTemplate, '/', HOST, '', data);
     let homeTemplate = typeof homeRes === 'string' ? homeRes : homeRes.html;
     fs.writeFileSync(indexHtmlPath, homeTemplate, 'utf-8');
 

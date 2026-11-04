@@ -7,11 +7,31 @@ function getEdgeSizedLogoUrl(url, size = 192) {
   if (trimmed.includes('res.cloudinary.com') && trimmed.includes('/upload/')) {
     const cleanUrl = trimmed.replace(/\/upload\/(?:(?:[a-z]{1,3}_[a-zA-Z0-9_.:-]+,?)+\/)*/, '/upload/');
     if (size > 0) {
-      return cleanUrl.replace('/upload/', `/upload/f_png,q_auto,w_${size},h_${size},c_fit/`);
+      return cleanUrl.replace('/upload/', `/upload/f_png,q_auto:best,w_${size},h_${size},c_pad,b_transparent/`);
     }
-    return cleanUrl.replace('/upload/', '/upload/f_png,q_auto/');
+    return cleanUrl.replace('/upload/', '/upload/f_png,q_auto:best/');
   }
   return trimmed;
+}
+
+function wrapPngInIcoEdge(pngBytes, size = 48) {
+  const len = pngBytes.byteLength;
+  const ico = new Uint8Array(22 + len);
+  const view = new DataView(ico.buffer);
+  view.setUint16(0, 0, true); // Reserved = 0
+  view.setUint16(2, 1, true); // Type = 1 (ICO)
+  view.setUint16(4, 1, true); // Count = 1
+  const dim = size >= 256 || size <= 0 ? 0 : size;
+  ico[6] = dim;
+  ico[7] = dim;
+  ico[8] = 0;
+  ico[9] = 0;
+  view.setUint16(10, 1, true); // Planes = 1
+  view.setUint16(12, 32, true); // BitCount = 32
+  view.setUint32(14, len, true); // BytesInRes
+  view.setUint32(18, 22, true); // ImageOffset = 22
+  ico.set(pngBytes, 22);
+  return ico;
 }
 
 export async function onRequest(context) {
@@ -43,6 +63,8 @@ export async function onRequest(context) {
     lowerPath === '/favicon-16x16.png' ||
     lowerPath === '/favicon-32x32.png' ||
     lowerPath === '/favicon-48x48.png' ||
+    lowerPath === '/favicon-96x96.png' ||
+    lowerPath === '/favicon-144x144.png' ||
     lowerPath === '/apple-touch-icon.png' ||
     lowerPath === '/apple-touch-icon-precomposed.png' ||
     lowerPath === '/android-chrome-192x192.png' ||
@@ -70,11 +92,6 @@ export async function onRequest(context) {
 
     if (lowerPath === '/site.webmanifest') {
       const siteTitle = String(settings.site_title || envObj.VITE_SITE_NAME || '').trim();
-      const icon48 = getEdgeSizedLogoUrl(rawFavicon, 48) || '/favicon-32x32.png';
-      const icon96 = getEdgeSizedLogoUrl(rawFavicon, 96) || '/apple-touch-icon.png';
-      const icon144 = getEdgeSizedLogoUrl(rawFavicon, 144) || '/apple-touch-icon.png';
-      const icon192 = getEdgeSizedLogoUrl(rawFavicon, 192) || '/android-chrome-192x192.png';
-      const icon512 = getEdgeSizedLogoUrl(rawFavicon, 512) || '/android-chrome-512x512.png';
       const manifestJson = JSON.stringify(
         {
           id: '/',
@@ -86,11 +103,11 @@ export async function onRequest(context) {
           orientation: 'portrait',
           lang: 'en-IN',
           icons: [
-            { src: icon48, sizes: '48x48', type: 'image/png', purpose: 'any' },
-            { src: icon96, sizes: '96x96', type: 'image/png', purpose: 'any' },
-            { src: icon144, sizes: '144x144', type: 'image/png', purpose: 'any' },
-            { src: icon192, sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-            { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+            { src: '/favicon-48x48.png', sizes: '48x48', type: 'image/png', purpose: 'any' },
+            { src: '/favicon-96x96.png', sizes: '96x96', type: 'image/png', purpose: 'any' },
+            { src: '/favicon-144x144.png', sizes: '144x144', type: 'image/png', purpose: 'any' },
+            { src: '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+            { src: '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
           ],
           theme_color: '#2563eb',
           background_color: '#ffffff',
@@ -114,9 +131,11 @@ export async function onRequest(context) {
       let sourceUrl = rawFavicon;
       if (lowerPath === '/favicon-16x16.png') size = 16;
       else if (lowerPath === '/favicon-32x32.png') size = 32;
-      else if (lowerPath === '/favicon-48x48.png') size = 48;
+      else if (lowerPath === '/favicon-48x48.png' || lowerPath === '/favicon.ico') size = 48;
+      else if (lowerPath === '/favicon-96x96.png') size = 96;
+      else if (lowerPath === '/favicon-144x144.png') size = 144;
       else if (lowerPath === '/apple-touch-icon.png' || lowerPath === '/apple-touch-icon-precomposed.png') size = 180;
-      else if (lowerPath === '/android-chrome-192x192.png' || lowerPath === '/favicon.ico' || lowerPath === '/favicon.png' || lowerPath === '/favicon.svg') size = 192;
+      else if (lowerPath === '/android-chrome-192x192.png' || lowerPath === '/favicon.png' || lowerPath === '/favicon.svg') size = 192;
       else if (lowerPath === '/android-chrome-512x512.png') size = 512;
       else if (lowerPath === '/logo.png') {
         size = 512;
@@ -130,6 +149,21 @@ export async function onRequest(context) {
             cf: { cacheEverything: true, cacheTtl: 86400 }
           });
           if (iconRes.ok) {
+            if (lowerPath === '/favicon.ico') {
+              const pngBytes = new Uint8Array(await iconRes.arrayBuffer());
+              if (pngBytes.byteLength > 64) {
+                const icoBytes = wrapPngInIcoEdge(pngBytes, 48);
+                return new Response(icoBytes, {
+                  status: 200,
+                  headers: {
+                    'Content-Type': 'image/x-icon',
+                    'Cache-Control': 'public, max-age=3600, s-maxage=86400',
+                    'Access-Control-Allow-Origin': '*',
+                    'Timing-Allow-Origin': '*'
+                  }
+                });
+              }
+            }
             return new Response(iconRes.body, {
               status: 200,
               headers: {
@@ -420,6 +454,32 @@ export async function onRequest(context) {
         /(<meta[^>]+name=["']twitter:url["'][^>]+content=["'])\/([^"']*["'])/gi,
         `$1${canonicalOrigin}/$2`
       );
+
+    // Normalize Cloudinary og:image / twitter:image URLs to ensure .jpg extension for WhatsApp / Facebook / Twitter
+    html = html.replace(
+      /(<meta[^>]+(?:property=["']og:image(?::secure_url)?["']|name=["']twitter:image["'])[^>]+content=["'])(https:\/\/res\.cloudinary\.com\/[^"']+)(["'])/gi,
+      (_, prefix, cldUrl, suffix) => {
+        let normalized = cldUrl;
+        if (normalized.includes('/upload/')) {
+          normalized = normalized.replace(/\/upload\/(?:(?:[a-z]{1,3}_[a-zA-Z0-9_.:-]+,?)+\/)*/, '/upload/w_1200,h_630,c_pad,b_auto,f_jpg,q_auto:good/');
+          if (/\.(webp|png|jpeg|gif|avif)$/i.test(normalized)) {
+            normalized = normalized.replace(/\.(webp|png|jpeg|gif|avif)$/i, '.jpg');
+          } else if (!normalized.toLowerCase().endsWith('.jpg')) {
+            normalized = `${normalized}.jpg`;
+          }
+        }
+        return `${prefix}${normalized}${suffix}`;
+      }
+    );
+
+    // Optimize payload for Social Scrapers (WhatsApp, Facebook, Twitter, Telegram, LinkedIn, Discord, Slack, iMessage)
+    const ua = (context.request.headers.get('user-agent') || '').toLowerCase();
+    const isSocialScraper = /whatsapp|facebookexternalhit|facebot|twitterbot|telegrambot|linkedinbot|slackbot|discordbot|applebot|pinterest|skypeuripreview/i.test(ua);
+    if (isSocialScraper) {
+      // Remove heavy inlined CSS so social crawlers read OpenGraph tags within the first 10 KB without buffer truncation
+      html = html.replace(/<style\s+id=["']vite-inline-css["']>[\s\S]*?<\/style>/gi, '');
+      html = html.replace(/<style\s+id=["']server-critical-css["']>[\s\S]*?<\/style>/gi, '');
+    }
 
     const headers = new Headers(response.headers);
     headers.delete('content-length');
