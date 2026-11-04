@@ -35,7 +35,6 @@ import rawDeviceProbeTs from '../lib/deviceProbe.ts?raw';
 import rawPreRenderEngineTs from '../seo/preRenderEngine.ts?raw';
 import rawCatchallJs from '../../functions/api/[[catchall]].js?raw';
 import rawVercelJson from '../../vercel.json?raw';
-import rawRedirectsFile from '../../public/_redirects?raw';
 import rawCryptoUtilsTs from '../lib/cryptoUtils.ts?raw';
 import rawServerCryptoTs from '../server/crypto.ts?raw';
 import rawNewsRendererTs from '../seo/renderers/newsRenderer.ts?raw';
@@ -53,7 +52,6 @@ const BUNDLED_PUBLIC_CORE_FILES: Record<string, string> = {
   'functions/_middleware.js': rawMiddlewareJs,
   'functions/api/[[catchall]].js': rawCatchallJs,
   'public/_headers': rawHeadersFile,
-  'public/_redirects': rawRedirectsFile,
   'vercel.json': rawVercelJson,
   'vite.config.ts': rawViteConfigTs,
   'scripts/prerender.ts': rawPrerenderTs,
