@@ -1,6 +1,66 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
+    <loc>https://yonoappdex.com/app/yono-games</loc>
+    <lastmod>2026-11-05T09:39:18+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793605742/sdb5d7jzazxpoax8m5nr.webp</image:loc>
+      <image:title>YONO GAMES</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/rummy-91</loc>
+    <lastmod>2026-11-05T09:34:07+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793605286/j0t6h8w7dgcb03njgsnc.webp</image:loc>
+      <image:title>RUMMY 91</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/ok-rummy</loc>
+    <lastmod>2026-11-05T09:26:27+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793604973/pw3qzwjgynklgorwkmgv.webp</image:loc>
+      <image:title>OK RUMMY</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/game-rummy</loc>
+    <lastmod>2026-11-05T09:21:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793604545/hexf50cvr06f3de71i6g.webp</image:loc>
+      <image:title>GAME RUMMY</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/jaiho-91</loc>
+    <lastmod>2026-11-05T09:15:32+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793606089/iudit2uppxoewflkceko.png</image:loc>
+      <image:title>JAIHO 91</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/yono-rummy</loc>
+    <lastmod>2026-11-05T08:07:10+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793602377/asitb9dppm1fwwdev4gx.png</image:loc>
+      <image:title>YONO RUMMY</image:title>
+    </image:image>
+  </url>
+  <url>
     <loc>https://yonoappdex.com/app/maha-games</loc>
     <lastmod>2026-11-04T14:32:53+00:00</lastmod>
     <changefreq>weekly</changefreq>
