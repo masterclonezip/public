@@ -90,6 +90,7 @@ interface AdminTabContentProps {
   handleTogglePublicSync?: (id: string) => Promise<void> | void;
   handleSaveSettings: (e: any) => void;
   handleSaveNews: (list?: any) => void;
+  handleSaveNewsSingle?: (singleItem: any) => Promise<void> | void;
   handleSaveCategories: (e: any) => void;
   handleSaveQuickLinks: (e: any) => void;
   handleSaveWebsiteFaqs: (e: any) => void;
@@ -149,6 +150,7 @@ export const AdminTabContent = ({
   handleTogglePublicSync,
   handleSaveSettings,
   handleSaveNews,
+  handleSaveNewsSingle,
   handleSaveCategories,
   handleSaveQuickLinks,
   handleSaveWebsiteFaqs,
@@ -234,6 +236,7 @@ export const AdminTabContent = ({
             handleNewsChange={handleNewsChange}
             handleDeleteNews={handleDeleteNews}
             saveNews={async (list) => { await handleSaveNews(list); }}
+            saveNewsSingle={handleSaveNewsSingle}
             setSaving={setSaving || (() => {})}
             appsList={appsList}
           />

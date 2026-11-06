@@ -256,11 +256,43 @@ export async function syncFromFirestore(): Promise<any> {
 
       const settings = cleanSettingsMetaTitles(mergedRawSettings);
 
+      const fallbackNewsMap = new Map<string, any>();
+      for (const fn of (fallbackData.news || [])) {
+        if (fn?.id) fallbackNewsMap.set(String(fn.id).trim().toLowerCase(), fn);
+        if (fn?.slug) fallbackNewsMap.set(String(fn.slug).trim().toLowerCase(), fn);
+      }
+
       const newsParsed = newsRes?.fields ? parseFirestoreDoc(newsRes.fields) : null;
-      const rawNewsList = Array.isArray(newsParsed?.items)
-        ? newsParsed.items.map((n: any) => cleanItemSeo({ ...n }))
-        : (fallbackData.news || []);
-      const news = rawNewsList.filter(isPublicReadyNews);
+      const newsFromFirestore = Boolean(newsParsed && Array.isArray(newsParsed.items));
+      const allNews = (newsFromFirestore ? newsParsed!.items : (fallbackData.news || [])).map((n: any) => {
+        const cleaned = cleanItemSeo({ ...n });
+        const bodyHtml = cleaned.content || cleaned.description_html || '';
+        if (!bodyHtml) {
+          const fb =
+            (cleaned.id && fallbackNewsMap.get(String(cleaned.id).trim().toLowerCase())) ||
+            (cleaned.slug && fallbackNewsMap.get(String(cleaned.slug).trim().toLowerCase()));
+          if (fb) {
+            const recoveredHtml = fb.content || fb.description_html || '';
+            if (recoveredHtml) {
+              cleaned.content = recoveredHtml;
+              cleaned.description_html = recoveredHtml;
+            }
+            if (!cleaned.seo_title && (fb.seo_title || fb.meta_title)) {
+              cleaned.seo_title = fb.seo_title || fb.meta_title;
+              cleaned.meta_title = cleaned.seo_title;
+            }
+            if (!cleaned.seo_description && (fb.seo_description || fb.meta_description)) {
+              cleaned.seo_description = fb.seo_description || fb.meta_description;
+              cleaned.meta_description = cleaned.seo_description;
+            }
+          }
+        } else {
+          cleaned.content = bodyHtml;
+          cleaned.description_html = bodyHtml;
+        }
+        return cleaned;
+      });
+      const news = allNews.filter(isPublicReadyNews);
 
       const videosParsed = videosRes?.fields ? parseFirestoreDoc(videosRes.fields) : null;
       const videos = Array.isArray(videosParsed?.items) ? videosParsed.items : fallbackData.videos;
@@ -269,28 +301,37 @@ export async function syncFromFirestore(): Promise<any> {
       const secureLinks = secLinksParsed?.items || secLinksParsed?.links || secLinksParsed || null;
 
       const fromFirestore = Boolean(metaExists || anyChunkFound);
-      const mergedApps = (fromFirestore
-        ? remoteApps
-        : (fallbackData.apps || [])).filter(isPublicReadyApp);
+      const allApps = fromFirestore ? remoteApps : (fallbackData.apps || []);
+      const mergedApps = allApps.filter(isPublicReadyApp);
 
       return {
         apps: mergedApps,
+        allApps,
         settings,
         news,
+        allNews,
         videos,
         secureLinks,
         reviews: fallbackData.reviews || [],
-        fromFirestore
+        fromFirestore,
+        newsFromFirestore
       };
     }
   } catch (restErr) {
     // REST API failed, return fallbackData
   }
 
+  const rawAllApps = fallbackData.apps || [];
+  const rawAllNews = fallbackData.news || [];
   return {
     ...fallbackData,
-    apps: (fallbackData.apps || []).filter(isPublicReadyApp),
-    news: (fallbackData.news || []).filter(isPublicReadyNews),
+    apps: rawAllApps.filter(isPublicReadyApp),
+    allApps: rawAllApps,
+    news: rawAllNews.filter(isPublicReadyNews),
+    allNews: rawAllNews,
+    fromFirestore: false,
+    newsFromFirestore: false
   };
 }
+
 

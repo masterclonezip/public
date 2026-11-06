@@ -151,11 +151,19 @@ async function doFetchStoreData() {
     apps: Array.isArray(liveData?.apps)
       ? liveData.apps
       : (freshStatic.apps || freshStatic.mockApps || []),
+    allApps: Array.isArray(liveData?.allApps)
+      ? liveData.allApps
+      : (Array.isArray(liveData?.apps) ? liveData.apps : (freshStatic.apps || freshStatic.mockApps || [])),
     settings: mergedSettings,
     news: Array.isArray(liveData?.news) ? liveData.news : (freshStatic.news || freshStatic.mockNews || []),
+    allNews: Array.isArray(liveData?.allNews)
+      ? liveData.allNews
+      : (Array.isArray(liveData?.news) ? liveData.news : (freshStatic.news || freshStatic.mockNews || [])),
     videos: Array.isArray(liveData?.videos) ? liveData.videos : (freshStatic.videos || freshStatic.mockVideos || []),
     developers: mergedSettings.developers || [],
-    secureLinks: liveData?.secureLinks || null
+    secureLinks: liveData?.secureLinks || null,
+    fromFirestore: Boolean(liveData?.fromFirestore),
+    newsFromFirestore: Boolean(liveData?.newsFromFirestore)
   };
   
   cachedData = data;

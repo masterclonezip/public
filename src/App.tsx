@@ -13,7 +13,14 @@ const AppAdmin = lazyWithRetry(() => import('./AppAdmin'));
 
 export default function App() {
   const adminPath = getAdminPath();
-  
+
+  const isDevelopmentPreview = typeof window !== 'undefined' && (
+    window.location.hostname.includes('run.app') ||
+    window.location.hostname.includes('localhost') ||
+    window.location.hostname.includes('127.0.0.1') ||
+    window.location.hostname.includes('webcontainer')
+  );
+
   // Ensure public routes always initialize cleanly and admin mode stays isolated on refresh
   const [mode, setMode] = useState<'admin' | 'public'>(() => {
     if (typeof window !== 'undefined') {
@@ -44,7 +51,10 @@ export default function App() {
       if (isExplicitPublicRoute) {
         return 'public';
       }
-      // Root path '/' and all public content paths must strictly initialize in public mode
+      // In AI Studio preview, honor saved 'admin' mode across dev server restarts/reloads
+      if (isDevelopmentPreview && savedMode === 'admin') {
+        return 'admin';
+      }
       return 'public';
     }
     return 'public';
@@ -52,9 +62,33 @@ export default function App() {
 
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  // Synchronize browser URL when switching modes
+  // Keep URL in sync when booting into admin mode from saved preview state
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (mode === 'admin') {
+      const path = window.location.pathname.toLowerCase();
+      const isOnAdminUrl =
+        path.startsWith(`/${adminPath.toLowerCase()}`) ||
+        path.startsWith('/admin') ||
+        path.startsWith('/masterworld') ||
+        path === '/login' ||
+        path.startsWith('/login/');
+      if (!isOnAdminUrl) {
+        let hasSession = false;
+        try {
+          const raw = localStorage.getItem('__adm_session') || sessionStorage.getItem('__adm_session');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            hasSession = Boolean(parsed?.idToken && (!parsed.expiresAt || parsed.expiresAt > Date.now()));
+          }
+        } catch (_) {}
+        window.history.replaceState(null, '', hasSession ? `/${adminPath}/dashboard` : `/${adminPath}/login`);
+      }
+    }
+  }, [mode, adminPath]);
+
+  // Synchronize browser URL BEFORE switching modes so BrowserRouter sees the target path immediately
   const handleSwitchMode = (targetMode: 'admin' | 'public') => {
-    setMode(targetMode);
     if (typeof window !== 'undefined') {
       localStorage.setItem('aistudio_view_mode', targetMode);
       if (targetMode === 'public') {
@@ -75,18 +109,20 @@ export default function App() {
           !path.startsWith('/masterworld') &&
           !path.startsWith('/login')
         ) {
-          window.history.pushState(null, '', `/${adminPath}/login`);
+          let hasSession = false;
+          try {
+            const raw = localStorage.getItem('__adm_session') || sessionStorage.getItem('__adm_session');
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              hasSession = Boolean(parsed?.idToken && (!parsed.expiresAt || parsed.expiresAt > Date.now()));
+            }
+          } catch (_) {}
+          window.history.pushState(null, '', hasSession ? `/${adminPath}/dashboard` : `/${adminPath}/login`);
         }
       }
     }
+    setMode(targetMode);
   };
-
-  const isDevelopmentPreview = typeof window !== 'undefined' && (
-    window.location.hostname.includes('run.app') ||
-    window.location.hostname.includes('localhost') ||
-    window.location.hostname.includes('127.0.0.1') ||
-    window.location.hostname.includes('webcontainer')
-  );
 
   return (
     <>

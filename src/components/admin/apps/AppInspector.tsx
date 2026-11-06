@@ -95,88 +95,88 @@ export const AppInspector = ({
   return (
     <div className="flex flex-col h-full">
       {/* Selected App Header panel */}
-      <div className="p-5 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/40 dark:bg-slate-900/30 flex flex-col sm:flex-row sm:items-start gap-4 shrink-0">
-        <div className="flex items-center justify-between w-full sm:w-auto">
+      <div className="p-3.5 sm:p-5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col gap-3 shrink-0">
+        <div className="flex items-center justify-between gap-2">
           <button 
             type="button"
             onClick={() => setSelectedAppId(null)} 
-            className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-all border-0 cursor-pointer"
+            className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 transition-all border-0 cursor-pointer"
           >
-            ← Back to List
+            ← Back to Apps
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => {
+              setEditingAppId(selectedApp.id);
+              setActiveFormTab('general');
+            }}
+            className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer border-0 shadow-xs active:scale-95"
+          >
+            <Edit2 className="w-3.5 h-3.5" /> Edit App
           </button>
         </div>
-        <div className="flex items-start gap-4 w-full">
+
+        <div className="flex items-center gap-3.5 w-full">
           <img 
             src={selectedApp.icon_url || 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=128&h=128&fit=crop'} 
             loading="lazy"
-            width={64}
-            height={64}
-            className="w-16 h-16 object-cover rounded-2xl shadow-sm border border-slate-200/60 dark:border-slate-800 bg-slate-100" 
+            width={56}
+            height={56}
+            className="w-14 h-14 object-cover rounded-2xl shadow-xs border border-slate-200/60 dark:border-slate-800 bg-slate-100 shrink-0" 
             alt="" 
           />
           <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white truncate max-w-sm">
+            <div className="flex items-center gap-2">
+              <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white truncate">
                 {selectedApp.name}
               </h3>
-              <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 border border-slate-200/50 dark:border-slate-700/50">
-                Order #{selectedApp.serial_number || 0}
+              <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 shrink-0">
+                #{selectedApp.serial_number || 0}
               </span>
             </div>
             
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
-              Folder: <span className="text-blue-500 dark:text-blue-400 font-semibold">{selectedApp.category}</span>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5 truncate">
+              Category: <span className="text-blue-600 dark:text-blue-400 font-bold">{selectedApp.category}</span>
             </p>
-
-            <div className="flex flex-wrap gap-2 mt-2">
-              <button 
-                type="button"
-                onClick={() => {
-                  setEditingAppId(selectedApp.id);
-                  setActiveFormTab('general');
-                }}
-                className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 dark:bg-blue-950/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border border-blue-200/40 dark:border-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg text-xs font-semibold cursor-pointer"
-              >
-                <Edit2 className="w-3.5 h-3.5" /> Edit Configuration
-              </button>
-              {handleTogglePublicSync && (
-                <button 
-                  type="button"
-                  onClick={() => handleTogglePublicSync(selectedApp.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-all border ${
-                    selectedApp.sync_to_public !== false 
-                      ? 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
-                      : 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800'
-                  }`}
-                  title={selectedApp.sync_to_public !== false ? "Click to set this app to Admin Only (unsynced from public)" : "Click to publish this app to public website"}
-                >
-                  {selectedApp.sync_to_public !== false ? <Globe className="w-3.5 h-3.5 text-emerald-500" /> : <Lock className="w-3.5 h-3.5 text-amber-500" />}
-                  <span>{selectedApp.sync_to_public !== false ? 'Live on Web' : 'Admin Only (Draft)'}</span>
-                </button>
-              )}
-              <button 
-                type="button"
-                onClick={() => handleDeleteApp(selectedApp.id)}
-                className="flex items-center gap-1.5 px-3 py-1 bg-rose-50 dark:bg-rose-950/20 hover:bg-rose-100 dark:hover:bg-rose-900/40 border border-rose-200/40 dark:border-rose-900/30 text-rose-600 dark:text-rose-400 rounded-lg text-xs font-semibold cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" /> Delete
-              </button>
-              <button 
-                type="button"
-                onClick={handleExportPdf}
-                disabled={isExportingPdf}
-                className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold cursor-pointer transition-all shadow-xs disabled:opacity-50"
-                title="Download complete app spec sheet and metadata as a PDF"
-              >
-                {isExportingPdf ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" />
-                ) : (
-                  <FileDown className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
-                )}
-                <span>{isExportingPdf ? 'Generating PDF...' : 'Download PDF'}</span>
-              </button>
-            </div>
           </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          {handleTogglePublicSync && (
+            <button 
+              type="button"
+              onClick={() => handleTogglePublicSync(selectedApp.id)}
+              className={`flex-1 sm:flex-initial justify-center flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all border ${
+                selectedApp.sync_to_public !== false 
+                  ? 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                  : 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800'
+              }`}
+            >
+              {selectedApp.sync_to_public !== false ? <Globe className="w-3.5 h-3.5 text-emerald-500" /> : <Lock className="w-3.5 h-3.5 text-amber-500" />}
+              <span>{selectedApp.sync_to_public !== false ? 'Live on Web' : 'Draft (Admin Only)'}</span>
+            </button>
+          )}
+          <button 
+            type="button"
+            onClick={handleExportPdf}
+            disabled={isExportingPdf}
+            className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold cursor-pointer transition-all border border-slate-200 dark:border-slate-700 disabled:opacity-50"
+          >
+            {isExportingPdf ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" />
+            ) : (
+              <FileDown className="w-3.5 h-3.5 text-blue-500" />
+            )}
+            <span>{isExportingPdf ? 'PDF...' : 'PDF'}</span>
+          </button>
+          <button 
+            type="button"
+            onClick={() => handleDeleteApp(selectedApp.id)}
+            className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/50 rounded-xl text-xs font-bold cursor-pointer"
+          >
+            <Trash2 className="w-3.5 h-3.5" /> Delete
+          </button>
         </div>
       </div>
 

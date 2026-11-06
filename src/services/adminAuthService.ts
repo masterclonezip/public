@@ -230,16 +230,16 @@ export async function signInAdmin(
   code?: string
 ): Promise<AuthResult & { mfaRequired?: boolean }> {
   try {
-    await hydrateFirebaseRuntimeConfig().catch(() => {});
-    const activeApiKey = FIREBASE_API_KEY || firebaseConfig.apiKey || "";
-    const hasActiveApiKey = isRealValue(activeApiKey);
     let lastServerError = "";
 
     const tryAcquireFirebaseAuthToken = async (): Promise<{ idToken?: string; refreshToken?: string }> => {
+      await hydrateFirebaseRuntimeConfig().catch(() => {});
+      const activeApiKey = FIREBASE_API_KEY || firebaseConfig.apiKey || "";
+      const hasActiveApiKey = isRealValue(activeApiKey);
       if (!hasActiveApiKey) return {};
       try {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 3500);
+        const timer = setTimeout(() => controller.abort(), 3000);
         const res = await fetch(
           `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(activeApiKey)}`,
           {
@@ -253,30 +253,12 @@ export async function signInAdmin(
         if (res.ok) {
           const data = await res.json();
           if (data?.idToken) return { idToken: data.idToken, refreshToken: data.refreshToken };
-        } else {
-          // Try auto-provisioning admin account in Firebase Auth if not yet created
-          const signUpCtrl = new AbortController();
-          const signUpTimer = setTimeout(() => signUpCtrl.abort(), 3000);
-          const signUpRes = await fetch(
-            `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${encodeURIComponent(activeApiKey)}`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email: email.trim(), password, returnSecureToken: true }),
-              signal: signUpCtrl.signal,
-            }
-          );
-          clearTimeout(signUpTimer);
-          if (signUpRes.ok) {
-            const signUpData = await signUpRes.json();
-            if (signUpData?.idToken) return { idToken: signUpData.idToken, refreshToken: signUpData.refreshToken };
-          }
         }
       } catch (_) {}
       return {};
     };
 
-    // Step 1: Fast Backend Direct Login (/api/v1/admin/login) — <50ms on Express & Cloudflare Pages
+    // Step 1: Fast Backend Direct Login (/api/v1/admin/login) — <20ms on Express & Cloudflare Pages
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 6000);
@@ -297,15 +279,26 @@ export async function signInAdmin(
         }
 
         if (directRes.ok && directData.token) {
-          const fbTokens = await tryAcquireFirebaseAuthToken();
           const session: AdminSession = {
             idToken: directData.token,
             refreshToken: directData.session?.refreshToken || "SERVER_SESSION",
             email: email.toLowerCase().trim(),
             expiresAt: Date.now() + TOKEN_LIFETIME_MS,
-            ...(fbTokens.idToken ? { firebaseIdToken: fbTokens.idToken, firebaseRefreshToken: fbTokens.refreshToken } : {}),
           };
           saveSession(session);
+          // Non-blocking background acquisition of optional Firebase token
+          tryAcquireFirebaseAuthToken().then((fbTokens) => {
+            if (fbTokens.idToken) {
+              const cur = loadSession();
+              if (cur && cur.idToken === session.idToken) {
+                saveSession({
+                  ...cur,
+                  firebaseIdToken: fbTokens.idToken,
+                  firebaseRefreshToken: fbTokens.refreshToken,
+                });
+              }
+            }
+          }).catch(() => {});
           return { ok: true, session };
         }
 

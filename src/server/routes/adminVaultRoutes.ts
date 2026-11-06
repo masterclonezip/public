@@ -567,6 +567,9 @@ adminVaultRouter.get('/api/v1/admin/data', async (req, res) => {
     const storeData: any = await fetchStoreData();
     const localData: any = getMergedData();
     const fromFirestore = Boolean(storeData?.fromFirestore);
+    const newsFromFirestore = Boolean(storeData?.newsFromFirestore || storeData?.fromFirestore);
+    const adminApps = Array.isArray(storeData.allApps) ? storeData.allApps : (Array.isArray(storeData.apps) ? storeData.apps : []);
+    const adminNews = Array.isArray(storeData.allNews) ? storeData.allNews : (Array.isArray(storeData.news) ? storeData.news : []);
 
     const mergedSettings =
       storeData.settings && Object.keys(storeData.settings).length > 0
@@ -603,12 +606,12 @@ adminVaultRouter.get('/api/v1/admin/data', async (req, res) => {
       success: true,
       source: isConfigured ? 'firebase' : 'local_backup',
       apps: fromFirestore
-        ? (Array.isArray(storeData.apps) ? storeData.apps : [])
-        : ((storeData.apps && storeData.apps.length > 0) ? storeData.apps : (localData.apps || [])),
+        ? adminApps
+        : (adminApps.length > 0 ? adminApps : (localData.apps || [])),
       settings: mergedSettings,
-      news: fromFirestore
-        ? (Array.isArray(storeData.news) ? storeData.news : [])
-        : ((storeData.news && storeData.news.length > 0) ? storeData.news : (localData.news || [])),
+      news: newsFromFirestore
+        ? adminNews
+        : (adminNews.length > 0 ? adminNews : (localData.news || [])),
       videos: fromFirestore
         ? (Array.isArray(storeData.videos) ? storeData.videos : [])
         : ((storeData.videos && storeData.videos.length > 0) ? storeData.videos : (localData.videos || [])),
@@ -616,6 +619,88 @@ adminVaultRouter.get('/api/v1/admin/data', async (req, res) => {
       faqs: localData.faqs || [],
       developers: localData.developers || [],
     });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
+adminVaultRouter.post(['/api/v1/admin/news/save', '/api/v1/admin/save-single-news'], async (req, res) => {
+  try {
+    const { item, persistedToFirestore } = req.body || {};
+    if (item && (item.id || item.slug)) {
+      const now = new Date().toISOString();
+      const current = getMergedData();
+      const siteTitle = typeof current.settings?.site_title === 'string' ? current.settings.site_title.trim() : '';
+      const normalizedItem = compileCanonicalNews({ ...item, updated_at: now }, siteTitle);
+      const idx = (current.news || []).findIndex(
+        (n: any) => n.id === normalizedItem.id || (normalizedItem.slug && n.slug === normalizedItem.slug)
+      );
+      if (idx >= 0) {
+        current.news[idx] = { ...current.news[idx], ...normalizedItem, updated_at: now };
+      } else {
+        current.news.unshift(normalizedItem);
+      }
+
+      if (!persistedToFirestore && isServerFirebaseConfigured()) {
+        const ok = await syncDocToServerFirestore('news', {
+          items: current.news,
+          count: current.news.length,
+          updated_at: now,
+          updatedAt: now,
+          _rest_admin_bypass: ADMIN_BYPASS_KEY
+        });
+        if (!ok) {
+          return res.status(500).json({ success: false, error: 'Failed to persist news item to Firestore' });
+        }
+      }
+
+      clearSeoCache();
+      setImmediate(() => {
+        try {
+          writeMergedData(current);
+        } catch (_) {}
+      });
+
+      return res.json({ success: true, item: normalizedItem });
+    }
+    res.status(400).json({ success: false, error: 'News item object required' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
+adminVaultRouter.post(['/api/v1/admin/news/delete', '/api/v1/admin/delete-single-news'], async (req, res) => {
+  try {
+    const { id: rawId, newsId, slug, persistedToFirestore } = req.body || {};
+    const id = rawId || newsId || slug;
+    if (id) {
+      const now = new Date().toISOString();
+      const current = getMergedData();
+      current.news = (current.news || []).filter((n: any) => n.id !== id && n.slug !== id);
+
+      if (!persistedToFirestore && isServerFirebaseConfigured()) {
+        const ok = await syncDocToServerFirestore('news', {
+          items: current.news,
+          count: current.news.length,
+          updated_at: now,
+          updatedAt: now,
+          _rest_admin_bypass: ADMIN_BYPASS_KEY
+        });
+        if (!ok) {
+          return res.status(500).json({ success: false, error: 'Failed to persist news deletion to Firestore' });
+        }
+      }
+
+      clearSeoCache();
+      setImmediate(() => {
+        try {
+          writeMergedData(current);
+        } catch (_) {}
+      });
+
+      return res.json({ success: true, id });
+    }
+    res.status(400).json({ success: false, error: 'News ID required' });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err?.message });
   }
@@ -662,7 +747,12 @@ adminVaultRouter.post('/api/v1/admin/save-news', async (req, res) => {
         }
       }
 
-      writeMergedData(current);
+      clearSeoCache();
+      setImmediate(() => {
+        try {
+          writeMergedData(current);
+        } catch (_) {}
+      });
 
       return res.json({ success: true, count: current.news.length, news: current.news });
     }
@@ -718,60 +808,63 @@ adminVaultRouter.post(['/api/v1/admin/app/save', '/api/v1/admin/save-single-app'
         }
       }
 
-      writeMergedData(current);
+      clearSeoCache();
 
-      // Update RAM vault and re-seal src/lib/secureVault.ts if the app has a destination link
-      try {
-        const { encryptAesGcmV2, decryptVaultValue } = await import('../crypto.js');
-        const { setRamVaultLink, isValidDestinationUrl } = await import('../services/linkService.js');
-        const AES_SECRET = getAesSecret();
-        const hasV2Key = Boolean(process.env.AES_KEY && process.env.AES_KEY.trim());
-        const vaultMap: Record<string, string> = {};
-        for (const item of current.apps) {
-          if (!item || item.sync_to_public === false) continue;
-          const id = String(item.id || '').trim();
-          const slug = String(item.slug || '').trim();
-          const rawUrl = item.more_information_url || item.encrypted_link || item.url || '';
-          if (!rawUrl || typeof rawUrl !== 'string') continue;
-          const trimmed = rawUrl.trim();
-          if (trimmed.toLowerCase().includes('mediafire.com') || trimmed.includes('com.example')) continue;
-          const plainUrl = trimmed.startsWith('v2.') || trimmed.startsWith('U2FsdGVkX1')
-            ? (await decryptVaultValue(trimmed)) || safeDecrypt(trimmed, AES_SECRET) || ''
-            : trimmed;
-          if (!isValidDestinationUrl(plainUrl)) continue;
-          if (id) {
-            vaultMap[id] = plainUrl;
-            setRamVaultLink(id, plainUrl);
+      // Update RAM vault and background files asynchronously so the HTTP response returns immediately (<10ms)
+      setImmediate(async () => {
+        try {
+          writeMergedData(current);
+          const { encryptAesGcmV2, decryptVaultValue } = await import('../crypto.js');
+          const { setRamVaultLink, isValidDestinationUrl } = await import('../services/linkService.js');
+          const AES_SECRET = getAesSecret();
+          const hasV2Key = Boolean(process.env.AES_KEY && process.env.AES_KEY.trim());
+          const vaultMap: Record<string, string> = {};
+          for (const item of current.apps) {
+            if (!item || item.sync_to_public === false) continue;
+            const id = String(item.id || '').trim();
+            const slug = String(item.slug || '').trim();
+            const rawUrl = item.more_information_url || item.encrypted_link || item.url || '';
+            if (!rawUrl || typeof rawUrl !== 'string') continue;
+            const trimmed = rawUrl.trim();
+            if (trimmed.toLowerCase().includes('mediafire.com') || trimmed.includes('com.example')) continue;
+            const plainUrl = trimmed.startsWith('v2.') || trimmed.startsWith('U2FsdGVkX1')
+              ? (await decryptVaultValue(trimmed)) || safeDecrypt(trimmed, AES_SECRET) || ''
+              : trimmed;
+            if (!isValidDestinationUrl(plainUrl)) continue;
+            if (id) {
+              vaultMap[id] = plainUrl;
+              setRamVaultLink(id, plainUrl);
+            }
+            if (slug) {
+              vaultMap[slug] = plainUrl;
+              setRamVaultLink(slug, plainUrl);
+            }
           }
-          if (slug) {
-            vaultMap[slug] = plainUrl;
-            setRamVaultLink(slug, plainUrl);
+          const jsonPayload = JSON.stringify(vaultMap);
+          const ciphertext = hasV2Key
+            ? (await encryptAesGcmV2(jsonPayload, process.env as Record<string, string | undefined>)) || safeEncrypt(jsonPayload, AES_SECRET)
+            : safeEncrypt(jsonPayload, AES_SECRET);
+          const rawTsSecret = String(
+            process.env.TURNSTILE_SECRET_KEY ||
+              process.env.VITE_TURNSTILE_SECRET_KEY ||
+              process.env.CF_TURNSTILE_SECRET_KEY ||
+              process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY ||
+              current.settings?.turnstile_secret_key ||
+              ''
+          ).trim();
+          const encryptedTurnstileSecret = rawTsSecret
+            ? (hasV2Key
+                ? (await encryptAesGcmV2(rawTsSecret, process.env as Record<string, string | undefined>)) || safeEncrypt(rawTsSecret, AES_SECRET)
+                : safeEncrypt(rawTsSecret, AES_SECRET))
+            : '';
+          if (ciphertext) {
+            const vaultFilePath = path.join(process.cwd(), 'src/lib/secureVault.ts');
+            fs.writeFileSync(vaultFilePath, generateSecureVaultFile(ciphertext, encryptedTurnstileSecret), 'utf8');
           }
+        } catch (vaultErr) {
+          console.warn('[adminVaultRoutes] Notice updating vault on single app save:', vaultErr);
         }
-        const jsonPayload = JSON.stringify(vaultMap);
-        const ciphertext = hasV2Key
-          ? (await encryptAesGcmV2(jsonPayload, process.env as Record<string, string | undefined>)) || safeEncrypt(jsonPayload, AES_SECRET)
-          : safeEncrypt(jsonPayload, AES_SECRET);
-        const rawTsSecret = String(
-          process.env.TURNSTILE_SECRET_KEY ||
-            process.env.VITE_TURNSTILE_SECRET_KEY ||
-            process.env.CF_TURNSTILE_SECRET_KEY ||
-            process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY ||
-            current.settings?.turnstile_secret_key ||
-            ''
-        ).trim();
-        const encryptedTurnstileSecret = rawTsSecret
-          ? (hasV2Key
-              ? (await encryptAesGcmV2(rawTsSecret, process.env as Record<string, string | undefined>)) || safeEncrypt(rawTsSecret, AES_SECRET)
-              : safeEncrypt(rawTsSecret, AES_SECRET))
-          : '';
-        if (ciphertext) {
-          const vaultFilePath = path.join(process.cwd(), 'src/lib/secureVault.ts');
-          fs.writeFileSync(vaultFilePath, generateSecureVaultFile(ciphertext, encryptedTurnstileSecret), 'utf8');
-        }
-      } catch (vaultErr) {
-        console.warn('[adminVaultRoutes] Notice updating vault on single app save:', vaultErr);
-      }
+      });
 
       return res.json({ success: true, app: appWithTime });
     }

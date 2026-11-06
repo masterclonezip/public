@@ -34,10 +34,12 @@ interface DataContextType {
   testCloudConnection: () => Promise<boolean>;
   saveAppSingle: (app: any) => Promise<any>;
   deleteAppSingle: (id: string) => Promise<void>;
+  saveNewsSingle: (item: any) => Promise<any>;
+  deleteNewsSingle: (id: string) => Promise<void>;
   saveSettingsSection: (section: string, data: any) => Promise<any>;
   saveApps: (apps: AppConfig[]) => Promise<void>;
   saveSettings: (settings: Partial<GlobalSettings>) => Promise<void>;
-  saveNews: (news: NewsItem[]) => Promise<void>;
+  saveNews: (news: NewsItem[]) => Promise<any>;
   saveVideos: (videos: VideoItem[]) => Promise<void>;
   isConnected: boolean | null;
   isLive: boolean;
@@ -134,6 +136,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     testCloudConnection,
     saveAppSingle: actions.saveAppSingle,
     deleteAppSingle: actions.deleteAppSingle,
+    saveNewsSingle: actions.saveNewsSingle,
+    deleteNewsSingle: actions.deleteNewsSingle,
     saveSettingsSection: actions.saveSettingsSection,
     saveApps: actions.saveApps,
     saveSettings: actions.saveSettings,
@@ -181,6 +185,8 @@ export const useData = () => {
       testCloudConnection: async () => true,
       saveAppSingle: async (app: any) => app,
       deleteAppSingle: async () => {},
+      saveNewsSingle: async (item: any) => item,
+      deleteNewsSingle: async () => {},
       saveSettingsSection: async () => {},
       saveApps: async () => {},
       saveSettings: async () => {},

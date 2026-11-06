@@ -86,6 +86,7 @@ export const useAppForm = (editApp: any, editingAppId: string | null, appsList: 
           video_url: editApp?.video_url || '',
           red_box_msg: editApp?.red_box_msg || '',
           yellow_box_msg: editApp?.yellow_box_msg || '',
+          idea_box_msg: editApp?.idea_box_msg || '',
           features_html: editApp?.features_html !== undefined ? editApp.features_html : (() => {
             const match = (appsList || []).find((a: any) => a.id === editingAppId || (editApp?.slug && a.slug === editApp.slug));
             return match?.features_html || '';
@@ -107,8 +108,20 @@ export const useAppForm = (editApp: any, editingAppId: string | null, appsList: 
             const customCats = allCats.filter((c: string) => !categoriesLower.includes(c.toLowerCase()));
             return customCats.filter((c, i) => customCats.findIndex(x => x.toLowerCase() === c.toLowerCase()) === i).join(', ');
           })(),
-          faqs: editApp?.faqs || [],
-          screenshots: editApp?.screenshots || []
+          faqs: (() => {
+            if (Array.isArray(editApp?.faqs)) return editApp.faqs;
+            if (typeof editApp?.faqs_json === 'string' && editApp.faqs_json.trim()) {
+              try { return JSON.parse(editApp.faqs_json); } catch (_) {}
+            }
+            return [];
+          })(),
+          screenshots: (() => {
+            if (Array.isArray(editApp?.screenshots)) return editApp.screenshots;
+            if (typeof editApp?.screenshots_json === 'string' && editApp.screenshots_json.trim()) {
+              try { return JSON.parse(editApp.screenshots_json); } catch (_) {}
+            }
+            return [];
+          })()
         });
       } else if (editingAppId === '') {
         setFormFields({

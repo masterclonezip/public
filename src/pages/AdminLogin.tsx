@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import AdminLoginComponent from '../components/AdminLogin';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { saveSession, clearSession } from '../services/adminAuthService';
+import { saveSession, clearSession, loadSession } from '../services/adminAuthService';
 import { getAdminPath } from '../lib/utils';
 
 export default function AdminLoginPage() {
@@ -18,8 +18,14 @@ export default function AdminLoginPage() {
 
     if (isLogout) {
       clearSession();
+      return;
     }
-  }, [location.search]);
+
+    const existing = loadSession();
+    if (existing && existing.idToken && (!existing.expiresAt || existing.expiresAt > Date.now())) {
+      navigate(`/${currentBase}/dashboard`, { replace: true });
+    }
+  }, [location.search, currentBase, navigate]);
 
   return (
     <AdminLoginComponent 
@@ -30,7 +36,7 @@ export default function AdminLoginPage() {
           email,
           expiresAt: Date.now() + 55 * 60 * 1000
         });
-        navigate(`/${currentBase}/dashboard`);
+        navigate(`/${currentBase}/dashboard`, { replace: true });
       }}
     />
   );

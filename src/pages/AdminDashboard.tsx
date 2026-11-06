@@ -21,7 +21,7 @@ export default function AdminDashboard() {
   const { 
     apps, settings, news, videos, 
     saveApps, saveSettings, saveNews, saveVideos,
-    saveAppSingle, deleteAppSingle, saveSettingsSection,
+    saveAppSingle, deleteAppSingle, saveNewsSingle, deleteNewsSingle, saveSettingsSection,
     loading, loadedFromServer, refreshAll, reloadServerData, dataSource, isRefreshing: dataRefreshing, lastSyncTime,
     gitConfig, gitConfigLoading, saveGitConfig, pushAllToGitHub
   } = useData();
@@ -113,13 +113,14 @@ export default function AdminDashboard() {
   const hasHydratedReviewsRef = React.useRef(false);
   useEffect(() => {
     const safeList = Array.isArray(appsList) ? appsList : [];
+    if (safeList.length === 0) return;
     registerCatalogAppsForReviews(safeList);
     recalculateAndBroadcastAtomicStats(safeList, false);
-    if (isAdminUser === true && safeList.length > 0 && !hasHydratedReviewsRef.current) {
+    if (isAdminUser === true && !hasHydratedReviewsRef.current) {
       hasHydratedReviewsRef.current = true;
       fetchAdminAppReviewCounts().catch(() => {});
     }
-  }, [appsList, isAdminUser]);
+  }, [appsList.length, isAdminUser]);
 
   const {
     newsList, setNewsList,
@@ -218,24 +219,7 @@ export default function AdminDashboard() {
 
       let encryptedUrlVal = '';
       if (plaintextUrl) {
-        // Fast local encryption baseline
         encryptedUrlVal = safeEncrypt(plaintextUrl);
-
-        // Server-side authoritative encryption verification
-        try {
-          const idToken = (await user?.getIdToken()) || undefined;
-          const res = await adminFetch('/api/v1/admin/encrypt', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {}) },
-            body: JSON.stringify({ url: plaintextUrl })
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.encrypted) encryptedUrlVal = data.encrypted;
-          }
-        } catch (encErr) {
-          console.warn("[ADMIN] Server encryption fallback to safeEncrypt:", encErr);
-        }
       }
 
       let category = 'General';
@@ -297,6 +281,7 @@ export default function AdminDashboard() {
         seo_keywords: formFieldsOverride?.seo_keywords ?? (formData ? (formData.get('seo_keywords') as string ?? formData.get('hidden_seo_keywords') as string) : '') ?? '',
         og_image_url: formFieldsOverride?.og_image_url ?? (formData ? (formData.get('og_image_url') as string ?? formData.get('hidden_og_image_url') as string) : '') ?? '',
         canonical_url: formFieldsOverride?.canonical_url ?? (formData ? (formData.get('canonical_url') as string ?? formData.get('hidden_canonical_url') as string) : '') ?? '',
+        target_region: formFieldsOverride?.target_region ?? (formData ? (formData.get('target_region') as string ?? formData.get('hidden_target_region') as string) : '') ?? (existingApp?.target_region || ''),
         video_url: formFieldsOverride?.video_url ?? (formData ? (formData.get('video_url') as string ?? formData.get('hidden_video_url') as string) : '') ?? '',
         publish_date: formFieldsOverride?.publish_date ?? (formData ? (formData.get('publish_date') as string ?? formData.get('hidden_publish_date') as string) : '') ?? '',
         release_notes: formFieldsOverride?.release_notes ?? (formData ? (formData.get('release_notes') as string ?? formData.get('hidden_release_notes') as string) : '') ?? '',
@@ -313,8 +298,10 @@ export default function AdminDashboard() {
               : (formData?.get('sync_to_public') !== null && formData?.get('sync_to_public') !== undefined
                   ? (formData?.get('sync_to_public') === 'on' || formData?.get('sync_to_public') === 'true')
                   : (existingApp?.sync_to_public !== false))),
-        screenshots: formFieldsOverride?.screenshots ? formFieldsOverride.screenshots : JSON.parse((formData ? (formData.get('screenshots_json') as string || formData.get('hidden_screenshots_json') as string) : '') || '[]'),
+        screenshots: (formFieldsOverride?.screenshots ? formFieldsOverride.screenshots : JSON.parse((formData ? (formData.get('screenshots_json') as string || formData.get('hidden_screenshots_json') as string) : '') || '[]')).filter(Boolean),
+        screenshots_json: JSON.stringify((formFieldsOverride?.screenshots ? formFieldsOverride.screenshots : JSON.parse((formData ? (formData.get('screenshots_json') as string || formData.get('hidden_screenshots_json') as string) : '') || '[]')).filter(Boolean)),
         faqs: formFieldsOverride?.faqs ? formFieldsOverride.faqs : JSON.parse((formData ? (formData.get('faqs_json') as string || formData.get('hidden_faqs_json') as string) : '') || '[]'),
+        faqs_json: JSON.stringify(formFieldsOverride?.faqs ? formFieldsOverride.faqs : JSON.parse((formData ? (formData.get('faqs_json') as string || formData.get('hidden_faqs_json') as string) : '') || '[]')),
         created_at: existingApp?.created_at || new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -414,7 +401,7 @@ export default function AdminDashboard() {
       />
 
       <main className="lg:pl-64 min-h-screen transition-all duration-300">
-        <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-2.5 sm:px-4 py-2 flex items-center justify-between gap-1.5 sm:gap-2">
+        <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-2 sm:px-4 py-1.5 flex items-center justify-between gap-1.5 sm:gap-2">
           <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
             <h2 className="text-sm sm:text-base md:text-lg font-black tracking-tight capitalize truncate shrink-0">
               {activeTab === 'news' ? 'News' : activeTab.replace('-', ' ')}
@@ -438,7 +425,7 @@ export default function AdminDashboard() {
               onClick={handleReloadCloudData} 
               disabled={saving || dataRefreshing} 
               title={lastSyncTime ? `Last synced: ${lastSyncTime}. Click to pull latest updates across all devices.` : 'Pull latest updates across all devices'}
-              className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg font-bold text-xs transition-all border-0 cursor-pointer shadow-xs active:scale-95 disabled:opacity-50 whitespace-nowrap"
+              className="flex items-center gap-1 px-2 sm:px-3 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg font-bold text-xs transition-all border-0 cursor-pointer shadow-xs active:scale-95 disabled:opacity-50 whitespace-nowrap"
              >
                 <RefreshCw size={13} className={(saving || dataRefreshing) ? 'animate-spin' : ''} />
                 <span className="hidden sm:inline">{(saving || dataRefreshing) ? 'Syncing...' : 'Sync Devices'}</span>
@@ -447,16 +434,42 @@ export default function AdminDashboard() {
              <button
                type="button"
                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-               className="lg:hidden p-2.5 sm:p-3 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center shrink-0 border-0"
+               className="lg:hidden p-1.5 sm:p-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl shadow-sm transition-all cursor-pointer flex items-center justify-center shrink-0 border-0"
                aria-label="Toggle Navigation Menu"
                title="Open Navigation Menu"
              >
-               <Menu size={22} className="stroke-[2.5]" />
+               <Menu size={18} className="stroke-[2.5]" />
              </button>
           </div>
         </header>
 
-        <div className={activeTab === 'ai-reviews' ? 'p-0 w-full h-[calc(100dvh-49px)] flex flex-col overflow-hidden' : (activeTab === 'reviews' ? 'p-0 sm:p-2 lg:p-4 w-full max-w-full' : 'p-3 sm:p-4 max-w-7xl mx-auto')}>
+        {/* Clean 1-Tap Mobile Quick Switch Bar */}
+        <div className="lg:hidden bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-2 py-1 flex items-center gap-1 overflow-x-auto no-scrollbar">
+          {[
+            { id: 'dashboard', label: 'Home' },
+            { id: 'apps', label: 'Apps' },
+            { id: 'news', label: 'News' },
+            { id: 'reviews', label: 'Reviews' },
+            { id: 'videos', label: 'Videos' },
+            { id: 'github', label: 'GitHub' },
+            { id: 'settings', label: 'Settings' }
+          ].map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => handleTabChange(item.id)}
+              className={`shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer border-0 ${
+                activeTab === item.id
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        <div className={activeTab === 'ai-reviews' ? 'p-0 w-full h-[calc(100dvh-49px)] flex flex-col overflow-hidden' : (activeTab === 'reviews' ? 'p-0 sm:p-2 lg:p-4 w-full max-w-full' : 'p-1.5 sm:p-4 max-w-7xl mx-auto')}>
           <AdminTabContent 
             activeTab={activeTab} appsList={appsList} newsList={newsList} banners={banners} videosList={videosList}
             categoriesList={categoriesList} quickLinksList={quickLinksList} websiteFaqsList={websiteFaqsList} developersList={developersList}
@@ -468,8 +481,30 @@ export default function AdminDashboard() {
               try {
                 const targetList = Array.isArray(list) ? list : newsList;
                 await saveNews(targetList);
+                setNewsList(targetList);
                 triggerHaptic();
-                toast('News saved and synchronized successfully!', 'success');
+                toast('News synchronized successfully!', 'success');
+              } catch (err: any) {
+                toast('Save failed: ' + (err?.message || 'Unknown error'), 'error');
+              } finally {
+                setSaving(false);
+              }
+            }}
+            handleSaveNewsSingle={async (singleItem: any) => {
+              setSaving(true);
+              try {
+                const savedItem = await saveNewsSingle(singleItem);
+                setNewsList(prev => {
+                  const idx = prev.findIndex((n: any) => n.id === savedItem.id || (savedItem.slug && n.slug === savedItem.slug));
+                  if (idx >= 0) {
+                    const next = [...prev];
+                    next[idx] = savedItem;
+                    return next;
+                  }
+                  return [savedItem, ...prev];
+                });
+                triggerHaptic();
+                toast('Article saved!', 'success');
               } catch (err: any) {
                 toast('Save failed: ' + (err?.message || 'Unknown error'), 'error');
               } finally {
@@ -521,11 +556,10 @@ export default function AdminDashboard() {
             handleAddNews={handleAddNews}
             handleNewsChange={handleNewsChange}
             handleDeleteNews={async (id: string) => {
-              const nextNews = newsList.filter((n: any) => n.id !== id);
               handleDeleteNews(id);
               try {
-                await saveNews(nextNews);
-                toast('News article deleted permanently.', 'success');
+                await deleteNewsSingle(id);
+                toast('News article deleted.', 'success');
               } catch (err: any) {
                 toast('Failed to delete news article: ' + (err?.message || 'Error'), 'error');
               }

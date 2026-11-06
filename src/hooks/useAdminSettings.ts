@@ -23,22 +23,28 @@ export const useAdminSettings = (settings: any, news: any[], videos: any[]) => {
       const mapped = news
         .filter(n => !deletedNewsIdsRef.current.has(n.id))
         .map(n => {
+          const staticFallback = (mockNews || []).find(
+            (m: any) => (m.id && m.id === n.id) || (m.slug && n.slug && m.slug.toLowerCase() === n.slug.toLowerCase())
+          );
           let content = n.content || n.description_html || '';
-          if (!content || content.trim().length <= 250) {
-            const staticFallback = (mockNews || []).find((m: any) => (m.id && m.id === n.id) || (m.slug && n.slug && m.slug.toLowerCase() === n.slug.toLowerCase()));
+          if (!content || !content.trim()) {
             if (staticFallback?.content || staticFallback?.description_html) {
               content = staticFallback.content || staticFallback.description_html;
             }
           }
           const brand = settings?.site_title || '';
           const cleanTitle = n.title ? formatPageTitle(n.title, '', brand) : '';
-          const rawSeoTitle = n.seo_title || n.meta_title || '';
+          const rawSeoTitle = n.seo_title || n.meta_title || staticFallback?.seo_title || staticFallback?.meta_title || '';
           const cleanSeoTitle = rawSeoTitle ? formatPageTitle(rawSeoTitle, '', brand) : '';
+          const rawSeoDesc = n.seo_description || n.meta_description || staticFallback?.seo_description || staticFallback?.meta_description || '';
           return {
+            ...(staticFallback || {}),
             ...n,
             title: cleanTitle || n.title || '',
             seo_title: cleanSeoTitle,
             meta_title: cleanSeoTitle,
+            seo_description: rawSeoDesc,
+            meta_description: rawSeoDesc,
             content,
             description_html: content
           };

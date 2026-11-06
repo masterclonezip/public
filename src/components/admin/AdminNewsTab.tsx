@@ -1,937 +1,1276 @@
-import React, { useState, useMemo } from 'react';
-import { 
-  Newspaper, 
-  Plus, 
-  Trash2, 
-  LayoutDashboard, 
-  Edit2, 
-  Save, 
-  X, 
-  CheckCircle2, 
-  RefreshCw, 
-  Globe, 
-  Lock, 
-  Pin, 
-  Flame, 
-  Sparkles, 
-  ExternalLink, 
-  Calendar, 
-  Clock, 
-  Eye, 
-  Search, 
-  FileText 
+import React, { useState, useMemo, useRef } from 'react';
+import {
+  Newspaper,
+  Plus,
+  Trash2,
+  Save,
+  RefreshCw,
+  Pin,
+  Search,
+  Edit3,
+  Eye,
+  Code,
+  Globe,
+  ExternalLink,
+  CheckCircle2,
+  AlertCircle,
+  Lock,
+  X,
+  ArrowLeft,
+  Wand2,
+  Smartphone,
+  ChevronDown,
+  ChevronUp,
+  User
 } from 'lucide-react';
-import { toast } from '../Toast';
 import ImageUpload from '../ImageUpload';
-import { safeHtml } from '../../lib/safeHtmlPublic';
 import { SeoFieldWithLimit } from './SeoFieldWithLimit';
+import { adminFetch } from '../../services/adminAuthService';
+import { safeHtml, structureHtmlFragment } from '../../lib/safeHtmlPublic';
 
 interface AdminNewsTabProps {
   newsList: any[];
-  handleAddNews: () => string;
-  handleDeleteNews: (id: string) => void;
-  handleNewsChange: (id: string, field: string, value: any) => void;
-  saveNews: (list: any[]) => Promise<void>;
   saving: boolean;
+  handleAddNews: () => string;
+  handleNewsChange: (id: string, field: string, value: any) => void;
+  handleDeleteNews: (id: string) => void;
+  saveNews: (list: any[]) => Promise<void>;
+  saveNewsSingle?: (singleItem: any) => Promise<void> | void;
   setSaving: (saving: boolean) => void;
-  appsList: any[];
+  appsList?: any[];
 }
 
-export const AdminNewsTab = React.memo(({
-  newsList,
-  handleAddNews,
-  handleDeleteNews,
-  handleNewsChange,
-  saveNews,
-  saving,
-  setSaving,
-  appsList
-}: AdminNewsTabProps) => {
-  const [editingNewsId, setEditingNewsId] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'live' | 'draft'>('all');
-  const [showHtmlPreview, setShowHtmlPreview] = useState(false);
+const QUICK_CATEGORIES = [
+  'General',
+  'Security Update',
+  'App Release',
+  'Industry News',
+  'Platform Guide',
+  'Safety Alert',
+  'Review & Analysis'
+];
 
-  // Statistics
-  const stats = useMemo(() => {
-    const total = newsList.length;
-    const live = newsList.filter(n => n.sync_to_public !== false).length;
-    const drafts = total - live;
-    const pinned = newsList.filter(n => n.is_pinned).length;
-    return { total, live, drafts, pinned };
+function createBlankDraft(): any {
+  const newId = Math.random().toString(36).substring(2, 11);
+  const nowIso = new Date().toISOString();
+  return {
+    id: newId,
+    slug: '',
+    title: '',
+    category: 'General',
+    logo_url: '',
+    image_url: '',
+    og_image_url: '',
+    description: '',
+    content: '',
+    description_html: '',
+    ceo_name: 'Admin Team',
+    author: 'Admin Team',
+    ceo_description: 'Transparency & Security Analyst',
+    seo_title: '',
+    meta_title: '',
+    seo_description: '',
+    meta_description: '',
+    seo_keywords: '',
+    canonical_url: '',
+    target_region: 'Global',
+    link: '',
+    related_app_id: '',
+    created_at: nowIso,
+    date: nowIso,
+    published_at: nowIso,
+    updated_at: nowIso,
+    read_time: '3 min read',
+    is_pinned: false,
+    is_breaking: false,
+    is_new: true,
+    sync_to_public: true
+  };
+}
+
+function normalizeDraftForSave(raw: any): any {
+  const nowIso = new Date().toISOString();
+  const title = String(raw.title || '').trim() || 'Untitled News Article';
+  const rawSlug = String(raw.slug || '').trim();
+  const slug = rawSlug
+    ? rawSlug.toLowerCase().replace(/[^a-z0-9-_]+/g, '-').replace(/(^-|-$)/g, '')
+    : title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || `news-${raw.id}`;
+
+  const rawBody = String(raw.content ?? raw.description_html ?? '').trim();
+  const structuredBody = rawBody ? structureHtmlFragment(rawBody) : '';
+  const coverImg = String(raw.logo_url || raw.image_url || '').trim();
+  const ogImg = String(raw.og_image_url || coverImg || '').trim();
+
+  // Plain text summary fallback for auto SEO
+  const plainBody = structuredBody
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const summaryText = String(raw.description || '').trim();
+
+  // Auto-populate SEO title & description if left blank so mobile publishing is 1-step
+  const seoTitle = String(raw.seo_title || raw.meta_title || title.slice(0, 58)).trim();
+  const seoDesc = String(
+    raw.seo_description || raw.meta_description || (summaryText || plainBody).slice(0, 155)
+  ).trim();
+
+  const authorName = String(raw.ceo_name || raw.author || 'Admin Team').trim();
+  const pubDate = raw.date || raw.published_at || raw.created_at || nowIso;
+
+  // Calculate read time automatically if default or empty
+  const words = plainBody ? plainBody.split(/\s+/).length : 0;
+  const computedReadTime = words > 0 ? `${Math.max(1, Math.ceil(words / 200))} min read` : '3 min read';
+  const readTime = String(raw.read_time || computedReadTime).trim() || computedReadTime;
+
+  return {
+    ...raw,
+    id: String(raw.id || Math.random().toString(36).substring(2, 11)).trim(),
+    title,
+    slug,
+    category: String(raw.category || 'General').trim() || 'General',
+    logo_url: coverImg,
+    image_url: coverImg,
+    og_image_url: ogImg,
+    description: summaryText,
+    content: structuredBody,
+    description_html: structuredBody,
+    seo_title: seoTitle,
+    meta_title: seoTitle,
+    seo_description: seoDesc,
+    meta_description: seoDesc,
+    seo_keywords: String(raw.seo_keywords || '').trim(),
+    canonical_url: String(raw.canonical_url || '').trim(),
+    target_region: String(raw.target_region || 'Global').trim(),
+    link: String(raw.link || '').trim(),
+    related_app_id: String(raw.related_app_id || '').trim(),
+    ceo_name: authorName,
+    author: authorName,
+    ceo_description: String(raw.ceo_description || 'Transparency & Security Analyst').trim(),
+    date: pubDate,
+    published_at: pubDate,
+    updated_at: nowIso,
+    read_time: readTime,
+    is_pinned: Boolean(raw.is_pinned),
+    is_breaking: Boolean(raw.is_breaking),
+    is_new: Boolean(raw.is_new),
+    sync_to_public: raw.sync_to_public !== false
+  };
+}
+
+export const AdminNewsTab: React.FC<AdminNewsTabProps> = ({
+  newsList,
+  saving,
+  handleDeleteNews,
+  saveNews,
+  saveNewsSingle,
+  setSaving,
+  appsList = []
+}) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'live' | 'draft' | 'pinned'>('all');
+
+  // Dedicated Editor State
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
+  const [draft, setDraft] = useState<any>(() => createBlankDraft());
+  const [htmlViewMode, setHtmlViewMode] = useState<'edit' | 'preview'>('edit');
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
+  const [isAiFormatting, setIsAiFormatting] = useState(false);
+  const [editorNotice, setEditorNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // Clean collapsible sections for optional settings (keeps mobile screen 100% uncluttered)
+  const [showSeoSection, setShowSeoSection] = useState(false);
+  const [showAuthorSection, setShowAuthorSection] = useState(false);
+
+  const htmlTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const filteredNews = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return (newsList || [])
+      .filter((item) => {
+        if (statusFilter === 'live' && item.sync_to_public === false) return false;
+        if (statusFilter === 'draft' && item.sync_to_public !== false) return false;
+        if (statusFilter === 'pinned' && !item.is_pinned) return false;
+        if (!q) return true;
+        return (
+          (item.title || '').toLowerCase().includes(q) ||
+          (item.slug || '').toLowerCase().includes(q) ||
+          (item.category || '').toLowerCase().includes(q) ||
+          (item.description || '').toLowerCase().includes(q)
+        );
+      })
+      .sort((a, b) => {
+        if (a.is_pinned && !b.is_pinned) return -1;
+        if (!a.is_pinned && b.is_pinned) return 1;
+        return new Date(b.date || b.created_at || 0).getTime() - new Date(a.date || a.created_at || 0).getTime();
+      });
+  }, [newsList, searchQuery, statusFilter]);
+
+  const { totalCount, liveCount, draftCount, pinnedCount } = useMemo(() => {
+    let live = 0, draftC = 0, pinned = 0;
+    for (let i = 0; i < newsList.length; i++) {
+      const n = newsList[i];
+      if (n.sync_to_public !== false) live++;
+      else draftC++;
+      if (n.is_pinned) pinned++;
+    }
+    return { totalCount: newsList.length, liveCount: live, draftCount: draftC, pinnedCount: pinned };
   }, [newsList]);
 
-  // Filtered news list based on search and status
-  const displayedNews = useMemo(() => {
-    return newsList.filter(item => {
-      // Status filter
-      if (statusFilter === 'live' && item.sync_to_public === false) return false;
-      if (statusFilter === 'draft' && item.sync_to_public !== false) return false;
+  const openNewArticleEditor = () => {
+    setDraft(createBlankDraft());
+    setIsCreatingNew(true);
+    setSlugManuallyEdited(false);
+    setHtmlViewMode('edit');
+    setShowSeoSection(false);
+    setShowAuthorSection(false);
+    setEditorNotice(null);
+    setIsEditorOpen(true);
+  };
 
-      // Search term
-      if (!searchTerm.trim()) return true;
-      const q = searchTerm.toLowerCase();
-      return (
-        item.title?.toLowerCase().includes(q) ||
-        item.slug?.toLowerCase().includes(q) ||
-        item.category?.toLowerCase().includes(q) ||
-        item.description?.toLowerCase().includes(q) ||
-        item.ceo_name?.toLowerCase().includes(q)
-      );
+  const openEditArticleEditor = (item: any) => {
+    const bodyHtml = item.content || item.description_html || '';
+    const coverImg = item.logo_url || item.image_url || '';
+    setDraft({
+      ...createBlankDraft(),
+      ...item,
+      content: bodyHtml,
+      description_html: bodyHtml,
+      logo_url: coverImg,
+      image_url: coverImg,
+      seo_title: item.seo_title || item.meta_title || '',
+      seo_description: item.seo_description || item.meta_description || '',
+      ceo_name: item.ceo_name || item.author || 'Admin Team',
+      author: item.author || item.ceo_name || 'Admin Team',
+      date: item.date || item.published_at || item.created_at || new Date().toISOString(),
+      sync_to_public: item.sync_to_public !== false
     });
-  }, [newsList, statusFilter, searchTerm]);
+    setIsCreatingNew(false);
+    setSlugManuallyEdited(true);
+    setHtmlViewMode('edit');
+    setShowSeoSection(false);
+    setShowAuthorSection(false);
+    setEditorNotice(null);
+    setIsEditorOpen(true);
+  };
 
-  const handleSaveAll = async (customList?: any[]) => {
+  const updateDraft = (field: string, value: any) => {
+    setDraft((prev: any) => {
+      const next: any = { ...prev, [field]: value };
+      if (field === 'title' && !slugManuallyEdited) {
+        next.slug = String(value || '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '');
+      }
+      if (field === 'content' || field === 'description_html') {
+        next.content = value;
+        next.description_html = value;
+      }
+      if (field === 'logo_url' || field === 'image_url') {
+        next.logo_url = value;
+        next.image_url = value;
+      }
+      if (field === 'seo_title' || field === 'meta_title') {
+        next.seo_title = value;
+        next.meta_title = value;
+      }
+      if (field === 'seo_description' || field === 'meta_description') {
+        next.seo_description = value;
+        next.meta_description = value;
+      }
+      if (field === 'ceo_name' || field === 'author') {
+        next.ceo_name = value;
+        next.author = value;
+      }
+      if (field === 'date' || field === 'published_at') {
+        next.date = value;
+        next.published_at = value;
+      }
+      return next;
+    });
+  };
+
+  const insertHtmlTag = (before: string, after: string = '', sample: string = 'Text here') => {
+    const el = htmlTextareaRef.current;
+    const current = String(draft.content || draft.description_html || '');
+    if (!el) {
+      updateDraft('content', `${current}${current ? '\n' : ''}${before}${sample}${after}`);
+      return;
+    }
+    const start = el.selectionStart ?? current.length;
+    const end = el.selectionEnd ?? current.length;
+    const selected = current.slice(start, end) || sample;
+    const nextVal = current.slice(0, start) + before + selected + after + current.slice(end);
+    updateDraft('content', nextVal);
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(start + before.length, start + before.length + selected.length);
+    }, 10);
+  };
+
+  const handleAutoFillSeoFromArticle = () => {
+    const cleanHeadline = String(draft.title || '').trim().slice(0, 58);
+    const rawSummary = String(draft.description || '').trim();
+    const plainBody = String(draft.content || '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const cleanDesc = (rawSummary || plainBody).slice(0, 155);
+    const coverImg = String(draft.logo_url || draft.image_url || '').trim();
+
+    setDraft((prev: any) => ({
+      ...prev,
+      seo_title: cleanHeadline,
+      meta_title: cleanHeadline,
+      seo_description: cleanDesc,
+      meta_description: cleanDesc,
+      og_image_url: prev.og_image_url || coverImg
+    }));
+    setEditorNotice({ type: 'success', text: 'SEO Title, Description & Social Image synced from article!' });
+  };
+
+  const handleAiFormatArticleHtml = async () => {
+    const rawContent = String(draft.content || draft.description_html || '').trim();
+    if (!rawContent) {
+      setEditorNotice({ type: 'error', text: 'Write or paste your article text first before formatting.' });
+      return;
+    }
+    setIsAiFormatting(true);
+    setEditorNotice(null);
+    try {
+      const res = await adminFetch('/api/v1/admin/ai-format-html', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: rawContent,
+          appName: draft.title || 'News Article'
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.formattedHtml) {
+        updateDraft('content', data.formattedHtml);
+        setEditorNotice({
+          type: 'success',
+          text: '✨ Article formatted into clean HTML headings & paragraphs!'
+        });
+      } else {
+        const localStructured = structureHtmlFragment(rawContent);
+        updateDraft('content', localStructured);
+        setEditorNotice({
+          type: 'success',
+          text: '✨ Structured paragraphs and headings into clean HTML.'
+        });
+      }
+    } catch (_) {
+      const localStructured = structureHtmlFragment(rawContent);
+      updateDraft('content', localStructured);
+      setEditorNotice({
+        type: 'success',
+        text: '✨ Structured paragraphs and headings into clean HTML.'
+      });
+    } finally {
+      setIsAiFormatting(false);
+    }
+  };
+
+  const handleSaveDraftToFirebase = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!String(draft.title || '').trim()) {
+      setEditorNotice({ type: 'error', text: 'Please enter an Article Headline (Title).' });
+      return;
+    }
+
+    const normalizedItem = normalizeDraftForSave(draft);
+
+    if (saveNewsSingle) {
+      await saveNewsSingle(normalizedItem);
+      setIsEditorOpen(false);
+      setIsCreatingNew(false);
+      return;
+    }
+
+    const existsInList = newsList.some((n) => n.id === normalizedItem.id);
+    const updatedList = existsInList
+      ? newsList.map((n) => (n.id === normalizedItem.id ? normalizedItem : n))
+      : [normalizedItem, ...newsList];
+
     setSaving(true);
     try {
-      const listToSave = customList || newsList;
-      await saveNews(listToSave);
-      toast('News saved and synchronized to public website & database successfully!', 'success');
-    } catch (e: any) {
-      console.error('Failed to save news:', e);
-      toast('Failed to save news: ' + (e?.message || 'Error'), 'error');
+      await saveNews(updatedList);
+      setIsEditorOpen(false);
+      setIsCreatingNew(false);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleSaveItemAndClose = async (itemId: string) => {
+  const handleQuickToggleStatus = async (item: any) => {
+    const nextSync = !(item.sync_to_public !== false);
+    const updatedItem = normalizeDraftForSave({
+      ...item,
+      sync_to_public: nextSync
+    });
+    if (saveNewsSingle) {
+      await saveNewsSingle(updatedItem);
+      return;
+    }
+    const updatedList = newsList.map((n) => (n.id === item.id ? updatedItem : n));
     setSaving(true);
     try {
-      await saveNews(newsList);
-      toast('News item saved and synchronized to public website!', 'success');
-      setEditingNewsId(null);
-    } catch (e: any) {
-      console.error('Failed to save news item:', e);
-      toast('Failed to save: ' + (e?.message || 'Error'), 'error');
+      await saveNews(updatedList);
     } finally {
       setSaving(false);
     }
   };
 
-  const calculateReadingTime = (text: string): string => {
-    if (!text) return '1 min read';
-    const words = text.replace(/<[^>]*>?/gm, ' ').trim().split(/\s+/).filter(Boolean).length;
-    const minutes = Math.max(1, Math.ceil(words / 180));
-    return `${minutes} min read`;
+  const handleQuickTogglePin = async (item: any) => {
+    const nextPin = !item.is_pinned;
+    const updatedItem = normalizeDraftForSave({
+      ...item,
+      is_pinned: nextPin
+    });
+    if (saveNewsSingle) {
+      await saveNewsSingle(updatedItem);
+      return;
+    }
+    const updatedList = newsList.map((n) => (n.id === item.id ? updatedItem : n));
+    setSaving(true);
+    try {
+      await saveNews(updatedList);
+    } finally {
+      setSaving(false);
+    }
   };
+
+  const linkedAppPreview = useMemo(() => {
+    if (!draft.related_app_id) return null;
+    return appsList.find((a) => a.id === draft.related_app_id || a.slug === draft.related_app_id) || null;
+  }, [draft.related_app_id, appsList]);
 
   return (
-    <div className="animate-fade-in space-y-6">
-      {/* Top Header Controls */}
-      <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-black/10 dark:border-white/10 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h2 className="text-xl font-bold flex items-center gap-2 dark:text-white">
-              <Newspaper className="w-5 h-5 text-blue-500" /> News Management &amp; Publishing Portal
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Create and manage transparency bulletins, updates, and releases published to the public website.
-            </p>
+    <div className="animate-fade-in space-y-2.5 sm:space-y-3.5 pb-6">
+      {/* Compact Header & Controls */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-2.5 sm:p-3.5 shadow-xs space-y-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 rounded-xl bg-blue-600/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+              <Newspaper className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white truncate">
+                News ({totalCount})
+              </h2>
+            </div>
           </div>
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
-              onClick={() => {
-                const newId = handleAddNews();
-                setEditingNewsId(newId);
-              }}
-              className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 active:scale-95 text-white px-4 py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
+              type="button"
+              onClick={openNewArticleEditor}
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer border-0 active:scale-95"
             >
-              <Plus className="w-4 h-4" /> Add News Article
-            </button>
-            <button
-              onClick={() => handleSaveAll()}
-              disabled={saving}
-              className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 active:scale-95 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
-            >
-              {saving ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4" />
-              )}
-              <span>{saving ? 'Syncing...' : 'Save & Publish All'}</span>
+              <Plus className="w-4 h-4" />
+              <span>New Article</span>
             </button>
           </div>
         </div>
 
-        {/* Stats & Search Bar */}
-        <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => setStatusFilter('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                statusFilter === 'all'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              All Articles ({stats.total})
-            </button>
-            <button
-              onClick={() => setStatusFilter('live')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                statusFilter === 'live'
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50'
-              }`}
-            >
-              <Globe className="w-3 h-3" /> Live on Public ({stats.live})
-            </button>
-            <button
-              onClick={() => setStatusFilter('draft')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                statusFilter === 'draft'
-                  ? 'bg-amber-600 text-white shadow-sm'
-                  : 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900/40 hover:bg-amber-100 dark:hover:bg-amber-900/50'
-              }`}
-            >
-              <Lock className="w-3 h-3" /> Drafts ({stats.drafts})
-            </button>
-            {stats.pinned > 0 && (
-              <span className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-100/60 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 flex items-center gap-1">
-                <Pin className="w-3 h-3" /> {stats.pinned} Pinned
-              </span>
-            )}
+        {/* Search & Filter Strip */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+            {[
+              { id: 'all', label: 'All', count: totalCount },
+              { id: 'live', label: 'Live', count: liveCount },
+              { id: 'draft', label: 'Drafts', count: draftCount },
+              { id: 'pinned', label: 'Pinned', count: pinnedCount }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setStatusFilter(tab.id as any)}
+                className={`shrink-0 px-2.5 py-1 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer border ${
+                  statusFilter === tab.id
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-slate-50 dark:bg-slate-800/70 text-slate-600 dark:text-slate-300 border-slate-200/70 dark:border-slate-700/70'
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                    statusFilter === tab.id
+                      ? 'bg-white/20 text-white'
+                      : 'bg-slate-200/70 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            ))}
           </div>
 
-          <div className="relative w-full md:w-72">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <div className="relative w-full sm:w-60">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              placeholder="Search news title, slug..."
-              className="w-full pl-9 pr-8 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search news..."
+              className="w-full bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl pl-8 pr-7 py-1.5 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:border-blue-500"
             />
-            {searchTerm && (
+            {searchQuery && (
               <button
-                onClick={() => setSearchTerm('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold border-0 bg-transparent cursor-pointer"
               >
-                <X className="w-3.5 h-3.5" />
+                ✕
               </button>
             )}
           </div>
         </div>
       </div>
 
-      {/* News List */}
-      <div className="space-y-4">
-        {displayedNews.length === 0 ? (
-          <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-12 text-center">
-            <Newspaper className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-            <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">
-              {searchTerm ? 'No Matching News Articles Found' : 'No News Items Yet'}
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-4">
-              {searchTerm ? `No articles matching "${searchTerm}".` : 'Add your first article or release announcement.'}
-            </p>
-            {searchTerm ? (
-              <button
-                onClick={() => setSearchTerm('')}
-                className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg font-semibold text-xs inline-flex items-center gap-2 cursor-pointer"
+      {/* News Articles List */}
+      {filteredNews.length === 0 ? (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-6 text-center space-y-2">
+          <Newspaper className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto" />
+          <div className="text-sm font-bold text-slate-800 dark:text-slate-200">No articles found</div>
+          <button
+            type="button"
+            onClick={openNewArticleEditor}
+            className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold border-0 cursor-pointer"
+          >
+            + Add First Article
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3">
+          {filteredNews.map((item) => {
+            const cover = item.logo_url || item.image_url || '';
+            const linkedApp = item.related_app_id
+              ? appsList.find((a) => a.id === item.related_app_id || a.slug === item.related_app_id)
+              : null;
+            const isConfirmingDelete = confirmDeleteId === item.id;
+
+            return (
+              <div
+                key={item.id}
+                className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-2.5 sm:p-3 transition-all shadow-xs flex flex-col justify-between gap-2"
               >
-                Clear Search
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  const newId = handleAddNews();
-                  setEditingNewsId(newId);
-                }}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold text-xs inline-flex items-center gap-2 cursor-pointer"
-              >
-                <Plus className="w-4 h-4" /> Add News Article
-              </button>
-            )}
-          </div>
-        ) : (
-          displayedNews.map((item: any) => (
-            <div 
-              key={item.id} 
-              className={`bg-white dark:bg-slate-900 border rounded-2xl p-6 shadow-sm relative overflow-hidden transition-all ${
-                editingNewsId === item.id 
-                  ? 'border-blue-500 ring-2 ring-blue-500/20' 
-                  : item.sync_to_public === false 
-                    ? 'border-amber-200 dark:border-amber-900/40 bg-amber-50/10 dark:bg-amber-950/5' 
-                    : 'border-black/10 dark:border-white/10'
-              }`}
-            >
-              {editingNewsId === item.id ? (
-                <div className="space-y-6">
-                  {/* Editor Header */}
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-black/10 dark:border-white/10 pb-4 mb-4 gap-4">
-                    <div>
-                      <h3 className="font-bold text-lg text-blue-600 flex items-center gap-2">
-                        <LayoutDashboard className="w-4 h-4" /> Editing: {item.title || 'Untitled News Article'}
-                      </h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-mono">
-                        ID: {item.id} • Slug: /{item.slug || 'untitled'}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                      <a
-                        href={`/news/${item.slug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 sm:flex-none flex justify-center items-center gap-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3.5 py-2 rounded-lg font-semibold text-xs transition-all cursor-pointer"
-                        title="View article on public website"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" /> Preview Live
-                      </a>
-                      <button
-                        onClick={() => handleSaveItemAndClose(item.id)}
-                        disabled={saving}
-                        className="flex-1 sm:flex-none flex justify-center items-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 disabled:opacity-50 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-all shadow-sm cursor-pointer"
-                      >
-                        {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                        <span>Save &amp; Done</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (window.confirm(`Delete article "${item.title || 'this item'}"?`)) {
-                            handleDeleteNews(item.id);
-                            const updatedList = newsList.filter(n => n.id !== item.id);
-                            handleSaveAll(updatedList);
-                            setEditingNewsId(null);
-                          }
+                {/* Card Content Row */}
+                <div
+                  onClick={() => openEditArticleEditor(item)}
+                  className="flex items-start gap-2.5 cursor-pointer"
+                >
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 overflow-hidden shrink-0 flex items-center justify-center">
+                    {cover ? (
+                      <img
+                        src={cover}
+                        alt=""
+                        loading="lazy"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
                         }}
-                        className="flex-1 sm:flex-none flex justify-center items-center gap-2 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/20 text-rose-600 px-3 py-2 rounded-lg font-semibold text-sm transition-all cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4" /> Delete
-                      </button>
-                      <button
-                        onClick={() => setEditingNewsId(null)}
-                        className="flex-1 sm:flex-none flex justify-center items-center gap-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-white px-3 py-2 rounded-lg font-semibold text-sm transition-all cursor-pointer"
-                      >
-                        <X className="w-4 h-4" /> Close
-                      </button>
-                    </div>
+                      />
+                    ) : (
+                      <Newspaper className="w-5 h-5 text-slate-400" />
+                    )}
                   </div>
 
-                  {/* Public Website Sync & Visibility Banner */}
-                  <div className={`p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
-                    item.sync_to_public !== false
-                      ? 'bg-emerald-50/80 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60'
-                      : 'bg-amber-50/80 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/60'
-                  }`}>
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                        item.sync_to_public !== false 
-                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
-                          : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
-                      }`}>
-                        {item.sync_to_public !== false ? <Globe className="w-5 h-5" /> : <Lock className="w-5 h-5" />}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-slate-900 dark:text-white">
-                            Public Website Status:
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1 flex-wrap mb-0.5">
+                      <span className="px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 text-[10px] font-bold">
+                        {item.category || 'General'}
+                      </span>
+
+                      {item.sync_to_public !== false ? (
+                        <span className="px-1.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold flex items-center gap-1">
+                          <Globe className="w-2.5 h-2.5" /> Live
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 text-[10px] font-bold flex items-center gap-1">
+                          <Lock className="w-2.5 h-2.5" /> Draft
+                        </span>
+                      )}
+
+                      {item.is_pinned && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-amber-500 text-white text-[9px] font-black">
+                          📌 Pinned
+                        </span>
+                      )}
+                    </div>
+
+                    <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white line-clamp-2 leading-snug">
+                      {item.title || 'Untitled Article'}
+                    </h3>
+
+                    <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">
+                      <span>
+                        {item.date
+                          ? new Date(item.date).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })
+                          : 'Today'}
+                      </span>
+                      {linkedApp && (
+                        <>
+                          <span>•</span>
+                          <span className="text-indigo-600 dark:text-indigo-400 font-semibold truncate max-w-[140px]">
+                            📱 {linkedApp.name}
                           </span>
-                          <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full ${
-                            item.sync_to_public !== false
-                              ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
-                              : 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
-                          }`}>
-                            {item.sync_to_public !== false ? 'Live on Public Website' : 'Admin Only (Draft)'}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                          {item.sync_to_public !== false 
-                            ? 'This article is live, indexed by Google (sitemap-news.xml), and viewable by all public visitors.'
-                            : 'This article is in draft mode and hidden from public visitors and search engine sitemaps.'}
-                        </p>
-                      </div>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                      <input 
-                        type="checkbox"
-                        checked={item.sync_to_public !== false}
-                        onChange={e => handleNewsChange(item.id, 'sync_to_public', e.target.checked)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-14 h-7 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-emerald-600"></div>
-                    </label>
-                  </div>
-
-                  {/* Publishing Flags & Date Bar */}
-                  <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-xl border border-slate-200 dark:border-slate-700/80 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-center">
-                    {/* Publication Date */}
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">
-                          Publication Date
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const nowIso = new Date().toISOString();
-                            handleNewsChange(item.id, 'date', nowIso);
-                            handleNewsChange(item.id, 'published_at', nowIso);
-                          }}
-                          className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline font-bold cursor-pointer"
-                        >
-                          Set Today
-                        </button>
-                      </div>
-                      <input
-                        type="date"
-                        value={(item.date || item.published_at || '').substring(0, 10)}
-                        onChange={e => {
-                          const val = e.target.value ? new Date(e.target.value).toISOString() : new Date().toISOString();
-                          handleNewsChange(item.id, 'date', val);
-                          handleNewsChange(item.id, 'published_at', val);
-                        }}
-                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-xs dark:text-white focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-
-                    {/* Estimated Read Time */}
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">
-                          Read Time
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const autoCalc = calculateReadingTime(item.content || item.description || '');
-                            handleNewsChange(item.id, 'read_time', autoCalc);
-                          }}
-                          className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline font-bold cursor-pointer"
-                        >
-                          Auto Calculate
-                        </button>
-                      </div>
-                      <input
-                        type="text"
-                        value={item.read_time || '3 min read'}
-                        onChange={e => handleNewsChange(item.id, 'read_time', e.target.value)}
-                        placeholder="3 min read"
-                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-xs dark:text-white focus:ring-2 focus:ring-blue-500 font-medium"
-                      />
-                    </div>
-
-                    {/* Feature Toggles */}
-                    <div className="sm:col-span-2 flex flex-wrap items-center gap-3 pt-2 sm:pt-0">
-                      <label className="flex items-center gap-2 cursor-pointer bg-white dark:bg-slate-900 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold select-none hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(item.is_pinned)}
-                          onChange={e => handleNewsChange(item.id, 'is_pinned', e.target.checked)}
-                          className="rounded text-amber-500 focus:ring-amber-400 w-4 h-4 cursor-pointer"
-                        />
-                        <span className="flex items-center gap-1 text-slate-800 dark:text-slate-200">
-                          <Pin className="w-3.5 h-3.5 text-amber-500" /> Pin to Top
-                        </span>
-                      </label>
-
-                      <label className="flex items-center gap-2 cursor-pointer bg-white dark:bg-slate-900 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold select-none hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(item.is_breaking)}
-                          onChange={e => handleNewsChange(item.id, 'is_breaking', e.target.checked)}
-                          className="rounded text-red-600 focus:ring-red-400 w-4 h-4 cursor-pointer"
-                        />
-                        <span className="flex items-center gap-1 text-slate-800 dark:text-slate-200">
-                          <Flame className="w-3.5 h-3.5 text-red-500" /> Breaking News
-                        </span>
-                      </label>
-
-                      <label className="flex items-center gap-2 cursor-pointer bg-white dark:bg-slate-900 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold select-none hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(item.is_new)}
-                          onChange={e => handleNewsChange(item.id, 'is_new', e.target.checked)}
-                          className="rounded text-emerald-600 focus:ring-emerald-400 w-4 h-4 cursor-pointer"
-                        />
-                        <span className="flex items-center gap-1 text-slate-800 dark:text-slate-200">
-                          <Sparkles className="w-3.5 h-3.5 text-emerald-500" /> New Badge
-                        </span>
-                      </label>
+                        </>
+                      )}
                     </div>
                   </div>
+                </div>
 
-                  {/* Form Grid */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* Left Column: General Info & Author */}
-                    <div className="space-y-5">
-                      <h4 className="font-bold text-sm text-slate-900 dark:text-white border-b border-black/5 dark:border-white/5 pb-2">
-                        General Article Information
-                      </h4>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Article Title *</label>
-                        <input
-                          type="text"
-                          value={item.title || ''}
-                          onChange={e => handleNewsChange(item.id, 'title', e.target.value)}
-                          className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
-                          placeholder="Article title"
-                        />
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Slug (URL Path)</label>
-                          <input
-                            type="text"
-                            value={item.slug || ''}
-                            onChange={e => handleNewsChange(item.id, 'slug', e.target.value)}
-                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm dark:text-white font-mono focus:ring-2 focus:ring-blue-500 transition-all"
-                            placeholder="article-slug-url"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Category</label>
-                          <input
-                            type="text"
-                            value={item.category || ''}
-                            onChange={e => handleNewsChange(item.id, 'category', e.target.value)}
-                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm dark:text-white focus:ring-2 focus:ring-blue-500 transition-all"
-                            placeholder="Industry / Updates / Transparency"
-                          />
-                        </div>
-                      </div>
+                {/* Simple 1-Tap Action Row */}
+                <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800/80">
+                  <button
+                    type="button"
+                    onClick={() => openEditArticleEditor(item)}
+                    className="flex-1 py-1.5 px-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer border-0 active:scale-95"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Edit</span>
+                  </button>
 
-                      {/* Thumbnail & Cover Image */}
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                          News Cover / Thumbnail URL (16:9 Aspect Ratio)
-                        </label>
-                        <ImageUpload
-                          value={item.logo_url || item.image_url || ''}
-                          onChange={val => {
-                            handleNewsChange(item.id, 'logo_url', val);
-                            handleNewsChange(item.id, 'image_url', val);
-                          }}
-                          className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm dark:text-white font-mono focus-within:ring-2 focus-within:ring-blue-500 transition-all overflow-hidden"
-                          placeholder="https://... (16:9 aspect ratio recommended)"
-                        />
-                        {(item.logo_url || item.image_url) && (
-                          <div className="mt-3 flex items-center justify-center w-full max-w-sm rounded-xl overflow-hidden border border-black/10 dark:border-white/10 bg-slate-100 dark:bg-slate-800 p-2">
-                            <img 
-                              src={item.logo_url || item.image_url} 
-                              alt="Thumbnail Preview" 
-                              className="max-w-full h-auto max-h-40 object-contain rounded-md shadow-sm" 
-                            />
-                          </div>
-                        )}
-                      </div>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickToggleStatus(item)}
+                    disabled={saving}
+                    className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer border ${
+                      item.sync_to_public !== false
+                        ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60'
+                        : 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60'
+                    }`}
+                  >
+                    {item.sync_to_public !== false ? 'Live' : 'Draft'}
+                  </button>
 
-                      {/* Short Description */}
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                          Short Summary / Search Snippet *
-                        </label>
-                        <textarea
-                          value={item.description || ''}
-                          onChange={e => handleNewsChange(item.id, 'description', e.target.value)}
-                          rows={3}
-                          className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm dark:text-white focus:ring-2 focus:ring-blue-500 transition-all leading-relaxed"
-                          placeholder="Brief summary for listings, Google snippets, and social sharing..."
-                        />
-                      </div>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickTogglePin(item)}
+                    disabled={saving}
+                    title={item.is_pinned ? 'Unpin' : 'Pin to Top'}
+                    className={`p-1.5 rounded-xl transition-all cursor-pointer border ${
+                      item.is_pinned
+                        ? 'bg-amber-500 text-white border-amber-500'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
+                    <Pin className="w-3.5 h-3.5" />
+                  </button>
 
-                      {/* Author Dossier */}
-                      <h4 className="font-bold text-sm text-slate-900 dark:text-white border-b border-black/5 dark:border-white/5 pb-2 mt-6">
-                        Author &amp; Attribution
-                      </h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Author / Lead Analyst</label>
-                          <input
-                            type="text"
-                            value={item.ceo_name || item.author || ''}
-                            onChange={e => {
-                              handleNewsChange(item.id, 'ceo_name', e.target.value);
-                              handleNewsChange(item.id, 'author', e.target.value);
-                            }}
-                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm dark:text-white focus:ring-2 focus:ring-blue-500 transition-all"
-                            placeholder="e.g. Admin Team"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Role / Bio Tagline</label>
-                          <input
-                            type="text"
-                            value={item.ceo_description || ''}
-                            onChange={e => handleNewsChange(item.id, 'ceo_description', e.target.value)}
-                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm dark:text-white focus:ring-2 focus:ring-blue-500 transition-all"
-                            placeholder="e.g. Transparency & Security Analyst"
-                          />
-                        </div>
-                      </div>
-                    </div>
+                  {item.slug && (
+                    <a
+                      href={`/news/${item.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="View Public Page"
+                      className="p-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 flex items-center justify-center"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
 
-                    {/* Right Column: SEO & External Meta */}
-                    <div className="space-y-5">
-                      <h4 className="font-bold text-sm text-slate-900 dark:text-white border-b border-black/5 dark:border-white/5 pb-2">
-                        SEO Meta &amp; Social Graph
-                      </h4>
-                      <div className="grid gap-4">
-                        <SeoFieldWithLimit
-                          label="SEO Meta Title"
-                          name={`news_seo_title_${item.id}`}
-                          value={item.seo_title || ''}
-                          onChange={val => handleNewsChange(item.id, 'seo_title', val)}
-                          maxChars={58}
-                          placeholder="Custom Google title tag (falls back to Title)..."
-                          helperText="Recommended: 50–58 characters to avoid Google search truncation."
-                        />
-                        <SeoFieldWithLimit
-                          label="SEO Meta Description"
-                          type="textarea"
-                          name={`news_seo_desc_${item.id}`}
-                          value={item.seo_description || ''}
-                          onChange={val => handleNewsChange(item.id, 'seo_description', val)}
-                          maxChars={155}
-                          rows={2}
-                          placeholder="Custom Google snippet description (falls back to Summary)..."
-                          helperText="Recommended: 130–155 characters to display fully in search snippets."
-                        />
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Social OG Image</label>
-                            <ImageUpload
-                              value={item.og_image_url || ''}
-                              onChange={val => handleNewsChange(item.id, 'og_image_url', val)}
-                              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm dark:text-white font-mono focus-within:ring-2 focus-within:ring-blue-500 transition-all overflow-hidden"
-                              placeholder="https://..."
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Canonical URL</label>
-                            <input
-                              type="text"
-                              value={item.canonical_url || ''}
-                              onChange={e => handleNewsChange(item.id, 'canonical_url', e.target.value)}
-                              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm dark:text-white font-mono focus:ring-2 focus:ring-blue-500 transition-all"
-                              placeholder="/news/..."
-                            />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Target Region</label>
-                            <input
-                              type="text"
-                              value={item.target_region || 'India'}
-                              onChange={e => handleNewsChange(item.id, 'target_region', e.target.value)}
-                              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm dark:text-white focus:ring-2 focus:ring-blue-500 transition-all"
-                              placeholder="India / Global"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">SEO Keywords</label>
-                            <input
-                              type="text"
-                              value={item.seo_keywords || ''}
-                              onChange={e => handleNewsChange(item.id, 'seo_keywords', e.target.value)}
-                              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm dark:text-white focus:ring-2 focus:ring-blue-500 transition-all"
-                              placeholder="app news, updates, release notes"
-                            />
-                          </div>
-                        </div>
-
-                        <h4 className="font-bold text-sm text-slate-900 dark:text-white border-b border-black/5 dark:border-white/5 pb-2 mt-4">
-                          Cross-Links &amp; Relationships
-                        </h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">External Source URL</label>
-                            <input
-                              type="text"
-                              value={item.link || ''}
-                              onChange={e => handleNewsChange(item.id, 'link', e.target.value)}
-                              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm dark:text-white font-mono focus:ring-2 focus:ring-blue-500 transition-all"
-                              placeholder="https://original-source-link..."
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Related Application</label>
-                            <select
-                              value={item.related_app_id || ''}
-                              onChange={e => handleNewsChange(item.id, 'related_app_id', e.target.value)}
-                              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm dark:text-white focus:ring-2 focus:ring-blue-500 transition-all"
-                            >
-                              <option value="">No App Linked</option>
-                              {appsList && appsList.map((app: any) => (
-                                <option key={app.id} value={app.id}>
-                                  {app.name} ({app.id})
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* HTML Content Body & Live Preview */}
-                  <div className="space-y-3 pt-6 border-t border-black/10 dark:border-white/10">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                      <div className="flex items-center gap-3">
-                        <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-blue-500" /> Full Article Body (HTML / Markdown)
-                        </h4>
-                        <span className="text-xs text-slate-400">
-                          {((item.content || item.description_html || '').trim().split(/\s+/).filter(Boolean).length)} words
-                        </span>
-                      </div>
+                  {isConfirmingDelete ? (
+                    <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => setShowHtmlPreview(prev => !prev)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                          showHtmlPreview
-                            ? 'bg-blue-600 text-white shadow-sm'
-                            : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
-                        }`}
+                        onClick={() => {
+                          setConfirmDeleteId(null);
+                          handleDeleteNews(item.id);
+                        }}
+                        className="px-2 py-1.5 bg-rose-600 text-white rounded-xl text-[10px] font-black uppercase border-0 cursor-pointer"
                       >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>{showHtmlPreview ? 'Hide Preview' : 'Show Live HTML Preview'}</span>
+                        Delete
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="px-2 py-1.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-[10px] font-bold border-0 cursor-pointer"
+                      >
+                        No
                       </button>
                     </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteId(item.id)}
+                      title="Delete Article"
+                      className="p-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/50 transition-all cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-                    {showHtmlPreview ? (
-                      <div className="p-6 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl max-h-[400px] overflow-y-auto">
-                        <div 
-                          className="prose dark:prose-invert max-w-none text-sm text-slate-800 dark:text-slate-200 leading-relaxed"
-                          dangerouslySetInnerHTML={{ __html: safeHtml(item.content || item.description_html || '<p><em>No content written yet.</em></p>') }}
-                        />
-                      </div>
-                    ) : (
-                      <textarea
-                        value={item.content || item.description_html || ''}
-                        onChange={e => {
-                          handleNewsChange(item.id, 'content', e.target.value);
-                          handleNewsChange(item.id, 'description_html', e.target.value);
+      {/* =====================================================================
+          CLEAN SINGLE-PAGE MOBILE NEWS EDITOR (Top Save Only — No Bottom Bar)
+         ===================================================================== */}
+      {isEditorOpen && (
+        <div className="fixed inset-0 z-[999999] bg-slate-950/60 backdrop-blur-xs flex items-stretch sm:items-center justify-center sm:p-3 animate-fade-in">
+          <form
+            onSubmit={handleSaveDraftToFirebase}
+            className="bg-white dark:bg-slate-900 w-full sm:max-w-3xl h-[100dvh] sm:h-[94dvh] sm:rounded-2xl border-0 sm:border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden"
+          >
+            {/* Clean Top Bar: Back Button + Title + Live/Pin + SAVE Button */}
+            <div className="px-2.5 py-2 sm:px-4 sm:py-2.5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between gap-1.5 shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setIsEditorOpen(false)}
+                  className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-0 cursor-pointer shrink-0"
+                  title="Close Editor"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <div className="min-w-0">
+                  <h3 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
+                    {isCreatingNew ? 'New Article' : 'Edit Article'}
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-mono truncate">
+                    /news/{draft.slug || 'auto-slug'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick Visibility, Pin & Top Save Button */}
+              <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => updateDraft('sync_to_public', !(draft.sync_to_public !== false))}
+                  className={`px-2 py-1.5 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${
+                    draft.sync_to_public !== false
+                      ? 'bg-emerald-600 text-white border-emerald-600'
+                      : 'bg-amber-500 text-white border-amber-500'
+                  }`}
+                >
+                  {draft.sync_to_public !== false ? 'Live' : 'Draft'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateDraft('is_pinned', !draft.is_pinned)}
+                  className={`px-2 py-1.5 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${
+                    draft.is_pinned
+                      ? 'bg-amber-500 text-white border-amber-500'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  📌
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer border-0 disabled:opacity-50 active:scale-95"
+                >
+                  {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  <span>{saving ? 'Saving...' : 'Save'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Feedback Banner */}
+            {editorNotice && (
+              <div
+                className={`mx-2.5 mt-2 p-2 rounded-xl text-xs font-semibold flex items-center justify-between gap-2 shrink-0 ${
+                  editorNotice.type === 'success'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                    : 'bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {editorNotice.type === 'success' ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  )}
+                  <span>{editorNotice.text}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditorNotice(null)}
+                  className="p-1 text-slate-400 hover:text-slate-600 bg-transparent border-0 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {/* Single-Scroll Clean Body */}
+            <div className="flex-1 overflow-y-auto p-2.5 sm:p-4 pb-6 space-y-3 custom-scrollbar">
+              {/* 1. Headline (Title) */}
+              <div>
+                <label className="block text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
+                  1. Article Title (Headline) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={draft.title || ''}
+                  onChange={(e) => updateDraft('title', e.target.value)}
+                  placeholder="Enter news headline..."
+                  className="w-full bg-slate-50/70 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm font-bold text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              {/* 2. Cover Image & Category */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
+                    2. Cover Image URL
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <ImageUpload
+                      name="news_cover_url"
+                      value={draft.logo_url || draft.image_url || ''}
+                      onChange={(val) => updateDraft('logo_url', val)}
+                      placeholder="Paste Cloudinary URL or upload..."
+                      className="flex-1 bg-slate-50/70 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-100 overflow-hidden"
+                    />
+                    {(draft.logo_url || draft.image_url) && (
+                      <img
+                        src={draft.logo_url || draft.image_url}
+                        alt="Cover"
+                        className="w-9 h-9 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
                         }}
-                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl p-4 text-slate-800 dark:text-slate-200 font-mono text-sm shadow-inner min-h-[280px] focus:ring-2 focus:ring-blue-500 transition-all leading-relaxed"
-                        placeholder="<p>Full article body HTML content with paragraphs, headings, bullet points...</p>"
                       />
                     )}
                   </div>
-
-                  {/* Editor Bottom Actions */}
-                  <div className="pt-4 border-t border-black/10 dark:border-white/10 flex flex-col sm:flex-row justify-end items-center gap-3">
-                    <button
-                      onClick={() => setEditingNewsId(null)}
-                      className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
-                    >
-                      Close Editor
-                    </button>
-                    <button
-                      onClick={() => handleSaveItemAndClose(item.id)}
-                      disabled={saving}
-                      className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 active:scale-95 disabled:opacity-50 text-white px-8 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
-                    >
-                      {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                      <span>Save &amp; Publish Article</span>
-                    </button>
-                  </div>
                 </div>
-              ) : (
-                /* Collapsed Item View */
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div className="flex items-start gap-4">
-                    {item.logo_url || item.image_url ? (
-                      <div className="w-24 h-16 bg-slate-50 dark:bg-slate-900/50 rounded-xl flex items-center justify-center border border-black/10 dark:border-white/10 shadow-sm shrink-0 p-1 overflow-hidden">
-                        <img
-                          src={item.logo_url || item.image_url}
-                          className="max-w-full max-h-full object-cover rounded-md"
-                          loading="lazy"
-                          alt={item.title}
-                          onError={(e) => {
-                            (e.target as HTMLElement).style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-24 h-16 bg-blue-50 dark:bg-blue-900/20 text-blue-500 rounded-xl flex items-center justify-center border border-blue-100 dark:border-blue-800 shrink-0">
-                        <Newspaper className="w-6 h-6" />
-                      </div>
-                    )}
-                    <div>
-                      <h3 className="font-bold text-base dark:text-white flex items-center gap-2 flex-wrap">
-                        {item.title || 'Untitled News Article'}
-                        
-                        {/* Live / Draft Badge */}
-                        {item.sync_to_public === false ? (
-                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800 flex items-center gap-1">
-                            <Lock className="w-2.5 h-2.5" /> Admin Only (Draft)
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/30 flex items-center gap-1">
-                            <Globe className="w-2.5 h-2.5" /> Live on Public
-                          </span>
-                        )}
 
-                        {/* Pinned Badge */}
-                        {item.is_pinned && (
-                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-amber-500 text-white shadow-sm flex items-center gap-1">
-                            <Pin className="w-2.5 h-2.5" /> Pinned
-                          </span>
-                        )}
-
-                        {/* Breaking Badge */}
-                        {item.is_breaking && (
-                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-red-600 text-white shadow-sm animate-pulse flex items-center gap-1">
-                            <Flame className="w-2.5 h-2.5" /> Breaking
-                          </span>
-                        )}
-
-                        {/* New Badge */}
-                        {item.is_new && !item.is_breaking && (
-                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-emerald-600 text-white shadow-sm flex items-center gap-1">
-                            <Sparkles className="w-2.5 h-2.5" /> New
-                          </span>
-                        )}
-
-                        {/* Category Tag */}
-                        {item.category && (
-                          <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                            {item.category}
-                          </span>
-                        )}
-                      </h3>
-
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
-                        {item.description || 'No description provided.'}
-                      </p>
-
-                      <div className="flex items-center gap-3 text-[11px] text-slate-400 dark:text-slate-500 mt-2 font-mono flex-wrap">
-                        <span>Slug: /{item.slug || 'untitled'}</span>
-                        <span>•</span>
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-slate-400" />
-                          {new Date(item.date || item.published_at || item.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </span>
-                        {item.read_time && (
-                          <>
-                            <span>•</span>
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-slate-400" /> {item.read_time}
-                            </span>
-                          </>
-                        )}
-                        {(item.ceo_name || item.author) && (
-                          <>
-                            <span>•</span>
-                            <span className="text-slate-600 dark:text-slate-300 font-sans">
-                              By: {item.ceo_name || item.author}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
-                    {/* View Live Link */}
-                    {item.slug && item.sync_to_public !== false && (
-                      <a
-                        href={`/news/${item.slug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-2 rounded-lg font-semibold text-xs transition-all cursor-pointer"
-                        title="Open live article in new tab"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" /> View
-                      </a>
-                    )}
-
-                    {/* Quick Pin Toggle */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newPinned = !item.is_pinned;
-                        handleNewsChange(item.id, 'is_pinned', newPinned);
-                        const updatedList = newsList.map(n => n.id === item.id ? { ...n, is_pinned: newPinned } : n);
-                        handleSaveAll(updatedList);
-                      }}
-                      className={`flex items-center gap-1 px-2.5 py-2 rounded-lg font-semibold text-xs transition-all border cursor-pointer ${
-                        item.is_pinned
-                          ? 'bg-amber-500 text-white border-amber-600 shadow-sm'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-200'
-                      }`}
-                      title={item.is_pinned ? "Click to unpin" : "Click to pin article to the top"}
-                    >
-                      <Pin className="w-3.5 h-3.5" />
-                    </button>
-
-                    {/* Quick Live Toggle */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newStatus = !(item.sync_to_public !== false);
-                        handleNewsChange(item.id, 'sync_to_public', newStatus);
-                        const updatedList = newsList.map(n => n.id === item.id ? { ...n, sync_to_public: newStatus } : n);
-                        handleSaveAll(updatedList);
-                      }}
-                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg font-semibold text-xs transition-all border cursor-pointer ${
-                        item.sync_to_public !== false
-                          ? 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
-                          : 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800'
-                      }`}
-                      title={item.sync_to_public !== false ? "Click to unpublish from public website" : "Click to publish live to public website"}
-                    >
-                      {item.sync_to_public !== false ? <Globe className="w-3.5 h-3.5 text-emerald-500" /> : <Lock className="w-3.5 h-3.5 text-amber-500" />}
-                      <span>{item.sync_to_public !== false ? 'Live' : 'Draft'}</span>
-                    </button>
-
-                    {/* Edit */}
-                    <button
-                      onClick={() => setEditingNewsId(item.id)}
-                      className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3.5 py-2 rounded-lg font-semibold text-xs transition-all cursor-pointer"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" /> Edit
-                    </button>
-
-                    {/* Delete */}
-                    <button
-                      onClick={() => {
-                        if (window.confirm(`Delete article "${item.title || 'this item'}"?`)) {
-                          handleDeleteNews(item.id);
-                          const updatedList = newsList.filter(n => n.id !== item.id);
-                          handleSaveAll(updatedList);
+                <div>
+                  <label className="block text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
+                    3. Category & App Link
+                  </label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <select
+                      value={QUICK_CATEGORIES.includes(draft.category) ? draft.category : 'Custom'}
+                      onChange={(e) => {
+                        if (e.target.value !== 'Custom') {
+                          updateDraft('category', e.target.value);
                         }
                       }}
-                      className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 px-3.5 py-2 rounded-lg font-semibold text-xs transition-all cursor-pointer"
+                      className="w-full bg-slate-50/70 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2 py-2 text-xs font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:border-blue-500 cursor-pointer"
                     >
-                      <Trash2 className="w-3.5 h-3.5" /> Delete
+                      {QUICK_CATEGORIES.map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
+
+                    <select
+                      value={draft.related_app_id || ''}
+                      onChange={(e) => updateDraft('related_app_id', e.target.value)}
+                      className="w-full bg-slate-50/70 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:border-blue-500 cursor-pointer"
+                      title="Connect an App to display a download card inside this news article"
+                    >
+                      <option value="">📱 No App Linked</option>
+                      {appsList.map((app) => (
+                        <option key={app.id} value={app.id}>
+                          {app.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {linkedAppPreview && (
+                    <div className="mt-1 flex items-center justify-between bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-800/50 rounded-lg px-2 py-1 text-[10px] font-bold text-indigo-700 dark:text-indigo-300">
+                      <span className="truncate">✓ Linked App: {linkedAppPreview.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => updateDraft('related_app_id', '')}
+                        className="text-rose-500 hover:underline bg-transparent border-0 cursor-pointer ml-2"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 4. Short Summary */}
+              <div>
+                <label className="block text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
+                  4. Short Summary (News Cards & Auto-SEO)
+                </label>
+                <textarea
+                  rows={2}
+                  value={draft.description || ''}
+                  onChange={(e) => updateDraft('description', e.target.value)}
+                  placeholder="Write 1–2 short sentences summarizing this news..."
+                  className="w-full bg-slate-50/70 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs font-medium text-slate-800 dark:text-slate-100 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              {/* 5. Article Content (HTML or Plain Text) */}
+              <div className="bg-slate-50/70 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-800 rounded-2xl p-2.5 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                  <label className="text-[11px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-200">
+                    5. Article Content (HTML or Text)
+                  </label>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={handleAiFormatArticleHtml}
+                      disabled={isAiFormatting}
+                      className="px-2 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer border-0 disabled:opacity-50"
+                    >
+                      {isAiFormatting ? (
+                        <RefreshCw className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Wand2 className="w-3 h-3" />
+                      )}
+                      <span>{isAiFormatting ? 'Formatting...' : 'Clean HTML'}</span>
                     </button>
+
+                    <div className="inline-flex rounded-lg bg-slate-200/80 dark:bg-slate-900 p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setHtmlViewMode('edit')}
+                        className={`px-2 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer border-0 ${
+                          htmlViewMode === 'edit'
+                            ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-2xs'
+                            : 'bg-transparent text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        <Code className="w-3 h-3" /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setHtmlViewMode('preview')}
+                        className={`px-2 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer border-0 ${
+                          htmlViewMode === 'preview'
+                            ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-2xs'
+                            : 'bg-transparent text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        <Eye className="w-3 h-3" /> Preview
+                      </button>
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
-          ))
-        )}
-      </div>
 
-      {/* Bottom Sticky Sync Bar */}
-      {newsList.length > 0 && (
-        <div className="mt-8 pt-6 border-t border-black/10 dark:border-white/10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Clicking Save &amp; Publish synchronizes all news entries to Cloud Firestore and local storage, immediately updating the public website.
-          </p>
-          <button
-            onClick={() => handleSaveAll()}
-            disabled={saving}
-            className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 active:scale-95 disabled:opacity-50 text-white px-8 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
-          >
-            {saving ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
-            ) : (
-              <Save className="w-4 h-4" />
-            )}
-            <span>{saving ? 'Synchronizing...' : 'Save & Publish All News'}</span>
-          </button>
+                {/* Simple 1-Tap HTML Tag Toolbar */}
+                {htmlViewMode === 'edit' && (
+                  <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-0.5">
+                    {[
+                      { label: 'H2', action: () => insertHtmlTag('<h2>', '</h2>', 'Section Heading') },
+                      { label: 'H3', action: () => insertHtmlTag('<h3>', '</h3>', 'Subheading') },
+                      { label: 'Paragraph', action: () => insertHtmlTag('<p>', '</p>', 'Paragraph text...') },
+                      { label: 'Bold', action: () => insertHtmlTag('<strong>', '</strong>', 'important text') },
+                      {
+                        label: 'List',
+                        action: () =>
+                          insertHtmlTag('<ul>\n  <li>', '</li>\n  <li>Second point</li>\n</ul>', 'First point')
+                      },
+                      { label: 'Quote', action: () => insertHtmlTag('<blockquote>', '</blockquote>', 'Key quote...') },
+                      {
+                        label: 'Link',
+                        action: () =>
+                          insertHtmlTag('<a href="https://" target="_blank" rel="noopener noreferrer">', '</a>', 'Link Text')
+                      }
+                    ].map((btn) => (
+                      <button
+                        key={btn.label}
+                        type="button"
+                        onClick={btn.action}
+                        className="shrink-0 px-2 py-1 rounded-lg bg-white dark:bg-slate-900 hover:bg-blue-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-[11px] font-bold transition-colors cursor-pointer"
+                      >
+                        {btn.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {htmlViewMode === 'edit' ? (
+                  <textarea
+                    ref={htmlTextareaRef}
+                    rows={9}
+                    value={draft.content || draft.description_html || ''}
+                    onChange={(e) => updateDraft('content', e.target.value)}
+                    placeholder="Write or paste your news article here. Plain text paragraphs are automatically converted to clean HTML on save..."
+                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs sm:text-sm font-mono leading-relaxed text-slate-800 dark:text-slate-100 focus:outline-none focus:border-blue-500"
+                  />
+                ) : (
+                  <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 min-h-[200px] max-h-[360px] overflow-y-auto">
+                    {(draft.content || draft.description_html || '').trim() ? (
+                      <div
+                        className="prose prose-sm dark:prose-invert max-w-none text-slate-800 dark:text-slate-200 leading-relaxed"
+                        dangerouslySetInnerHTML={{
+                          __html: safeHtml(structureHtmlFragment(draft.content || draft.description_html || ''))
+                        }}
+                      />
+                    ) : (
+                      <p className="text-xs text-slate-400 italic text-center py-8">
+                        Nothing to preview yet. Switch to Edit to write your article.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* ===============================================================
+                  OPTIONAL ACCORDION 1: SEO & URL SETTINGS (AUTO-FILLED)
+                 =============================================================== */}
+              <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-white dark:bg-slate-900">
+                <button
+                  type="button"
+                  onClick={() => setShowSeoSection(!showSeoSection)}
+                  className="w-full px-3 py-2.5 flex items-center justify-between gap-2 bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100/70 dark:hover:bg-slate-800 transition-colors cursor-pointer border-0 text-left"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Globe className="w-4 h-4 text-blue-500 shrink-0" />
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+                      SEO, URL Slug & Social Sharing
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold shrink-0">
+                      Auto-Synced
+                    </span>
+                  </div>
+                  {showSeoSection ? (
+                    <ChevronUp className="w-4 h-4 text-slate-400 shrink-0" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                  )}
+                </button>
+
+                {showSeoSection && (
+                  <div className="p-3 space-y-3 border-t border-slate-200 dark:border-slate-800 animate-fade-in">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Auto-fills from Headline & Summary if left blank:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleAutoFillSeoFromArticle}
+                        className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 text-[11px] font-bold border border-blue-200 dark:border-blue-800 cursor-pointer shrink-0"
+                      >
+                        Sync from Article
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                          URL Slug
+                        </label>
+                        <input
+                          type="text"
+                          value={draft.slug || ''}
+                          onChange={(e) => {
+                            setSlugManuallyEdited(true);
+                            updateDraft('slug', e.target.value.toLowerCase().replace(/[^a-z0-9-_]+/g, '-'));
+                          }}
+                          placeholder="auto-generated-from-title"
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-blue-600 dark:text-blue-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                          SEO Keywords (Comma separated)
+                        </label>
+                        <input
+                          type="text"
+                          value={draft.seo_keywords || ''}
+                          onChange={(e) => updateDraft('seo_keywords', e.target.value)}
+                          placeholder="security, update, release"
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100"
+                        />
+                      </div>
+                    </div>
+
+                    <SeoFieldWithLimit
+                      label="SEO Meta Title (Max 58 chars)"
+                      name="news_seo_title"
+                      value={draft.seo_title || ''}
+                      onChange={(val) => updateDraft('seo_title', val)}
+                      maxChars={58}
+                      placeholder={draft.title || 'Auto-filled from headline...'}
+                    />
+
+                    <SeoFieldWithLimit
+                      label="SEO Meta Description (Max 155 chars)"
+                      type="textarea"
+                      name="news_seo_description"
+                      value={draft.seo_description || ''}
+                      onChange={(val) => updateDraft('seo_description', val)}
+                      maxChars={155}
+                      rows={2}
+                      placeholder={draft.description || 'Auto-filled from summary...'}
+                    />
+
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                        Social Share OG Image URL (Defaults to Cover Image)
+                      </label>
+                      <ImageUpload
+                        name="news_og_image_url"
+                        value={draft.og_image_url || ''}
+                        onChange={(val) => updateDraft('og_image_url', val)}
+                        placeholder={draft.logo_url || 'https://res.cloudinary.com/...'}
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-100 overflow-hidden"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ===============================================================
+                  OPTIONAL ACCORDION 2: AUTHOR, DATE & BADGES
+                 =============================================================== */}
+              <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-white dark:bg-slate-900">
+                <button
+                  type="button"
+                  onClick={() => setShowAuthorSection(!showAuthorSection)}
+                  className="w-full px-3 py-2.5 flex items-center justify-between gap-2 bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100/70 dark:hover:bg-slate-800 transition-colors cursor-pointer border-0 text-left"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <User className="w-4 h-4 text-indigo-500 shrink-0" />
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+                      Author, Publish Date & Extra Badges
+                    </span>
+                    <span className="text-[10px] text-slate-400 truncate hidden sm:inline">
+                      ({draft.ceo_name || 'Admin Team'} • {draft.read_time || '3 min read'})
+                    </span>
+                  </div>
+                  {showAuthorSection ? (
+                    <ChevronUp className="w-4 h-4 text-slate-400 shrink-0" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                  )}
+                </button>
+
+                {showAuthorSection && (
+                  <div className="p-3 space-y-3 border-t border-slate-200 dark:border-slate-800 animate-fade-in">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                          Author Name
+                        </label>
+                        <input
+                          type="text"
+                          value={draft.ceo_name || ''}
+                          onChange={(e) => updateDraft('ceo_name', e.target.value)}
+                          placeholder="Admin Team"
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                          Author Role / Title
+                        </label>
+                        <input
+                          type="text"
+                          value={draft.ceo_description || ''}
+                          onChange={(e) => updateDraft('ceo_description', e.target.value)}
+                          placeholder="Transparency & Security Analyst"
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                            Publish Date
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => updateDraft('date', new Date().toISOString())}
+                            className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-transparent border-0 cursor-pointer"
+                          >
+                            Set Now
+                          </button>
+                        </div>
+                        <input
+                          type="datetime-local"
+                          value={(() => {
+                            const raw = draft.date || draft.created_at;
+                            if (!raw) return '';
+                            const d = new Date(raw);
+                            if (isNaN(d.getTime())) return '';
+                            const pad = (n: number) => String(n).padStart(2, '0');
+                            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+                              d.getHours()
+                            )}:${pad(d.getMinutes())}`;
+                          })()}
+                          onChange={(e) => {
+                            if (!e.target.value) return;
+                            const parsed = new Date(e.target.value);
+                            if (!isNaN(parsed.getTime())) {
+                              updateDraft('date', parsed.toISOString());
+                            }
+                          }}
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                          External Reference Link (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={draft.link || ''}
+                          onChange={(e) => updateDraft('link', e.target.value)}
+                          placeholder="https://..."
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-slate-800 dark:text-slate-100"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => updateDraft('is_breaking', !draft.is_breaking)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                          draft.is_breaking
+                            ? 'bg-rose-600 text-white border-rose-600'
+                            : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                        }`}
+                      >
+                        ⚡ Breaking News Badge
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => updateDraft('is_new', !draft.is_new)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                          draft.is_new
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                        }`}
+                      >
+                        ✨ New Article Badge
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </form>
         </div>
       )}
     </div>
   );
-});
-
-AdminNewsTab.displayName = 'AdminNewsTab';
+};
 
 export default AdminNewsTab;

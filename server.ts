@@ -552,6 +552,26 @@ async function startServer() {
       if (viteDevServer) {
         try {
           adminTemplate = await viteDevServer.transformIndexHtml(req.originalUrl, adminTemplate);
+          if (!adminTemplate.includes('__vite_plugin_react_preamble_installed__') && !adminTemplate.includes('@react-refresh')) {
+            const fallbackScript = `<script type="module">
+              try {
+                const RefreshRuntime = (await import('/@react-refresh')).default;
+                RefreshRuntime.injectIntoGlobalHook(window);
+                window.$RefreshReg$ = () => {};
+                window.$RefreshSig$ = () => (type) => type;
+                window.__vite_plugin_react_preamble_installed__ = true;
+              } catch (e) {
+                window.$RefreshReg$ = window.$RefreshReg$ || function() {};
+                window.$RefreshSig$ = window.$RefreshSig$ || function() { return function(type) { return type; }; };
+                window.__vite_plugin_react_preamble_installed__ = true;
+              }
+            </script>`;
+            if (adminTemplate.includes('<head>')) {
+              adminTemplate = adminTemplate.replace('<head>', '<head>' + fallbackScript);
+            } else {
+              adminTemplate = fallbackScript + adminTemplate;
+            }
+          }
         } catch (_) {}
       }
 

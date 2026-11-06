@@ -1253,9 +1253,43 @@ export async function onRequest(context) {
         if (devsSnap.exists && Array.isArray(devsSnap.data?.items)) liveSettings.developers = devsSnap.data.items;
         if (linksSnap.exists && Array.isArray(linksSnap.data?.items)) liveSettings.quick_links = linksSnap.data.items;
 
-        const liveNews = newsSnap.exists && Array.isArray(newsSnap.data?.items)
+        const staticNewsFallbackMap = new Map();
+        for (const fn of (staticData?.news || [])) {
+          if (fn?.id) staticNewsFallbackMap.set(String(fn.id).trim().toLowerCase(), fn);
+          if (fn?.slug) staticNewsFallbackMap.set(String(fn.slug).trim().toLowerCase(), fn);
+        }
+        const rawLiveNews = newsSnap.exists && Array.isArray(newsSnap.data?.items)
           ? newsSnap.data.items
           : (staticData?.news || []);
+        const liveNews = rawLiveNews.map((n) => {
+          if (!n || typeof n !== 'object') return n;
+          const copy = { ...n };
+          const bodyHtml = copy.content || copy.description_html || '';
+          if (!bodyHtml) {
+            const fb =
+              (copy.id && staticNewsFallbackMap.get(String(copy.id).trim().toLowerCase())) ||
+              (copy.slug && staticNewsFallbackMap.get(String(copy.slug).trim().toLowerCase()));
+            if (fb) {
+              const recovered = fb.content || fb.description_html || '';
+              if (recovered) {
+                copy.content = recovered;
+                copy.description_html = recovered;
+              }
+              if (!copy.seo_title && (fb.seo_title || fb.meta_title)) {
+                copy.seo_title = fb.seo_title || fb.meta_title;
+                copy.meta_title = copy.seo_title;
+              }
+              if (!copy.seo_description && (fb.seo_description || fb.meta_description)) {
+                copy.seo_description = fb.seo_description || fb.meta_description;
+                copy.meta_description = copy.seo_description;
+              }
+            }
+          } else {
+            copy.content = bodyHtml;
+            copy.description_html = bodyHtml;
+          }
+          return copy;
+        });
         const liveVideos = videosSnap.exists && Array.isArray(videosSnap.data?.items)
           ? videosSnap.data.items
           : (staticData?.videos || []);
@@ -1438,6 +1472,49 @@ export async function onRequest(context) {
       return new Response(JSON.stringify({ status: 'OK', success: true, settings: body?.settings || delta }), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
     } catch (err) {
       return new Response(JSON.stringify({ status: 'ERROR', success: false, error: err?.message || 'Save settings failed' }), { status: 500, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
+    }
+  }
+
+  if ((url.pathname === '/api/v1/admin/news/save' || url.pathname === '/api/v1/admin/save-single-news') && request.method === 'POST') {
+    let body = {};
+    try { body = JSON.parse(rawBody || '{}'); } catch (_) {}
+    const item = body?.item;
+    if (body?.persistedToFirestore === true) {
+      return new Response(JSON.stringify({ status: 'OK', success: true, item }), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
+    }
+    try {
+      const nowIso = new Date().toISOString();
+      const newsSnap = await edgeReadDoc('store_data', 'news');
+      const currentNews = newsSnap.exists && Array.isArray(newsSnap.data?.items) ? [...newsSnap.data.items] : [...(staticData?.news || [])];
+      const idx = currentNews.findIndex((n) => n && (n.id === item?.id || (item?.slug && n.slug === item.slug)));
+      if (idx >= 0) {
+        currentNews[idx] = { ...currentNews[idx], ...item, updated_at: nowIso };
+      } else if (item) {
+        currentNews.unshift({ ...item, updated_at: nowIso });
+      }
+      await edgeWriteDoc('store_data', 'news', { items: currentNews, count: currentNews.length, updated_at: nowIso, updatedAt: nowIso }, false);
+      return new Response(JSON.stringify({ status: 'OK', success: true, item }), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
+    } catch (err) {
+      return new Response(JSON.stringify({ status: 'ERROR', success: false, error: err?.message || 'Save news item failed' }), { status: 500, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
+    }
+  }
+
+  if ((url.pathname === '/api/v1/admin/news/delete' || url.pathname === '/api/v1/admin/delete-single-news') && request.method === 'POST') {
+    let body = {};
+    try { body = JSON.parse(rawBody || '{}'); } catch (_) {}
+    const id = body?.id || body?.newsId || body?.slug;
+    if (body?.persistedToFirestore === true) {
+      return new Response(JSON.stringify({ status: 'OK', success: true, id }), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
+    }
+    try {
+      const nowIso = new Date().toISOString();
+      const newsSnap = await edgeReadDoc('store_data', 'news');
+      const currentNews = newsSnap.exists && Array.isArray(newsSnap.data?.items) ? [...newsSnap.data.items] : [...(staticData?.news || [])];
+      const nextNews = currentNews.filter((n) => n && n.id !== id && n.slug !== id);
+      await edgeWriteDoc('store_data', 'news', { items: nextNews, count: nextNews.length, updated_at: nowIso, updatedAt: nowIso }, false);
+      return new Response(JSON.stringify({ status: 'OK', success: true, id }), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
+    } catch (err) {
+      return new Response(JSON.stringify({ status: 'ERROR', success: false, error: err?.message || 'Delete news item failed' }), { status: 500, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
     }
   }
 

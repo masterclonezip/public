@@ -156,10 +156,18 @@ function AppContent() {
         <Suspense fallback={<LoadingScreen />}>
           <Routes location={location}>
             <Route path="/login" element={<ErrorBoundary><AdminLoginPageLazy /></ErrorBoundary>} />
-            <Route path="/" element={<Navigate to={`/${adminPath}/login`} replace />} />
+            <Route path="/" element={
+              <ProtectedAdminRoute>
+                <ErrorBoundary><AdminDashboard /></ErrorBoundary>
+              </ProtectedAdminRoute>
+            } />
             {Array.from(new Set([adminPath, 'admin', 'masterworld'])).map(base => (
               <React.Fragment key={base}>
-                <Route path={`/${base}`} element={<Navigate to={`/${base}/login`} replace />} />
+                <Route path={`/${base}`} element={
+                  <ProtectedAdminRoute>
+                    <ErrorBoundary><AdminDashboard /></ErrorBoundary>
+                  </ProtectedAdminRoute>
+                } />
                 <Route path={`/${base}/login`} element={<ErrorBoundary><AdminLoginPageLazy /></ErrorBoundary>} />
                 <Route path={`/${base}/*`} element={
                   <ProtectedAdminRoute>
@@ -168,7 +176,11 @@ function AppContent() {
                 } />
               </React.Fragment>
             ))}
-            <Route path="*" element={<Navigate to={`/${adminPath}/login`} replace />} />
+            <Route path="*" element={
+              <ProtectedAdminRoute>
+                <ErrorBoundary><AdminDashboard /></ErrorBoundary>
+              </ProtectedAdminRoute>
+            } />
           </Routes>
         </Suspense>
       </div>
