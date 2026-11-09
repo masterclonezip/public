@@ -1,13 +1,283 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
-    <loc>https://yonoappdex.com/</loc>
-    <lastmod>2026-09-01T00:00:00+00:00</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>1.0</priority>
+    <loc>https://yonoappdex.com/app/gogo-rummy</loc>
+    <lastmod>2026-11-09T16:27:33+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
     <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_512/v1793499107/vvqemcm3gkjsko5m6unw.png</image:loc>
-      <image:title>Official Brand Logo</image:title>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794040627/b2rbqbpvjshpxcxhgvmv.png</image:loc>
+      <image:title>GOGO RUMMY</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/bingo-101</loc>
+    <lastmod>2026-11-09T16:25:09+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794040947/rj2x5dtvn0qsk1ict895.webp</image:loc>
+      <image:title>BINGO 101</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/max-rummy</loc>
+    <lastmod>2026-11-09T16:19:20+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794041292/bsm2icv4uwlskqlkdeyx.png</image:loc>
+      <image:title>MAX RUMMY</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/rummy-888</loc>
+    <lastmod>2026-11-09T16:10:38+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793912081/um8zzdeyggvw880vfqq9.webp</image:loc>
+      <image:title>RUMMY 888</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/spin-winner</loc>
+    <lastmod>2026-11-09T16:05:28+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793598636/yxihfx2fq1q2g3rzqn03.png</image:loc>
+      <image:title>SPIN WINNER</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/rummy-77</loc>
+    <lastmod>2026-11-09T16:02:34+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793912450/ykr6efwlezi0qfok9jpc.webp</image:loc>
+      <image:title>RUMMY 77</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/ace-rummy</loc>
+    <lastmod>2026-11-09T16:00:29+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793911376/av3qxtsizdcqkzth59yw.png</image:loc>
+      <image:title>ACE RUMMY</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/vip-rummy</loc>
+    <lastmod>2026-11-09T15:56:40+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793910880/xcudrlmkzy1q2imvtts2.png</image:loc>
+      <image:title>VIP RUMMY</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/hi-rummy</loc>
+    <lastmod>2026-11-09T15:52:37+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793910787/ehvyja1054h6bwgiob2l.png</image:loc>
+      <image:title>HI RUMMY</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/joy-rummy</loc>
+    <lastmod>2026-11-09T15:49:38+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793910225/eztvlhqkpxuk5frbtsp0.webp</image:loc>
+      <image:title>JOY RUMMY</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/ok-rummy</loc>
+    <lastmod>2026-11-09T15:48:09+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793604973/pw3qzwjgynklgorwkmgv.webp</image:loc>
+      <image:title>OK RUMMY</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/rummy-91</loc>
+    <lastmod>2026-11-09T15:47:45+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793605286/j0t6h8w7dgcb03njgsnc.webp</image:loc>
+      <image:title>RUMMY 91</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/gold-rummy</loc>
+    <lastmod>2026-11-09T15:47:02+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793909867/nyllw2ovro09ly7rkdgo.png</image:loc>
+      <image:title>GOLD RUMMY</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/yono-slots</loc>
+    <lastmod>2026-11-09T15:44:18+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793941958/jwhfcn4oegifwmsj6ryp.webp</image:loc>
+      <image:title>YONO SLOTS</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/maha-games</loc>
+    <lastmod>2026-11-09T15:40:15+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793618959/epskuazwjo5fuug7m6hx.webp</image:loc>
+      <image:title>MAHA GAMES</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/jaiho-91</loc>
+    <lastmod>2026-11-09T15:38:06+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793942036/l2ez61vhexwqjtbk7yus.webp</image:loc>
+      <image:title>JAIHO 91</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/yono-games</loc>
+    <lastmod>2026-11-09T15:34:26+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793605742/sdb5d7jzazxpoax8m5nr.webp</image:loc>
+      <image:title>YONO GAMES</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/share-slots</loc>
+    <lastmod>2026-11-09T15:27:43+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793911740/zwhzecv1dxcemha4veqf.webp</image:loc>
+      <image:title>SHARE SLOTS</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/every-77</loc>
+    <lastmod>2026-11-08T04:33:36+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793546491/vtwuonharlo6opxo1nsm.webp</image:loc>
+      <image:title>EVER 777</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/rummy-ludo</loc>
+    <lastmod>2026-11-07T08:35:56+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794040299/plpmvaezoavjlbqjrft2.webp</image:loc>
+      <image:title>RUMMY LUDO</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/game-rummy</loc>
+    <lastmod>2026-11-06T17:37:33+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793604545/hexf50cvr06f3de71i6g.webp</image:loc>
+      <image:title>GAME RUMMY</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/yono-vip</loc>
+    <lastmod>2026-11-06T17:33:23+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793913580/jlcgcs9z9bztpbnwbiqm.webp</image:loc>
+      <image:title>YONO VIP</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/love-rummy</loc>
+    <lastmod>2026-11-06T17:25:19+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793601987/wxgtv2j9fhaaipo2m5zy.webp</image:loc>
+      <image:title>LOVE RUMMY</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/jaiho-play</loc>
+    <lastmod>2026-11-06T17:24:19+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793601579/inl1rn1gsuffv8cafixu.webp</image:loc>
+      <image:title>JAIHO PLAY</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/yono-rummy</loc>
+    <lastmod>2026-11-06T17:21:56+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793985566/cff8xpqmygsjqnl2epgs.png</image:loc>
+      <image:title>YONO RUMMY</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/777-game</loc>
+    <lastmod>2026-11-06T17:06:47+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793597622/yzjijduiceeuy1gngztc.webp</image:loc>
+      <image:title>777 GAME</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/slots-winner</loc>
+    <lastmod>2026-11-06T16:51:23+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793553811/see8zebidhgqfnb1rz3l.png</image:loc>
+      <image:title>SLOTS WINNER</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/789-jackports</loc>
+    <lastmod>2026-11-06T15:50:32+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793593515/fuaaradfu1aup1ybfohi.webp</image:loc>
+      <image:title>789 JACKPORTS</image:title>
     </image:image>
   </url>
 </urlset>
