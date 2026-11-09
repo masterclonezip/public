@@ -6,7 +6,8 @@ import { getAesSecret, safeDecrypt, safeEncrypt } from '../lib/cryptoUtils';
 import { generateAllSitemaps, normalizeSitemapHost } from '../lib/sitemapGenerator';
 import { ensureDefaultSettings } from '../lib/defaultLegalContent';
 import { AppConfig, GlobalSettings, NewsItem, VideoItem } from '../types';
-import { getResolvedCommunityFirebaseConfig, parseFirestoreFields } from '../lib/communityFirebase';
+import { getResolvedCommunityFirebaseConfig, parseFirestoreFields, buildPublicCommunitySyncBundle } from '../lib/communityFirebase';
+import { getAllSiteIconUrls, wrapPngsInIco } from '../seo/utils';
 
 import communityCatalogStats from '../lib/communityCatalogStats.json';
 import communityStaticReviews from '../lib/communityStaticReviews.json';
@@ -606,7 +607,6 @@ export function useGitHubSync(
 
     try {
       log("GitHub Sync: Compiling unified community reviews ledger & atomic ratings...");
-      const { buildPublicCommunitySyncBundle } = await import('../lib/communityFirebase');
       const syncBundle = await buildPublicCommunitySyncBundle(finalApps);
       finalApps = syncBundle.harmonizedApps;
       communityStatsPayload = syncBundle.communityStatsPayload;
@@ -643,10 +643,9 @@ export function useGitHubSync(
     // Fallback: If reviews payload is empty, load from existing communityStaticReviews without artificial limits
     if (!communityReviewsPayload || Object.keys(communityReviewsPayload).length === 0) {
       try {
-        const existingReviews = await import('../lib/communityStaticReviews.json');
-        const rawMap = (existingReviews.default || existingReviews) as Record<string, any[]>;
+        const rawMap = (communityStaticReviews as any) as Record<string, any[]>;
         const slicedMap: Record<string, any[]> = {};
-        for (const [key, list] of Object.entries(rawMap)) {
+        for (const [key, list] of Object.entries(rawMap || {})) {
           if (Array.isArray(list)) {
             slicedMap[key] = list;
           }
@@ -801,10 +800,6 @@ export function useGitHubSync(
         {
           path: 'src/lib/staticData.json',
           content: activeStaticJsonCode
-        },
-        {
-          path: 'public-api/staticData.json',
-          content: activeStaticJsonCode
         }
       ];
 
@@ -880,7 +875,6 @@ export function useGitHubSync(
           content: robotsContent
         });
 
-        const { getAllSiteIconUrls, wrapPngsInIco } = await import('../seo/utils');
         const icons = getAllSiteIconUrls(finalSettings, publicDomain);
         const siteTitle = String(finalSettings?.site_title || (import.meta as any).env?.VITE_SITE_NAME || '').trim();
         const manifestContent = JSON.stringify({

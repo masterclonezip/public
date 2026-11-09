@@ -162,6 +162,12 @@ publicApiRouter.get('/api/v1/public/videos', async (req, res) => {
 function sanitizeSettingsForPublicClient(settings: any): any {
   const copy = settings && typeof settings === 'object' ? { ...settings } : {};
   delete copy.turnstile_secret_key;
+  delete copy.admin_password;
+  delete copy.admin_totp_secret;
+  delete copy.cloudinary_api_secret;
+  delete copy.cloudinary_api_key;
+  delete copy.gemini_api_key;
+  delete copy._rest_admin_bypass;
   const envSiteKey = getEnvOnlyTurnstileSiteKey();
   if (envSiteKey) {
     copy.turnstile_site_key = envSiteKey;
@@ -173,9 +179,34 @@ function sanitizeSettingsForPublicClient(settings: any): any {
 
 publicApiRouter.get('/api/v1/public/runtime-config', (_req, res) => {
   const siteKey = getEnvOnlyTurnstileSiteKey() || getPublicTurnstileSiteKey();
+  const communityProjectId = (
+    process.env.VITE_COMMUNITY_FIREBASE_PROJECT_ID ||
+    process.env.COMMUNITY_FIREBASE_PROJECT_ID ||
+    ''
+  ).replace(/^["']|["']$/g, '').trim();
+  const communityApiKey = (
+    process.env.VITE_COMMUNITY_FIREBASE_API_KEY ||
+    process.env.COMMUNITY_FIREBASE_API_KEY ||
+    ''
+  ).replace(/^["']|["']$/g, '').trim();
+  const communityDatabaseId = (
+    process.env.VITE_COMMUNITY_FIREBASE_DATABASE_ID ||
+    process.env.COMMUNITY_FIREBASE_DATABASE_ID ||
+    '(default)'
+  ).replace(/^["']|["']$/g, '').trim();
+
   res.setHeader('Cache-Control', 'no-store, private');
   res.json({
     success: true,
+    ...(communityProjectId && communityApiKey
+      ? {
+          communityFirebase: {
+            projectId: communityProjectId,
+            apiKey: communityApiKey,
+            databaseId: communityDatabaseId,
+          },
+        }
+      : {}),
     turnstileSiteKey: siteKey,
     turnstile: { siteKey },
   });

@@ -1,4 +1,3 @@
-import { jsPDF } from 'jspdf';
 import { AppConfig } from '../types';
 
 /**
@@ -22,6 +21,7 @@ function decodeHtmlEntities(text: string): string {
 export async function exportAppToPdf(app: AppConfig): Promise<void> {
   if (!app) return;
 
+  const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',

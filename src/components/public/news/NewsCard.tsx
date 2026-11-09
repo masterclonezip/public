@@ -22,10 +22,6 @@ function NewsCardComponent({ item, index, onShare }: NewsCardProps) {
   const category = (item.category || '').trim();
   const isEager = typeof index === 'number' && index < 3;
 
-  const prefetchArticle = () => {
-    import('../../../pages/NewsDetailPage').catch(() => {});
-  };
-
   const handleCardClick = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('a')) {
       return;
@@ -36,8 +32,6 @@ function NewsCardComponent({ item, index, onShare }: NewsCardProps) {
   return (
     <article 
       onClick={handleCardClick}
-      onPointerEnter={prefetchArticle}
-      onTouchStart={prefetchArticle}
       className="group bg-white dark:bg-zinc-900 overflow-hidden flex flex-col hover:shadow-lg transition-shadow duration-200 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 cursor-pointer text-left"
     >
       <Link 

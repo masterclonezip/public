@@ -180,7 +180,7 @@ export default function VideosPage() {
               const ytId = getYoutubeId(video.youtube_url);
               const thumbUrl = ytId 
                 ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` 
-                : 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=600&q=80';
+                : '/logo.png';
 
               return (
                 <div

@@ -34,7 +34,7 @@ export default React.memo(function NewAdditions({ apps }: NewAdditionsProps) {
               <div className="relative w-full aspect-square">
                 <div className="w-full h-full rounded-[14px] xxs:rounded-[16px] xs:rounded-[20px] sm:rounded-[24px] overflow-hidden bg-zinc-100 dark:bg-zinc-800 border border-black/5 dark:border-white/10 shadow-sm group-hover:shadow-[0_8px_20px_-8px_rgba(0,0,0,0.1)] transition-all">
                   <img 
-                    src={getOptimizedImageUrl(app.icon_url, 120) || "https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=128&h=128&fit=crop"} 
+                    src={getOptimizedImageUrl(app.icon_url, 120) || "/logo.png"} 
                     alt={app.name} 
                     loading={index < 6 ? "eager" : "lazy"}
                     decoding="async"
@@ -47,7 +47,7 @@ export default React.memo(function NewAdditions({ apps }: NewAdditionsProps) {
                       if (app.icon_url && target.src !== app.icon_url) {
                         target.src = app.icon_url;
                       } else {
-                        target.src = "https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=128&h=128&fit=crop";
+                        target.src = "/logo.png";
                       }
                     }}
                   />

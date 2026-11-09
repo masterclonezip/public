@@ -31,12 +31,6 @@ export default function NewsPage() {
     }
   }, [fetchNews, mockNews]);
 
-  // Instantly prefetch the NewsDetailPage chunk into memory
-  // so any news card click opens instantaneously with 0ms latency
-  useEffect(() => {
-    import('./NewsDetailPage').catch(() => {});
-  }, []);
-
   const rawPage = parseInt(searchParams.get('page') || '1', 10);
   const currentPage = isNaN(rawPage) || rawPage < 1 ? 1 : rawPage;
   const activeCategory = searchParams.get('category') || 'All';

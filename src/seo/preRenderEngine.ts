@@ -145,10 +145,12 @@ export async function getPagePreRender(urlPath: string, data: any): Promise<stri
     bodyHtml = renderers.renderEthics(settings);
   } else if (cleanPathLower === '/disclaimer') {
     bodyHtml = renderers.renderDisclaimer(settings);
-  } else if (cleanPathLower === '/developers') {
+  } else if (cleanPathLower === '/developers' || cleanPathLower === '/developer') {
     bodyHtml = renderers.renderDevelopersList(developers, settings);
   } else if (cleanPathLower === '/faq' || cleanPathLower === '/faqs') {
     bodyHtml = renderers.renderFaqPage(settings);
+  } else if (cleanPathLower === '/safety' || cleanPathLower === '/safety-status') {
+    bodyHtml = renderers.renderResponsibility(settings);
   } else if (cleanPathLower.startsWith('/moreinfo/')) {
     const parts = cleanPathLower.split('/');
     const slug = parts[parts.length - 1];

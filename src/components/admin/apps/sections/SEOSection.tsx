@@ -122,17 +122,19 @@ export const SEOSection = ({ formFields, handleFieldChange }: SEOSectionProps) =
             className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-100 focus-within:ring-2 focus-within:ring-blue-500 font-mono overflow-hidden" 
             placeholder="https://..."
           />
-          <img 
-            src={formFields.og_image_url || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&q=80'} 
-            loading="lazy"
-            width={64}
-            height={40}
-            className="w-16 h-10 object-cover rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100 shadow-xs shrink-0" 
-            alt="og-preview" 
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&q=80';
-            }}
-          />
+          {formFields.og_image_url ? (
+            <img 
+              src={formFields.og_image_url} 
+              loading="lazy"
+              width={64}
+              height={40}
+              className="w-16 h-10 object-cover rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100 shadow-xs shrink-0" 
+              alt="og-preview" 
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/logo.png';
+              }}
+            />
+          ) : null}
         </div>
       </div>
     </div>

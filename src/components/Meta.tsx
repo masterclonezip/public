@@ -235,9 +235,11 @@ const Meta: React.FC<MetaProps> = ({
     setMetaTag('property', 'og:image:width', ogWidth);
     setMetaTag('property', 'og:image:height', ogHeight);
     setMetaTag('property', 'og:image:alt', fullTitle);
-    if (resolvedSiteName) {
+    if (resolvedSiteName && (cleanPathLower === '/' || cleanPathLower === '')) {
       setMetaTag('property', 'og:site_name', resolvedSiteName);
       setMetaTag('name', 'application-name', resolvedSiteName);
+    } else {
+      document.head.querySelectorAll('meta[property="og:site_name" i], meta[name="application-name" i]').forEach(el => el.remove());
     }
     setMetaTag('property', 'og:locale', 'en_IN');
 

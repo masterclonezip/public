@@ -570,20 +570,22 @@ export default defineConfig(({mode}) => {
     return '';
   };
 
-  const primaryProjectId = pickEnv('VITE_FIREBASE_PROJECT_ID', 'FIREBASE_PROJECT_ID', 'VITE_COMMUNITY_FIREBASE_PROJECT_ID', 'COMMUNITY_FIREBASE_PROJECT_ID');
-  const primaryApiKey = pickEnv('VITE_FIREBASE_API_KEY', 'FIREBASE_API_KEY', 'VITE_COMMUNITY_FIREBASE_API_KEY', 'COMMUNITY_FIREBASE_API_KEY');
-  const primaryAppId = pickEnv('VITE_FIREBASE_APP_ID', 'FIREBASE_APP_ID', 'VITE_COMMUNITY_FIREBASE_APP_ID', 'COMMUNITY_FIREBASE_APP_ID');
-  const primaryAuthDomain = pickEnv('VITE_FIREBASE_AUTH_DOMAIN', 'FIREBASE_AUTH_DOMAIN') || (primaryProjectId ? `${primaryProjectId}.firebaseapp.com` : '');
-  const primaryStorageBucket = pickEnv('VITE_FIREBASE_STORAGE_BUCKET', 'FIREBASE_STORAGE_BUCKET') || (primaryProjectId ? `${primaryProjectId}.appspot.com` : '');
-  const primaryMessagingSenderId = pickEnv('VITE_FIREBASE_MESSAGING_SENDER_ID', 'FIREBASE_MESSAGING_SENDER_ID', 'FIREBASE_MESSAGING_ID', 'VITE_COMMUNITY_FIREBASE_MESSAGING_SENDER_ID');
-  const primaryDatabaseId = pickEnv('VITE_FIREBASE_DATABASE_ID', 'FIREBASE_DATABASE_ID') || '(default)';
+  const isAdminBuild = fs.existsSync(path.resolve(__dirname, 'src/pages/AdminDashboard.tsx'));
 
-  const communityProjectId = pickEnv('VITE_COMMUNITY_FIREBASE_PROJECT_ID', 'COMMUNITY_FIREBASE_PROJECT_ID', 'VITE_FIREBASE_PROJECT_ID', 'FIREBASE_PROJECT_ID');
-  const communityApiKey = pickEnv('VITE_COMMUNITY_FIREBASE_API_KEY', 'COMMUNITY_FIREBASE_API_KEY', 'VITE_FIREBASE_API_KEY', 'FIREBASE_API_KEY');
-  const communityAppId = pickEnv('VITE_COMMUNITY_FIREBASE_APP_ID', 'COMMUNITY_FIREBASE_APP_ID', 'VITE_FIREBASE_APP_ID', 'FIREBASE_APP_ID');
+  const primaryProjectId = isAdminBuild ? pickEnv('VITE_FIREBASE_PROJECT_ID', 'FIREBASE_PROJECT_ID') : '';
+  const primaryApiKey = isAdminBuild ? pickEnv('VITE_FIREBASE_API_KEY', 'FIREBASE_API_KEY') : '';
+  const primaryAppId = isAdminBuild ? pickEnv('VITE_FIREBASE_APP_ID', 'FIREBASE_APP_ID') : '';
+  const primaryAuthDomain = isAdminBuild ? (pickEnv('VITE_FIREBASE_AUTH_DOMAIN', 'FIREBASE_AUTH_DOMAIN') || (primaryProjectId ? `${primaryProjectId}.firebaseapp.com` : '')) : '';
+  const primaryStorageBucket = isAdminBuild ? (pickEnv('VITE_FIREBASE_STORAGE_BUCKET', 'FIREBASE_STORAGE_BUCKET') || (primaryProjectId ? `${primaryProjectId}.appspot.com` : '')) : '';
+  const primaryMessagingSenderId = isAdminBuild ? pickEnv('VITE_FIREBASE_MESSAGING_SENDER_ID', 'FIREBASE_MESSAGING_SENDER_ID', 'FIREBASE_MESSAGING_ID') : '';
+  const primaryDatabaseId = isAdminBuild ? (pickEnv('VITE_FIREBASE_DATABASE_ID', 'FIREBASE_DATABASE_ID') || '(default)') : '';
+
+  const communityProjectId = pickEnv('VITE_COMMUNITY_FIREBASE_PROJECT_ID', 'COMMUNITY_FIREBASE_PROJECT_ID');
+  const communityApiKey = pickEnv('VITE_COMMUNITY_FIREBASE_API_KEY', 'COMMUNITY_FIREBASE_API_KEY');
+  const communityAppId = pickEnv('VITE_COMMUNITY_FIREBASE_APP_ID', 'COMMUNITY_FIREBASE_APP_ID');
   const communityAuthDomain = pickEnv('VITE_COMMUNITY_FIREBASE_AUTH_DOMAIN', 'COMMUNITY_FIREBASE_AUTH_DOMAIN') || (communityProjectId ? `${communityProjectId}.firebaseapp.com` : '');
   const communityStorageBucket = pickEnv('VITE_COMMUNITY_FIREBASE_STORAGE_BUCKET', 'COMMUNITY_FIREBASE_STORAGE_BUCKET') || (communityProjectId ? `${communityProjectId}.appspot.com` : '');
-  const communityMessagingSenderId = pickEnv('VITE_COMMUNITY_FIREBASE_MESSAGING_SENDER_ID', 'COMMUNITY_FIREBASE_MESSAGING_SENDER_ID', 'VITE_COMMUNITY_FIREBASE_MESSAGING_ID', 'VITE_FIREBASE_MESSAGING_SENDER_ID');
+  const communityMessagingSenderId = pickEnv('VITE_COMMUNITY_FIREBASE_MESSAGING_SENDER_ID', 'COMMUNITY_FIREBASE_MESSAGING_SENDER_ID', 'VITE_COMMUNITY_FIREBASE_MESSAGING_ID');
   const communityDatabaseId = pickEnv('VITE_COMMUNITY_FIREBASE_DATABASE_ID', 'COMMUNITY_FIREBASE_DATABASE_ID') || '(default)';
 
   const rawTurnstileCandidates = [
@@ -596,8 +598,6 @@ export default defineConfig(({mode}) => {
     pickEnv('VITE_TURNSTILE_KEY'),
     pickEnv('TURNSTILE_KEY'),
     pickEnv('CLOUDFLARE_TURNSTILE_KEY'),
-    pickEnv('TURNSTILE_SECRET_KEY'),
-    pickEnv('VITE_TURNSTILE_SECRET_KEY'),
   ];
   const turnstileSiteKey =
     rawTurnstileCandidates
@@ -614,9 +614,6 @@ export default defineConfig(({mode}) => {
       .find((k) => /^0x4[A-Za-z0-9_-]{16,25}$/.test(k)) || '';
 
   const resolvedBuildEnv: Record<string, string> = {
-    VITE_ADMIN_PATH: pickEnv('VITE_ADMIN_PATH', 'ADMIN_PATH') || 'masterworld',
-    ADMIN_PATH: pickEnv('ADMIN_PATH', 'VITE_ADMIN_PATH') || 'masterworld',
-    VITE_ADMIN_EMAIL: pickEnv('VITE_ADMIN_EMAIL', 'ADMIN_EMAIL'),
     VITE_PUBLIC_DOMAIN: (pickEnv('VITE_PUBLIC_DOMAIN', 'PUBLIC_DOMAIN') || '').replace(/^(https?:\/\/)(?:www\.|admin\.|masterworld\.)+/i, '$1').replace(/^(?:www\.|admin\.|masterworld\.)+/i, ''),
     PUBLIC_DOMAIN: (pickEnv('PUBLIC_DOMAIN', 'VITE_PUBLIC_DOMAIN') || '').replace(/^(https?:\/\/)(?:www\.|admin\.|masterworld\.)+/i, '$1').replace(/^(?:www\.|admin\.|masterworld\.)+/i, ''),
     VITE_SITE_NAME: pickEnv('VITE_SITE_NAME', 'SITE_NAME'),
@@ -625,20 +622,6 @@ export default defineConfig(({mode}) => {
     VITE_SUPPORT_EMAIL: pickEnv('VITE_SUPPORT_EMAIL', 'SUPPORT_EMAIL'),
     VITE_TURNSTILE_SITE_KEY: turnstileSiteKey,
     TURNSTILE_SITE_KEY: turnstileSiteKey,
-    VITE_FIREBASE_PROJECT_ID: primaryProjectId,
-    FIREBASE_PROJECT_ID: primaryProjectId,
-    VITE_FIREBASE_API_KEY: primaryApiKey,
-    FIREBASE_API_KEY: primaryApiKey,
-    VITE_FIREBASE_APP_ID: primaryAppId,
-    FIREBASE_APP_ID: primaryAppId,
-    VITE_FIREBASE_AUTH_DOMAIN: primaryAuthDomain,
-    FIREBASE_AUTH_DOMAIN: primaryAuthDomain,
-    VITE_FIREBASE_STORAGE_BUCKET: primaryStorageBucket,
-    FIREBASE_STORAGE_BUCKET: primaryStorageBucket,
-    VITE_FIREBASE_MESSAGING_SENDER_ID: primaryMessagingSenderId,
-    FIREBASE_MESSAGING_SENDER_ID: primaryMessagingSenderId,
-    VITE_FIREBASE_DATABASE_ID: primaryDatabaseId,
-    FIREBASE_DATABASE_ID: primaryDatabaseId,
     VITE_COMMUNITY_FIREBASE_PROJECT_ID: communityProjectId,
     COMMUNITY_FIREBASE_PROJECT_ID: communityProjectId,
     VITE_COMMUNITY_FIREBASE_API_KEY: communityApiKey,
@@ -653,28 +636,49 @@ export default defineConfig(({mode}) => {
     COMMUNITY_FIREBASE_MESSAGING_SENDER_ID: communityMessagingSenderId,
     VITE_COMMUNITY_FIREBASE_DATABASE_ID: communityDatabaseId,
     COMMUNITY_FIREBASE_DATABASE_ID: communityDatabaseId,
-    VITE_CLOUDINARY_CLOUD_NAME: pickEnv('VITE_CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_CLOUD_NAME'),
-    CLOUDINARY_CLOUD_NAME: pickEnv('CLOUDINARY_CLOUD_NAME', 'VITE_CLOUDINARY_CLOUD_NAME'),
-    VITE_CLOUDINARY_UPLOAD_PRESET: pickEnv('VITE_CLOUDINARY_UPLOAD_PRESET', 'CLOUDINARY_UPLOAD_PRESET', 'CLOUDINARY_UPLOAD_FOLDER', 'CLOUDINARY_FOLDER') || 'uploads',
-    VITE_GITHUB_OWNER: pickEnv('VITE_GITHUB_OWNER', 'GITHUB_OWNER'),
-    GITHUB_OWNER: pickEnv('GITHUB_OWNER', 'VITE_GITHUB_OWNER'),
-    VITE_GITHUB_PUBLIC_REPO: pickEnv('VITE_GITHUB_PUBLIC_REPO', 'GITHUB_PUBLIC_REPO', 'VITE_GITHUB_REPO', 'GITHUB_REPO'),
-    GITHUB_PUBLIC_REPO: pickEnv('GITHUB_PUBLIC_REPO', 'VITE_GITHUB_PUBLIC_REPO', 'GITHUB_REPO', 'VITE_GITHUB_REPO'),
-    VITE_GITHUB_ADMIN_REPO: pickEnv('VITE_GITHUB_ADMIN_REPO', 'GITHUB_ADMIN_REPO'),
-    GITHUB_ADMIN_REPO: pickEnv('GITHUB_ADMIN_REPO', 'VITE_GITHUB_ADMIN_REPO'),
-    VITE_GITHUB_BRANCH: pickEnv('VITE_GITHUB_BRANCH', 'GITHUB_BRANCH') || 'main',
-    GITHUB_BRANCH: pickEnv('GITHUB_BRANCH', 'VITE_GITHUB_BRANCH') || 'main',
+    ...(isAdminBuild
+      ? {
+          VITE_ADMIN_PATH: pickEnv('VITE_ADMIN_PATH', 'ADMIN_PATH') || 'masterworld',
+          ADMIN_PATH: pickEnv('ADMIN_PATH', 'VITE_ADMIN_PATH') || 'masterworld',
+          VITE_ADMIN_EMAIL: pickEnv('VITE_ADMIN_EMAIL', 'ADMIN_EMAIL'),
+          VITE_FIREBASE_PROJECT_ID: primaryProjectId,
+          FIREBASE_PROJECT_ID: primaryProjectId,
+          VITE_FIREBASE_API_KEY: primaryApiKey,
+          FIREBASE_API_KEY: primaryApiKey,
+          VITE_FIREBASE_APP_ID: primaryAppId,
+          FIREBASE_APP_ID: primaryAppId,
+          VITE_FIREBASE_AUTH_DOMAIN: primaryAuthDomain,
+          FIREBASE_AUTH_DOMAIN: primaryAuthDomain,
+          VITE_FIREBASE_STORAGE_BUCKET: primaryStorageBucket,
+          FIREBASE_STORAGE_BUCKET: primaryStorageBucket,
+          VITE_FIREBASE_MESSAGING_SENDER_ID: primaryMessagingSenderId,
+          FIREBASE_MESSAGING_SENDER_ID: primaryMessagingSenderId,
+          VITE_FIREBASE_DATABASE_ID: primaryDatabaseId,
+          FIREBASE_DATABASE_ID: primaryDatabaseId,
+          VITE_CLOUDINARY_CLOUD_NAME: pickEnv('VITE_CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_CLOUD_NAME'),
+          CLOUDINARY_CLOUD_NAME: pickEnv('CLOUDINARY_CLOUD_NAME', 'VITE_CLOUDINARY_CLOUD_NAME'),
+          VITE_CLOUDINARY_UPLOAD_PRESET: pickEnv('VITE_CLOUDINARY_UPLOAD_PRESET', 'CLOUDINARY_UPLOAD_PRESET', 'CLOUDINARY_UPLOAD_FOLDER', 'CLOUDINARY_FOLDER') || 'uploads',
+          VITE_GITHUB_OWNER: pickEnv('VITE_GITHUB_OWNER', 'GITHUB_OWNER'),
+          GITHUB_OWNER: pickEnv('GITHUB_OWNER', 'VITE_GITHUB_OWNER'),
+          VITE_GITHUB_PUBLIC_REPO: pickEnv('VITE_GITHUB_PUBLIC_REPO', 'GITHUB_PUBLIC_REPO', 'VITE_GITHUB_REPO', 'GITHUB_REPO'),
+          GITHUB_PUBLIC_REPO: pickEnv('GITHUB_PUBLIC_REPO', 'VITE_GITHUB_PUBLIC_REPO', 'GITHUB_REPO', 'VITE_GITHUB_REPO'),
+          VITE_GITHUB_ADMIN_REPO: pickEnv('VITE_GITHUB_ADMIN_REPO', 'GITHUB_ADMIN_REPO'),
+          GITHUB_ADMIN_REPO: pickEnv('GITHUB_ADMIN_REPO', 'VITE_GITHUB_ADMIN_REPO'),
+          VITE_GITHUB_BRANCH: pickEnv('VITE_GITHUB_BRANCH', 'GITHUB_BRANCH') || 'main',
+          GITHUB_BRANCH: pickEnv('GITHUB_BRANCH', 'VITE_GITHUB_BRANCH') || 'main',
+        }
+      : {}),
   };
 
   return {
     plugins: [react(), tailwindcss(), adminAuthDevPlugin(env)],
     envPrefix: ['VITE_'],
     define: {
-      __ADMIN_ENABLED__: true,
+      __ADMIN_ENABLED__: isAdminBuild,
       __APP_BUILD_ENV__: JSON.stringify(resolvedBuildEnv),
       'process.env.NODE_ENV': JSON.stringify(mode === 'production' ? 'production' : (process.env.NODE_ENV || 'development')),
-      'process.env.ADMIN_PATH': JSON.stringify(resolvedBuildEnv.ADMIN_PATH),
-      'process.env.VITE_ADMIN_PATH': JSON.stringify(resolvedBuildEnv.VITE_ADMIN_PATH),
+      'process.env.ADMIN_PATH': JSON.stringify(resolvedBuildEnv.ADMIN_PATH || ''),
+      'process.env.VITE_ADMIN_PATH': JSON.stringify(resolvedBuildEnv.VITE_ADMIN_PATH || ''),
       'process.env.VITE_TURNSTILE_SITE_KEY': JSON.stringify(turnstileSiteKey),
       'process.env.TURNSTILE_SITE_KEY': JSON.stringify(turnstileSiteKey),
       'import.meta.env.VITE_TURNSTILE_SITE_KEY': JSON.stringify(turnstileSiteKey),

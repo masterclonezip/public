@@ -189,7 +189,12 @@ const getInitialCache = () => {
   try {
     if (typeof window !== 'undefined' && (window as any).__INITIAL_DATA__) {
       const initData = (window as any).__INITIAL_DATA__;
-      if (initData && ((Array.isArray(initData.apps) && initData.apps.length > 0) || (Array.isArray(initData.news) && initData.news.length > 0))) {
+      if (
+        initData &&
+        ((Array.isArray(initData.apps) && initData.apps.length > 0) ||
+          (Array.isArray(initData.news) && initData.news.length > 0) ||
+          (initData.settings && Object.keys(initData.settings).length > 0))
+      ) {
         return initData;
       }
     }

@@ -101,7 +101,7 @@ export const useAdminSettings = (settings: any, news: any[], videos: any[]) => {
       id: Math.random().toString(36).substr(2, 9),
       title: 'New Banner',
       subtitle: 'Subtitle text',
-      image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800&q=80',
+      image: '',
       link: '/'
     };
     setBanners(prev => [...prev, newBanner]);

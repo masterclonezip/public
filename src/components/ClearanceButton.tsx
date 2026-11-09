@@ -68,7 +68,7 @@ export default function ClearanceButton({
         className={
           unavailableMessage || needsManualRetry || (uiTimeoutExceeded && !isReady)
             ? 'hidden'
-            : 'w-full min-h-[65px] flex items-center justify-center'
+            : 'w-full min-h-[65px] rounded-xl bg-zinc-50/70 dark:bg-zinc-800/40 border border-zinc-200/60 dark:border-white/[0.06] flex items-center justify-center overflow-hidden px-1'
         }
       >
         <div
@@ -86,28 +86,28 @@ export default function ClearanceButton({
           </p>
         </div>
       ) : needsManualRetry ? (
-        <div className="w-full rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-black/10 dark:border-white/10 p-4 text-center flex flex-col items-center gap-3">
+        <div className="w-full rounded-2xl bg-zinc-100 dark:bg-zinc-800/80 border border-black/10 dark:border-white/10 p-4 text-center flex flex-col items-center gap-3">
           <p className="text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Please try again
           </p>
           <button
             type="button"
             onClick={handleManualRetry}
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm transition-all cursor-pointer"
+            className="inline-flex items-center justify-center gap-2 min-h-[44px] px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm transition-all cursor-pointer active:scale-[0.98]"
           >
             <RefreshCw className="w-4 h-4" />
             <span>Try Again</span>
           </button>
         </div>
       ) : uiTimeoutExceeded && !isReady ? (
-        <div className="w-full rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-black/10 dark:border-white/10 p-4 text-center flex flex-col items-center gap-3">
+        <div className="w-full rounded-2xl bg-zinc-100 dark:bg-zinc-800/80 border border-black/10 dark:border-white/10 p-4 text-center flex flex-col items-center gap-3">
           <p className="text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300 leading-relaxed">
             Verification could not be completed. Please check your connection and reload.
           </p>
           <button
             type="button"
             onClick={handleManualRetry}
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm transition-all cursor-pointer"
+            className="inline-flex items-center justify-center gap-2 min-h-[44px] px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm transition-all cursor-pointer active:scale-[0.98]"
           >
             <RefreshCw className="w-4 h-4" />
             <span>Reload Verification</span>
@@ -119,7 +119,7 @@ export default function ClearanceButton({
           type="button"
           id={`clearance-btn-${cleanSlug}`}
           disabled={!isReady || isDispatching}
-          className={`w-full py-4 px-8 rounded-2xl flex items-center justify-center gap-2.5 font-extrabold text-sm sm:text-base tracking-wide transition-all shadow-md ${
+          className={`w-full min-h-[52px] py-3.5 px-8 rounded-2xl flex items-center justify-center gap-2.5 font-extrabold text-sm sm:text-base tracking-wide transition-all shadow-md outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 ${
             isReady && !isDispatching
               ? 'premium-action-btn premium-action-btn-blowing text-white cursor-pointer active:scale-[0.98]'
               : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border border-black/5 dark:border-white/5 cursor-not-allowed'

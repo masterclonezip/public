@@ -437,27 +437,23 @@ function writeMergedData(data: any) {
   });
 }
 
-adminVaultRouter.get(['/api/v1/admin/runtime-config', '/api/v1/public/runtime-config'], (_req, res) => {
+adminVaultRouter.get('/api/v1/admin/runtime-config', (_req, res) => {
   const primaryProjectId =
     process.env.VITE_FIREBASE_PROJECT_ID ||
     process.env.FIREBASE_PROJECT_ID ||
-    process.env.VITE_COMMUNITY_FIREBASE_PROJECT_ID ||
-    process.env.COMMUNITY_FIREBASE_PROJECT_ID ||
     '';
   const primaryApiKey =
     process.env.VITE_FIREBASE_API_KEY ||
     process.env.FIREBASE_API_KEY ||
-    process.env.VITE_COMMUNITY_FIREBASE_API_KEY ||
-    process.env.COMMUNITY_FIREBASE_API_KEY ||
     '';
   const communityProjectId =
     process.env.VITE_COMMUNITY_FIREBASE_PROJECT_ID ||
     process.env.COMMUNITY_FIREBASE_PROJECT_ID ||
-    primaryProjectId;
+    '';
   const communityApiKey =
     process.env.VITE_COMMUNITY_FIREBASE_API_KEY ||
     process.env.COMMUNITY_FIREBASE_API_KEY ||
-    primaryApiKey;
+    '';
 
   res.setHeader('Cache-Control', 'no-store, private');
   res.json({
@@ -493,18 +489,14 @@ adminVaultRouter.get(['/api/v1/admin/runtime-config', '/api/v1/public/runtime-co
   });
 });
 
-adminVaultRouter.get(['/api/v1/admin/firebase-status', '/api/v1/public/firebase-status'], async (_req, res) => {
+adminVaultRouter.get('/api/v1/admin/firebase-status', async (_req, res) => {
   const projectId =
     process.env.VITE_FIREBASE_PROJECT_ID ||
     process.env.FIREBASE_PROJECT_ID ||
-    process.env.VITE_COMMUNITY_FIREBASE_PROJECT_ID ||
-    process.env.COMMUNITY_FIREBASE_PROJECT_ID ||
     '';
   const apiKey =
     process.env.VITE_FIREBASE_API_KEY ||
     process.env.FIREBASE_API_KEY ||
-    process.env.VITE_COMMUNITY_FIREBASE_API_KEY ||
-    process.env.COMMUNITY_FIREBASE_API_KEY ||
     '';
   const databaseId =
     process.env.VITE_FIREBASE_DATABASE_ID ||

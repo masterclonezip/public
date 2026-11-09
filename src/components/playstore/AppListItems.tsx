@@ -181,7 +181,7 @@ export const AppListItem = React.memo(({ app, index }: { app: any; index?: numbe
         <div className="relative w-[52px] h-[52px] xxs:w-[60px] xxs:h-[60px] xs:w-[72px] xs:h-[72px] sm:w-[88px] sm:h-[88px] shrink-0">
           <div className="w-full h-full rounded-[14px] xxs:rounded-[16px] xs:rounded-[18px] sm:rounded-[22px] overflow-hidden bg-zinc-100 dark:bg-zinc-800 shadow-sm border border-black/5 dark:border-white/10 relative z-10 transition-transform group-hover:-translate-y-0.5 duration-300">
             <img 
-              src={getOptimizedImageUrl(app.icon_url, 120) || "https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=128&h=128&fit=crop"} 
+              src={getOptimizedImageUrl(app.icon_url, 120) || "/logo.png"} 
               alt={`${app.name} app icon`} 
               width={88}
               height={88}
@@ -194,7 +194,7 @@ export const AppListItem = React.memo(({ app, index }: { app: any; index?: numbe
                 if (app.icon_url && target.src !== app.icon_url) {
                   target.src = app.icon_url;
                 } else {
-                  target.src = "https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=128&h=128&fit=crop";
+                  target.src = "/logo.png";
                 }
               }}
             />
@@ -268,7 +268,7 @@ export const TopChartItem = React.memo(({ rank, app }: { rank: number; app: any 
         <div className="relative w-[52px] h-[52px] xxs:w-[60px] xxs:h-[60px] xs:w-[72px] xs:h-[72px] sm:w-[88px] sm:h-[88px] shrink-0">
           <div className="w-full h-full rounded-[14px] xxs:rounded-[16px] xs:rounded-[18px] sm:rounded-[22px] overflow-hidden bg-zinc-100 dark:bg-zinc-800 shadow-sm border border-black/5 dark:border-white/10 relative z-10 transition-transform group-hover:-translate-y-0.5 duration-300">
             <img 
-              src={getOptimizedImageUrl(app.icon_url, 180) || "https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=128&h=128&fit=crop"} 
+              src={getOptimizedImageUrl(app.icon_url, 180) || "/logo.png"} 
               alt={`${app.name} app icon`} 
               width={88}
               height={88}
@@ -281,7 +281,7 @@ export const TopChartItem = React.memo(({ rank, app }: { rank: number; app: any 
                 if (app.icon_url && target.src !== app.icon_url) {
                   target.src = app.icon_url;
                 } else {
-                  target.src = "https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=128&h=128&fit=crop";
+                  target.src = "/logo.png";
                 }
               }}
             />

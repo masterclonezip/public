@@ -15,6 +15,9 @@ export const FeaturedBanner = React.memo(({ items }: BannerProps) => {
   const [isDragging, setIsDragging] = React.useState(false);
   const [isVisible, setIsVisible] = React.useState(true);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const touchStartXRef = React.useRef<number | null>(null);
+  const touchStartYRef = React.useRef<number | null>(null);
+  const touchDeltaXRef = React.useRef<number>(0);
 
   React.useEffect(() => {
     if (!containerRef.current || typeof IntersectionObserver === 'undefined') return;
@@ -45,14 +48,49 @@ export const FeaturedBanner = React.memo(({ items }: BannerProps) => {
     setCurrentIndex((prev) => (prev - 1 + items.length) % items.length);
   };
 
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!items || items.length <= 1) return;
+    touchStartXRef.current = e.touches[0].clientX;
+    touchStartYRef.current = e.touches[0].clientY;
+    touchDeltaXRef.current = 0;
+    setIsDragging(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (touchStartXRef.current === null || touchStartYRef.current === null) return;
+    const dx = e.touches[0].clientX - touchStartXRef.current;
+    const dy = e.touches[0].clientY - touchStartYRef.current;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      touchDeltaXRef.current = dx;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartXRef.current !== null && items.length > 1) {
+      if (touchDeltaXRef.current <= -40) {
+        handleNext();
+      } else if (touchDeltaXRef.current >= 40) {
+        handlePrev();
+      }
+    }
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+    touchDeltaXRef.current = 0;
+    setIsDragging(false);
+  };
+
   return (
     <div 
       ref={containerRef}
       className="w-full relative px-0 sm:px-4 max-w-4xl mx-auto mb-5 group/carousel select-none"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
     >
-      <div className="w-full overflow-hidden rounded-2xl sm:rounded-[20px] shadow-sm sm:border border-zinc-100 dark:border-zinc-800/80 bg-zinc-50 dark:bg-zinc-950/40 relative h-[110px] xxs:h-[120px] xs:h-[135px] sm:h-[160px] md:h-[185px]">
+      <div className="w-full overflow-hidden rounded-2xl sm:rounded-[20px] shadow-sm sm:border border-zinc-100 dark:border-zinc-800/80 bg-zinc-50 dark:bg-zinc-950/40 relative h-[110px] xxs:h-[120px] xs:h-[135px] sm:h-[160px] md:h-[185px] touch-pan-y">
         <div 
           className="flex h-full w-full transition-transform duration-300 ease-out"
           style={{ width: `${items.length * 100}%`, transform: `translateX(-${(currentIndex * 100) / items.length}%)` }}
@@ -71,13 +109,13 @@ export const FeaturedBanner = React.memo(({ items }: BannerProps) => {
                   {...(i === 0 ? { fetchPriority: "high" as const } : { fetchPriority: "low" as const })}
                   width={800}
                   height={400}
-                  src={getOptimizedImageUrl(item.image, 600) || `https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=800&h=400&fit=crop`}
+                  src={getOptimizedImageUrl(item.image, 600) || '/logo.png'}
                   srcSet={item.image ? `${getOptimizedImageUrl(item.image, 400)} 400w, ${getOptimizedImageUrl(item.image, 600)} 600w, ${getOptimizedImageUrl(item.image, 800)} 800w` : undefined}
                   sizes="(max-width: 640px) 100vw, 800px"
                   className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 pointer-events-none"
                   alt={item.title || "Featured banner"}
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=800&h=400&fit=crop`;
+                    (e.target as HTMLImageElement).src = '/logo.png';
                   }}
                 />
                 

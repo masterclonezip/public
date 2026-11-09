@@ -17,7 +17,10 @@ import {
   X, 
   ChevronRight,
   Shield,
-  ExternalLink
+  ExternalLink,
+  Search,
+  Sparkles,
+  HelpCircle
 } from 'lucide-react';
 import LanguageSelector from '../LanguageSelector';
 import { getSizedLogoUrl } from '../../seo/utils';
@@ -26,6 +29,7 @@ import { safeVibrate } from '../../lib/utilsPublic';
 interface MobileMenuModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenSearch?: () => void;
   siteTitle: string;
   logoUrl?: string;
   triggerHaptic?: () => void;
@@ -46,6 +50,7 @@ interface PublicMenuCategory {
 export function MobileMenuModal({
   isOpen,
   onClose,
+  onOpenSearch,
   siteTitle,
   logoUrl,
   triggerHaptic,
@@ -82,6 +87,7 @@ export function MobileMenuModal({
       title: 'Discover & Media',
       items: [
         { to: '/', label: 'Home', subtitle: 'App Directory', icon: LayoutGrid, color: '#0284c7' },
+        { to: '/new-apps', label: 'New Releases', subtitle: 'Latest Additions', icon: Sparkles, color: '#2563eb' },
         { to: '/news', label: 'News Hub', subtitle: 'Updates & Guides', icon: Newspaper, color: '#0891b2' },
         { to: '/videos', label: 'Video Center', subtitle: 'Gameplay & Reviews', icon: Video, color: '#6366f1' }
       ]
@@ -92,6 +98,7 @@ export function MobileMenuModal({
         { to: '/responsibility', label: 'Safety Index', subtitle: 'Risk & Integrity', icon: ShieldCheck, color: '#10b981' },
         { to: '/about', label: 'About Us', subtitle: 'Transparency Mission', icon: Info, color: '#8b5cf6' },
         { to: '/developers', label: 'Developers', subtitle: 'Verified Creators', icon: Users, color: '#3b82f6' },
+        { to: '/faq', label: 'Platform FAQs', subtitle: 'Common Questions', icon: HelpCircle, color: '#0d9488' },
         { to: '/contact', label: 'Support Desk', subtitle: 'Direct Assistance', icon: Send, color: '#f59e0b' },
         { to: '/report-removal', label: 'Report & Removal', subtitle: 'Zero-Tolerance Policy', icon: Trash2, color: '#ef4444' }
       ]
@@ -125,12 +132,12 @@ export function MobileMenuModal({
       aria-modal="true"
       aria-label="Public Navigation Menu"
     >
-      {/* 1. TOP HEADER BAR: Full-Width Branding + Portal Pill + Close */}
+      {/* 1. TOP HEADER BAR: Full-Width Branding + Close */}
       <div className="w-full px-4 pt-3.5 pb-3 border-b border-slate-200 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl flex items-center justify-between shrink-0 shadow-xs">
         <Link 
           to="/" 
           onClick={() => { handleTap(); onClose(); }}
-          className="flex items-center gap-3 group focus:outline-none"
+          className="flex items-center gap-3 group focus:outline-none min-w-0"
         >
           <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 p-0.5 flex items-center justify-center shrink-0 shadow-xs transition-transform group-hover:scale-105">
             {logoUrl ? (
@@ -146,12 +153,9 @@ export function MobileMenuModal({
               <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             )}
           </div>
-          <div>
-            <div className="text-sm font-black tracking-tight flex items-center gap-1.5 leading-none text-slate-900 dark:text-white">
-              <span>{siteTitle || ''}</span>
-              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30 uppercase tracking-widest">
-                Official
-              </span>
+          <div className="min-w-0">
+            <div className="text-sm font-black tracking-tight truncate leading-none text-slate-900 dark:text-white">
+              {siteTitle || ''}
             </div>
             <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-1 leading-none">
               Transparency Directory
@@ -170,13 +174,35 @@ export function MobileMenuModal({
         </button>
       </div>
 
-      {/* 2. LANGUAGE SELECTOR BAR */}
-      <div className="w-full px-4 py-2 bg-slate-50/80 dark:bg-slate-900/40 border-b border-slate-200/80 dark:border-slate-800/50 shrink-0 flex items-center justify-between">
-        <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-          Language & Region
-        </span>
-        <div className="w-36">
-          <LanguageSelector />
+      {/* 2. QUICK SEARCH & LANGUAGE SELECTOR BAR */}
+      <div className="w-full px-4 py-2.5 bg-slate-50/80 dark:bg-slate-900/40 border-b border-slate-200/80 dark:border-slate-800/50 shrink-0 space-y-2">
+        <button
+          type="button"
+          onClick={() => {
+            handleTap();
+            if (onOpenSearch) {
+              onOpenSearch();
+            } else {
+              onClose();
+              window.dispatchEvent(new CustomEvent('open-search-modal'));
+            }
+          }}
+          className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-xs font-semibold shadow-2xs active:scale-[0.99] transition cursor-pointer"
+        >
+          <span className="flex items-center gap-2.5">
+            <Search size={15} className="text-blue-500 shrink-0" />
+            <span>Search apps, games & categories...</span>
+          </span>
+          <ChevronRight size={14} className="text-slate-400 shrink-0" />
+        </button>
+
+        <div className="flex items-center justify-between pt-0.5">
+          <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            Language & Region
+          </span>
+          <div className="w-36">
+            <LanguageSelector />
+          </div>
         </div>
       </div>
 
@@ -188,9 +214,6 @@ export function MobileMenuModal({
             <div className="flex items-center justify-between px-1 mb-2">
               <span className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                 {category.title}
-              </span>
-              <span className="text-[10px] font-mono text-slate-400 dark:text-slate-600">
-                {category.items.length} items
               </span>
             </div>
 

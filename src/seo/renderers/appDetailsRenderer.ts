@@ -103,7 +103,7 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
     return `${pct}%`;
   };
 
-  const rawIcon = getField(app, 'icon_url') || 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=128&fit=crop';
+  const rawIcon = getField(app, 'icon_url') || '/logo.png';
   const icon = optimizeImageUrl(rawIcon, 512);
 
   const rawDesc = app.description_html ? sanitizeHtml(app.description_html) : `<p>Comprehensive application profile and details for <strong>${escapeHtml(name)}</strong>.</p>`;
@@ -256,8 +256,7 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
               ${r.adminReply && r.adminReply.text ? `
                 <div class="mt-3 p-3 bg-zinc-100/80 dark:bg-zinc-800/60 rounded-xl border border-black/5 dark:border-white/5 text-[11px] text-zinc-700 dark:text-zinc-300">
                   <div class="flex items-center justify-between gap-2 mb-1">
-                    <span class="font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
-                      <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                    <span class="font-bold text-zinc-900 dark:text-white">
                       ${escapeHtml(r.adminReply.author || 'Developer Response')}
                     </span>
                     ${r.adminReply.timestamp ? `<span class="text-[9px] text-zinc-400">${escapeHtml(formatReviewDate(r.adminReply.timestamp))}</span>` : ''}
@@ -266,13 +265,13 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
                 </div>
               ` : ''}
             </div>
-            <div class="flex items-center gap-4 mt-4 pt-3.5 border-t border-black/[0.03] dark:border-white/[0.03]">
+            <div class="flex items-center gap-3 xs:gap-4 mt-4 pt-3.5 border-t border-black/[0.03] dark:border-white/[0.03]">
               <span class="text-[10px] text-zinc-400 dark:text-zinc-500">Was this review helpful?</span>
-              <button type="button" class="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-zinc-500 dark:text-zinc-400 active:scale-95 cursor-pointer">
+              <button type="button" class="flex items-center gap-1.5 min-h-[32px] px-3 py-1.5 text-[11px] font-bold rounded-lg tabular-nums transition-all bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-zinc-500 dark:text-zinc-400 active:scale-95 cursor-pointer">
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
                 <span>Helpful ${helpfulCount > 0 ? `(${helpfulCount})` : ''}</span>
               </button>
-              <button type="button" class="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all ml-auto bg-black/5 hover:bg-rose-500/10 hover:text-rose-600 dark:bg-white/5 dark:hover:bg-rose-500/15 text-zinc-500 dark:text-zinc-400 active:scale-95 cursor-pointer">
+              <button type="button" class="flex items-center gap-1.5 min-h-[32px] px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all ml-auto bg-black/5 hover:bg-rose-500/10 hover:text-rose-600 dark:bg-white/5 dark:hover:bg-rose-500/15 text-zinc-500 dark:text-zinc-400 active:scale-95 cursor-pointer">
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15" stroke-width="2"></line></svg>
                 <span>Report</span>
               </button>

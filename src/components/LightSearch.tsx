@@ -12,10 +12,15 @@ interface LightSearchProps {
 
 export default function LightSearch({ isOpen, onClose }: LightSearchProps) {
   const [query, setQuery] = useState('');
+  const [selectedIndex, setSelectedIndex] = useState(-1);
   const [history, setHistory] = useState<string[]>([]);
   const { apps, settings, fetchApps } = useData();
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    setSelectedIndex(-1);
+  }, [query]);
 
   useEffect(() => {
     if (isOpen) {
@@ -42,6 +47,7 @@ export default function LightSearch({ isOpen, onClose }: LightSearchProps) {
     } else {
       document.body.style.overflow = '';
       setQuery('');
+      setSelectedIndex(-1);
     }
   }, [isOpen]);
 
@@ -50,8 +56,6 @@ export default function LightSearch({ isOpen, onClose }: LightSearchProps) {
       document.body.style.overflow = '';
     };
   }, []);
-
-  if (!isOpen) return null;
 
   const saveToHistory = (searchTerm: string) => {
     const trimmed = searchTerm.trim();
@@ -114,6 +118,8 @@ export default function LightSearch({ isOpen, onClose }: LightSearchProps) {
         return (
           app.name.toLowerCase().includes(q) ||
           app.category?.toLowerCase().includes(q) ||
+          app.developer?.toLowerCase().includes(q) ||
+          app.slug?.toLowerCase().includes(q) ||
           app.seo_keywords?.toLowerCase().includes(q)
         );
       }).sort((a, b) => {
@@ -135,6 +141,36 @@ export default function LightSearch({ isOpen, onClose }: LightSearchProps) {
     onClose();
   };
 
+  const handleSelectApp = (app: any) => {
+    saveToHistory(app.name);
+    document.body.style.overflow = '';
+    navigate(`/app/${app.slug || app.id}`);
+    onClose();
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      } else if (e.key === 'ArrowDown' && results.length > 0) {
+        e.preventDefault();
+        setSelectedIndex(prev => (prev + 1) % results.length);
+      } else if (e.key === 'ArrowUp' && results.length > 0) {
+        e.preventDefault();
+        setSelectedIndex(prev => (prev <= 0 ? results.length - 1 : prev - 1));
+      } else if (e.key === 'Enter' && selectedIndex >= 0 && results[selectedIndex]) {
+        e.preventDefault();
+        handleSelectApp(results[selectedIndex]);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose, results, selectedIndex]);
+
+  if (!isOpen) return null;
+
   return (
     <div 
       className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex flex-col items-center pt-3 sm:pt-12 px-3 sm:px-4 animate-in fade-in duration-150"
@@ -151,6 +187,10 @@ export default function LightSearch({ isOpen, onClose }: LightSearchProps) {
         <form 
           onSubmit={(e) => {
             e.preventDefault();
+            if (selectedIndex >= 0 && results[selectedIndex]) {
+              handleSelectApp(results[selectedIndex]);
+              return;
+            }
             if (query.trim()) {
               handleSelectTerm(query.trim());
             }
@@ -160,18 +200,25 @@ export default function LightSearch({ isOpen, onClose }: LightSearchProps) {
           <Search className="w-5 h-5 text-blue-500 shrink-0" />
           <input
             ref={inputRef}
-            type="search"
+            type="text"
+            inputMode="search"
             enterKeyHint="search"
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search games, apps, categories..."
+            placeholder="Search games, apps, developers..."
             className="flex-1 bg-transparent text-sm sm:text-base font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 outline-none border-none p-0 focus:ring-0"
           />
           {query.length > 0 && (
             <button
               type="button"
-              onClick={() => setQuery('')}
-              className="p-1 rounded-full text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
+              onClick={() => {
+                setQuery('');
+                inputRef.current?.focus();
+              }}
+              className="p-1.5 rounded-full text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
               aria-label="Clear input"
             >
               <X className="w-4 h-4" />
@@ -180,7 +227,7 @@ export default function LightSearch({ isOpen, onClose }: LightSearchProps) {
           <button 
             type="button"
             onClick={onClose}
-            className="px-2.5 py-1 text-xs font-semibold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 rounded-lg transition-colors"
+            className="px-2.5 py-1 text-xs font-semibold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
             aria-label="Close search"
           >
             Esc
@@ -196,55 +243,60 @@ export default function LightSearch({ isOpen, onClose }: LightSearchProps) {
                 <div className="text-[11px] font-semibold text-zinc-400 dark:text-zinc-500 px-3 pt-1 uppercase tracking-wider">
                   Top Matches
                 </div>
-                {results.map((app) => (
-                  <div
-                    key={app.id}
-                    onMouseEnter={() => preloadAppDetails(app)}
-                    onTouchStart={() => preloadAppDetails(app)}
-                    onClick={() => {
-                      saveToHistory(app.name);
-                      document.body.style.overflow = '';
-                      navigate(`/app/${app.slug || app.id}`);
-                      onClose();
-                    }}
-                    className="flex items-center justify-between gap-3 p-2 sm:p-2.5 rounded-xl hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80 transition-colors cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <img
-                        src={getOptimizedImageUrl(app.icon_url, 96) || "https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=128&h=128&fit=crop"}
-                        alt={app.name}
-                        width={40}
-                        height={40}
-                        loading="lazy"
-                        decoding="async"
-                        className="w-10 h-10 rounded-xl object-cover shrink-0 border border-black/5 dark:border-white/5 bg-zinc-100 dark:bg-zinc-800"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          if (app.icon_url && target.src !== app.icon_url) {
-                            target.src = app.icon_url;
-                          }
-                        }}
-                      />
-                      <div className="min-w-0">
-                        <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate group-hover:text-blue-500 transition-colors">
-                          {app.name}
-                        </h4>
-                        <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
-                          {app.category?.split(',')[0] || 'Game'} • ★ {app.rating || '4.8'}
-                        </p>
+                {results.map((app, idx) => {
+                  const isActive = idx === selectedIndex;
+                  return (
+                    <div
+                      key={app.id}
+                      onMouseEnter={() => {
+                        setSelectedIndex(idx);
+                        preloadAppDetails(app);
+                      }}
+                      onTouchStart={() => preloadAppDetails(app)}
+                      onClick={() => handleSelectApp(app)}
+                      className={`flex items-center justify-between gap-3 p-2 sm:p-2.5 rounded-xl transition-colors cursor-pointer group ${
+                        isActive
+                          ? 'bg-blue-50/90 dark:bg-blue-950/40 ring-1 ring-blue-500/30'
+                          : 'hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img
+                          src={getOptimizedImageUrl(app.icon_url, 96) || "/logo.png"}
+                          alt={app.name}
+                          width={40}
+                          height={40}
+                          loading="lazy"
+                          decoding="async"
+                          className="w-10 h-10 rounded-xl object-cover shrink-0 border border-black/5 dark:border-white/5 bg-zinc-100 dark:bg-zinc-800"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            if (app.icon_url && target.src !== app.icon_url) {
+                              target.src = app.icon_url;
+                            }
+                          }}
+                        />
+                        <div className="min-w-0">
+                          <h4 className={`text-sm font-semibold truncate transition-colors ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-900 dark:text-zinc-100 group-hover:text-blue-500'}`}>
+                            {app.name}
+                          </h4>
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                            {app.category?.split(',')[0] || 'Game'} • ★ {app.rating || '4.8'}
+                          </p>
+                        </div>
                       </div>
+                      <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 px-2.5 py-1 bg-blue-50 dark:bg-blue-950/40 rounded-lg shrink-0">
+                        View
+                      </span>
                     </div>
-                    <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 px-2.5 py-1 bg-blue-50 dark:bg-blue-950/40 rounded-lg shrink-0">
-                      View
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {/* View all search results button */}
                 <button
                   type="button"
                   onClick={() => handleSelectTerm(query.trim())}
-                  className="w-full mt-2 p-2.5 text-center text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-xl transition-colors"
+                  className="w-full mt-2 p-2.5 text-center text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-xl transition-colors cursor-pointer"
                 >
                   View all results for "{query.trim()}" →
                 </button>

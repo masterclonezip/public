@@ -251,7 +251,9 @@ export function sanitizePublicSettings(settings: any): any {
   delete copy.admin_password;
   delete copy.admin_totp_secret;
   delete copy.cloudinary_api_secret;
+  delete copy.cloudinary_api_key;
   delete copy.gemini_api_key;
+  delete copy._rest_admin_bypass;
   return copy;
 }
 
@@ -1002,6 +1004,7 @@ export async function commitTreeToGitHub({
                 t.path === 'bun.lock' ||
                 t.path === 'public/favicon.webp' ||
                 (t.path.startsWith('public/') && t.path.endsWith('.gz')) ||
+                t.path.startsWith('public-api/') ||
                 t.path.startsWith('public/assets/aistudio/') ||
                 t.path.startsWith('.aistudio/')
               )

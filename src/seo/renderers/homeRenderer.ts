@@ -32,7 +32,7 @@ export function renderHome(apps: any[], settings: any, news: any[], _videos: any
     const ratingRaw = getField(app, 'rating', '5.0');
     const ratingVal = typeof ratingRaw === 'number' ? ratingRaw : (parseFloat(String(ratingRaw)) || 5.0);
     const rating = ratingVal.toFixed(1);
-    const rawIcon = getField(app, 'icon_url') || 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=128&fit=crop';
+    const rawIcon = getField(app, 'icon_url') || '/logo.png';
     const icon = optimizeImageUrl(rawIcon, 120);
     const isNew = app.is_new === true || (app.is_new && app.is_new.booleanValue === true);
     const isHot = app.is_hot === true || (app.is_hot && app.is_hot.booleanValue === true);
@@ -296,7 +296,7 @@ export function renderCategory(categoryName: string, _categorySlug: string, cate
     const slug = getField(app, 'slug');
     const category = getField(app, 'category');
     const rating = getField(app, 'rating', '5.0');
-    const rawIcon = getField(app, 'icon_url') || 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=128&fit=crop';
+    const rawIcon = getField(app, 'icon_url') || '/logo.png';
     const icon = optimizeImageUrl(rawIcon, 128);
     const isNew = app.is_new === true || (app.is_new && app.is_new.booleanValue === true);
     const isTopItem = i < 4;
@@ -347,7 +347,7 @@ export function renderNewApps(newApps: any[], settings: any): string {
     const slug = getField(app, 'slug');
     const category = getField(app, 'category');
     const rating = getField(app, 'rating', '5.0');
-    const rawIcon = getField(app, 'icon_url') || 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=128&fit=crop';
+    const rawIcon = getField(app, 'icon_url') || '/logo.png';
     const icon = optimizeImageUrl(rawIcon, 128);
     const isTopItem = i < 4;
     

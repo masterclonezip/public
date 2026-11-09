@@ -88,7 +88,7 @@ export function ReviewItem({
               {username}
             </span>
             {(isReported || rev.reported) && (
-              <span className="inline-flex items-center gap-1 bg-rose-500/10 text-rose-600 dark:text-rose-450 text-[10px] font-black px-2 py-0.5 rounded-full border border-rose-500/10 shrink-0 select-none uppercase tracking-wide animate-pulse">
+              <span className="inline-flex items-center gap-1 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-rose-500/10 shrink-0 select-none uppercase tracking-wide">
                 Flagged
               </span>
             )}
@@ -134,8 +134,7 @@ export function ReviewItem({
           {rev.adminReply && rev.adminReply.text && (
             <div className="mt-3 p-3 bg-zinc-100/80 dark:bg-zinc-800/60 rounded-xl border border-black/5 dark:border-white/5 text-[11px] text-zinc-700 dark:text-zinc-300">
               <div className="flex items-center justify-between gap-2 mb-1">
-                <span className="font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                <span className="font-bold text-zinc-900 dark:text-white">
                   {rev.adminReply.author || 'Developer Response'}
                 </span>
                 {rev.adminReply.timestamp && (
@@ -150,7 +149,7 @@ export function ReviewItem({
         </div>
 
         {/* Footer Help voting Panel */}
-        <div className="flex items-center gap-4 mt-4 pt-3.5 border-t border-black/[0.03] dark:border-white/[0.03]">
+        <div className="flex items-center gap-3 xs:gap-4 mt-4 pt-3.5 border-t border-black/[0.03] dark:border-white/[0.03]">
           <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
             Was this review helpful?
           </span>
@@ -159,7 +158,7 @@ export function ReviewItem({
             onClick={() => onHelpfulVote(rev.id)}
             disabled={isVoted}
             aria-label={`Vote helpful for review by ${rev.username || 'user'}`}
-            className={`flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all ${
+            className={`flex items-center gap-1.5 min-h-[32px] px-3 py-1.5 text-[11px] font-bold rounded-lg tabular-nums transition-all ${
               isVoted
                 ? 'bg-blue-500/10 text-blue-500 cursor-default'
                 : 'bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-zinc-500 dark:text-zinc-400 active:scale-95 cursor-pointer'
@@ -174,7 +173,7 @@ export function ReviewItem({
             onClick={() => onReport(rev.id)}
             disabled={isReported || rev.reported}
             aria-label={`Report review by ${rev.username || 'user'}`}
-            className={`flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all ml-auto ${
+            className={`flex items-center gap-1.5 min-h-[32px] px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all ml-auto ${
               isReported || rev.reported
                 ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 cursor-default font-black'
                 : 'bg-black/5 hover:bg-rose-500/10 hover:text-rose-600 dark:bg-white/5 dark:hover:bg-rose-500/15 text-zinc-500 dark:text-zinc-400 active:scale-95 cursor-pointer'

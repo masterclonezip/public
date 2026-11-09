@@ -41,7 +41,7 @@ export function ScreenshotsEditor({ initialScreenshots, onChange }: ScreenshotsE
                value={url}
                onChange={(val) => updateUrl(idx, val)}
                className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-semibold text-slate-800 dark:text-slate-100 focus-within:ring-2 focus-within:ring-blue-500 font-mono overflow-hidden"
-               placeholder="e.g. https://images.unsplash.com/photo-... or custom URL"
+               placeholder="https://res.cloudinary.com/... or custom image URL"
             />
             {url && (
               <div className="relative group w-12 h-16 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0 flex items-center justify-center p-0.5">

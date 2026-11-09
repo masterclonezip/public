@@ -401,20 +401,58 @@ export async function onRequest(context) {
     };
   };
 
-  // 7. Runtime Configuration Bridge (Provides public client credentials when env vars are marked 'Encrypt' on Cloudflare Pages)
-  if (url.pathname === '/api/v1/admin/runtime-config' || url.pathname === '/api/v1/public/runtime-config') {
+  // 7. Runtime Configuration Bridge (Strictly separates public vs admin runtime config)
+  if (url.pathname === '/api/v1/public/runtime-config') {
+    const communityProjectId = String(
+      env?.VITE_COMMUNITY_FIREBASE_PROJECT_ID ||
+      env?.COMMUNITY_FIREBASE_PROJECT_ID ||
+      ''
+    ).replace(/^["']|["']$/g, '').trim();
+    const communityApiKey = String(
+      env?.VITE_COMMUNITY_FIREBASE_API_KEY ||
+      env?.COMMUNITY_FIREBASE_API_KEY ||
+      ''
+    ).replace(/^["']|["']$/g, '').trim();
+    const siteKey = getEnvOnlyTurnstileSiteKey(env) || getPublicTurnstileSiteKey(env);
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        ...(communityProjectId && communityApiKey
+          ? {
+              communityFirebase: {
+                projectId: communityProjectId,
+                apiKey: communityApiKey,
+                databaseId: normalizeEdgeDbId(env?.VITE_COMMUNITY_FIREBASE_DATABASE_ID || env?.COMMUNITY_FIREBASE_DATABASE_ID, communityProjectId),
+              },
+            }
+          : {}),
+        turnstileSiteKey: siteKey,
+        turnstile: { siteKey },
+      }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store, private',
+        },
+      }
+    );
+  }
+
+  if (url.pathname === '/api/v1/admin/runtime-config') {
     const cfg = getEdgeFirestoreConfig();
     const primaryProjectId = cfg.projectId;
     const primaryApiKey = cfg.apiKey;
     const communityProjectId = String(
       env?.VITE_COMMUNITY_FIREBASE_PROJECT_ID ||
       env?.COMMUNITY_FIREBASE_PROJECT_ID ||
-      primaryProjectId
+      ''
     ).replace(/^["']|["']$/g, '').trim();
     const communityApiKey = String(
       env?.VITE_COMMUNITY_FIREBASE_API_KEY ||
       env?.COMMUNITY_FIREBASE_API_KEY ||
-      primaryApiKey
+      ''
     ).replace(/^["']|["']$/g, '').trim();
 
     return new Response(

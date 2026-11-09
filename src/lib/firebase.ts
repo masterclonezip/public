@@ -58,8 +58,6 @@ const getEnv = (key: string): string => {
 const resolvedProjectId =
   getEnv('VITE_FIREBASE_PROJECT_ID') ||
   getEnv('FIREBASE_PROJECT_ID') ||
-  getEnv('VITE_COMMUNITY_FIREBASE_PROJECT_ID') ||
-  getEnv('COMMUNITY_FIREBASE_PROJECT_ID') ||
   '';
 
 const normalizeDatabaseId = (rawId: string | undefined, projId?: string): string => {
@@ -83,35 +81,27 @@ const firebaseConfig = {
   appId:
     getEnv('VITE_FIREBASE_APP_ID') ||
     getEnv('FIREBASE_APP_ID') ||
-    getEnv('VITE_COMMUNITY_FIREBASE_APP_ID') ||
-    getEnv('COMMUNITY_FIREBASE_APP_ID') ||
     '',
   apiKey:
     getEnv('VITE_FIREBASE_API_KEY') ||
     getEnv('FIREBASE_API_KEY') ||
-    getEnv('VITE_COMMUNITY_FIREBASE_API_KEY') ||
-    getEnv('COMMUNITY_FIREBASE_API_KEY') ||
     '',
   authDomain:
     getEnv('VITE_FIREBASE_AUTH_DOMAIN') ||
     getEnv('FIREBASE_AUTH_DOMAIN') ||
-    getEnv('VITE_COMMUNITY_FIREBASE_AUTH_DOMAIN') ||
     (resolvedProjectId ? `${resolvedProjectId}.firebaseapp.com` : ''),
   firestoreDatabaseId: normalizeDatabaseId(
     getEnv('VITE_FIREBASE_DATABASE_ID') ||
-      getEnv('FIREBASE_DATABASE_ID') ||
-      getEnv('VITE_COMMUNITY_FIREBASE_DATABASE_ID'),
+      getEnv('FIREBASE_DATABASE_ID'),
     resolvedProjectId
   ),
   storageBucket:
     getEnv('VITE_FIREBASE_STORAGE_BUCKET') ||
     getEnv('FIREBASE_STORAGE_BUCKET') ||
-    getEnv('VITE_COMMUNITY_FIREBASE_STORAGE_BUCKET') ||
     (resolvedProjectId ? `${resolvedProjectId}.appspot.com` : ''),
   messagingSenderId:
     getEnv('VITE_FIREBASE_MESSAGING_SENDER_ID') ||
     getEnv('FIREBASE_MESSAGING_SENDER_ID') ||
-    getEnv('VITE_COMMUNITY_FIREBASE_MESSAGING_SENDER_ID') ||
     '',
   measurementId:
     getEnv('VITE_FIREBASE_MEASUREMENT_ID') ||
@@ -216,13 +206,6 @@ export async function hydrateFirebaseRuntimeConfig(): Promise<boolean> {
         const res = await fetchWithTimeout('/api/v1/admin/runtime-config', {}, 5000);
         if (res.ok) data = await res.json();
       } catch (_) {}
-
-      if (!data?.firebase?.projectId) {
-        try {
-          const res = await fetchWithTimeout('/api/v1/public/runtime-config', {}, 5000);
-          if (res.ok) data = await res.json();
-        } catch (_) {}
-      }
 
       if (data?.firebase?.projectId && data?.firebase?.apiKey) {
         firebaseConfig.projectId = String(data.firebase.projectId).replace(/^["']|["']$/g, '').trim();

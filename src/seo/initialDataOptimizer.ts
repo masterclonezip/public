@@ -455,7 +455,28 @@ export function optimizeInitialDataForRoute(
         const k = String(item.slug || item.id || '').toLowerCase().trim();
         return k && !includedKeys.has(k);
       })
-      .map((item: any) => mapFullNewsItem(item));
+      .map((item: any) => ({
+        id: item.id,
+        slug: item.slug,
+        title: item.title,
+        logo_url: item.logo_url || item.image_url || item.image || '',
+        image_url: item.image_url || item.logo_url || item.image || '',
+        image: item.image || item.image_url || item.logo_url || '',
+        description: item.description || item.seo_description || item.meta_description || '',
+        ceo_name: item.ceo_name || item.author || 'Editorial Team',
+        author: item.author || item.ceo_name || 'Editorial Team',
+        category: item.category || 'General',
+        published_at: item.published_at || item.created_at || item.date || '',
+        date: item.date || item.published_at || item.created_at || '',
+        read_time: item.read_time || '3 min read',
+        is_breaking: Boolean(item.is_breaking),
+        is_new: Boolean(item.is_new),
+        is_pinned: Boolean(item.is_pinned),
+        link: item.link || '',
+        tags: Array.isArray(item.tags) ? item.tags : [],
+        related_app_id: item.related_app_id || '',
+        _isTrimmed: true
+      }));
 
     optimizedNews = [...fullArticleList, ...fullRecent, ...remainingStubs];
   } else if (isNewsIndexPage || isHomePage) {
@@ -472,10 +493,11 @@ export function optimizeInitialDataForRoute(
     }));
   }
 
-  // Optimized Videos: Omit on App Details and News Detail pages to keep initial HTML and JSON.parse ultra-light
-  const rawVideos = (isAppDetailPage || isNewsDetailPage)
-    ? []
-    : (Array.isArray(data.videos) ? data.videos : (Array.isArray(data.mockVideos) ? data.mockVideos : []));
+  // Optimized Videos: Only include on Home and Video routes to keep initial HTML and JSON.parse ultra-light across all other pages
+  const isVideoPage = cleanPathLower === '/videos' || cleanPathLower.startsWith('/videos/');
+  const rawVideos = (isHomePage || isVideoPage)
+    ? (Array.isArray(data.videos) ? data.videos : (Array.isArray(data.mockVideos) ? data.mockVideos : []))
+    : [];
   const optimizedVideos: any[] = rawVideos.map((item: any) => {
     if (!item) return null;
     return {
@@ -500,39 +522,57 @@ export function optimizeInitialDataForRoute(
     };
   }).filter(Boolean);
 
-  // Public Settings: On App Details & News Detail pages, omit heavy legal HTML blobs, website_faqs, banners, and developers
+  // Public Settings: Strictly scope heavy HTML/legal/FAQ/developer fields to only the specific route that renders them
   const rawSettings = data.settings || data.mockSettings || {};
   const optimizedSettings: any = {};
-  const detailPageKeys = [
+  const basePageKeys = [
     'site_title', 'logo_url', 'favicon_url', 'seo_title', 'seo_description', 'seo_keywords',
     'meta_title', 'meta_description', 'social_links', 'categories', 'trending_searches',
     'ticker_text', 'support_email', 'last_updated', 'animations_enabled',
     'quick_links', 'turnstile_site_key', 'helpline_whatsapp', 'helpline_telegram',
     'news_meta_title', 'news_meta_description'
   ];
-  const fullAllowedKeys = [
-    ...detailPageKeys,
-    'hero_title_text', 'hero_title_subtitle', 'hero_title_color', 'hero_title_animation',
-    'hero_title_visible', 'hero_title_style', 'portal_heading', 'secure_index_title',
-    'secure_index_subtitle', 'banners',
-    'about_meta_title', 'about_meta_description', 'about_content', 'about_us',
-    'contact_meta_title', 'contact_meta_description', 'contact_content',
-    'privacy_meta_title', 'privacy_meta_description', 'privacy_content',
-    'terms_meta_title', 'terms_meta_description', 'terms_content',
-    'responsibility_meta_title', 'responsibility_meta_description', 'responsibility_content',
-    'report_removal_meta_title', 'report_removal_meta_description', 'report_removal_content',
-    'notice_meta_title', 'notice_meta_description', 'important_notice', 'important_notice_heading',
-    'ethics_meta_title', 'ethics_meta_description', 'ethics_discrimination_text', 'ethics_heading',
-    'disclaimer_meta_title', 'disclaimer_meta_description', 'disclaimer_text', 'disclaimer_heading',
-    'developers_meta_title', 'developers_meta_description', 'developers',
-    'website_faqs', 'faq_meta_title', 'faq_meta_description',
-    'videos_meta_title', 'videos_meta_description',
-    'new_apps_meta_title', 'new_apps_meta_description',
-    'categories_meta_title', 'categories_meta_description',
-    'safety_meta_title', 'safety_meta_description'
-  ];
 
-  const allowedKeys = (isAppDetailPage || isNewsDetailPage) ? detailPageKeys : fullAllowedKeys;
+  const routeSpecificKeys: string[] = [];
+  if (isHomePage) {
+    routeSpecificKeys.push(
+      'hero_title_text', 'hero_title_subtitle', 'hero_title_color', 'hero_title_animation',
+      'hero_title_visible', 'hero_title_style', 'portal_heading', 'secure_index_title',
+      'secure_index_subtitle', 'banners', 'website_faqs', 'faq_meta_title', 'faq_meta_description'
+    );
+  } else if (cleanPathLower === '/about') {
+    routeSpecificKeys.push('about_meta_title', 'about_meta_description', 'about_content', 'about_us');
+  } else if (cleanPathLower === '/contact') {
+    routeSpecificKeys.push('contact_meta_title', 'contact_meta_description', 'contact_content');
+  } else if (cleanPathLower === '/privacy') {
+    routeSpecificKeys.push('privacy_meta_title', 'privacy_meta_description', 'privacy_content');
+  } else if (cleanPathLower === '/terms') {
+    routeSpecificKeys.push('terms_meta_title', 'terms_meta_description', 'terms_content');
+  } else if (cleanPathLower === '/responsibility') {
+    routeSpecificKeys.push('responsibility_meta_title', 'responsibility_meta_description', 'responsibility_content');
+  } else if (cleanPathLower === '/report-removal') {
+    routeSpecificKeys.push('report_removal_meta_title', 'report_removal_meta_description', 'report_removal_content');
+  } else if (cleanPathLower === '/notice') {
+    routeSpecificKeys.push('notice_meta_title', 'notice_meta_description', 'important_notice', 'important_notice_heading');
+  } else if (cleanPathLower === '/ethics') {
+    routeSpecificKeys.push('ethics_meta_title', 'ethics_meta_description', 'ethics_discrimination_text', 'ethics_heading');
+  } else if (cleanPathLower === '/disclaimer') {
+    routeSpecificKeys.push('disclaimer_meta_title', 'disclaimer_meta_description', 'disclaimer_text', 'disclaimer_heading');
+  } else if (cleanPathLower === '/developers' || cleanPathLower === '/developer') {
+    routeSpecificKeys.push('developers_meta_title', 'developers_meta_description', 'developers');
+  } else if (cleanPathLower === '/faq' || cleanPathLower === '/faqs') {
+    routeSpecificKeys.push('website_faqs', 'faq_meta_title', 'faq_meta_description');
+  } else if (isVideoPage) {
+    routeSpecificKeys.push('videos_meta_title', 'videos_meta_description');
+  } else if (cleanPathLower === '/new-apps') {
+    routeSpecificKeys.push('new_apps_meta_title', 'new_apps_meta_description');
+  } else if (cleanPathLower === '/categories' || cleanPathLower.startsWith('/category/') || cleanPathLower.startsWith('/categories/')) {
+    routeSpecificKeys.push('categories_meta_title', 'categories_meta_description');
+  } else if (cleanPathLower === '/safety' || cleanPathLower === '/safety-status') {
+    routeSpecificKeys.push('safety_meta_title', 'safety_meta_description');
+  }
+
+  const allowedKeys = [...basePageKeys, ...routeSpecificKeys];
 
   const htmlContentKeys = new Set([
     'about_content', 'about_us', 'contact_content', 'privacy_content', 'terms_content',
@@ -559,8 +599,8 @@ export function optimizeInitialDataForRoute(
     }
   }
 
-  // Ensure developers array is available when not on detail pages
-  if (!isAppDetailPage && !isNewsDetailPage && !optimizedSettings.developers && Array.isArray(data.developers)) {
+  // Ensure developers array is available on /developers route
+  if ((cleanPathLower === '/developers' || cleanPathLower === '/developer') && !optimizedSettings.developers && Array.isArray(data.developers)) {
     optimizedSettings.developers = data.developers;
   }
 

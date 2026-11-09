@@ -32,7 +32,7 @@ export function renderVideosList(videos: any[], _settings: any): string {
     const videoId = extractYoutubeId(videoUrl);
     const thumb = videoId
       ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
-      : 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=600&q=80';
+      : '/logo.png';
     const createdAt = getField(v, 'created_at');
     const dateLabel = createdAt ? new Date(createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : 'Recent';
     const shortId = String(getField(v, 'id') || slug || '').substring(0, 8).toUpperCase();

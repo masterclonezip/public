@@ -204,7 +204,7 @@ const AppsTab = React.memo(({ appsList, editingAppId, setEditingAppId, handleDel
                         }`}
                       >
                         <img 
-                          src={app.icon_url || 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=128&h=128&fit=crop'} 
+                          src={app.icon_url || '/logo.png'} 
                           loading="lazy"
                           width={40}
                           height={40}

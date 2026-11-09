@@ -945,3 +945,13 @@ Families with too little traffic stay shadow (or tolerated). Never enforce a sig
      - Removed the `HW_VERIFIED_MOBILE.` bypass and `siteverify_secret_mismatch_fallback` autopass branch in Gate G6 (`handleSessionClearance`).
      - Gate G6 now **unconditionally calls `POST https://challenges.cloudflare.com/turnstile/v0/siteverify`** for every clearance request using the configured `TURNSTILE_SECRET_KEY` candidate ring, failing closed (`softRetryResponse` on transient network/timeout or missing secret; `paddedHard404Response` on invalid/forged tokens, action mismatch, hostname mismatch, or `cdata !== "${appId}_${nid}_${hw}"` hardware commitment mismatch) before Gate G7 decrypts the destination URL.
 
+- **v11.1.19 (Mobile Touch Ergonomics, Resilient Monogram Icon Fallback, Zero-Pill Metadata & Turnstile Script Error Recovery):**
+  1. **Resilient Icon Fallback & Zero-Pill Tabular Metadata (`src/pages/GatewayPage.tsx`):**
+     - Added `iconError` state (reset on `slug` change) and deterministic monogram fallback (`appMonogram`) so broken or missing `app.icon_url` images never display a broken image icon or pulsing gray placeholder.
+     - Replaced rounded pill chips (`ID: ...`, `Ver: ...`, `Verified`) with unboxed tabular metadata separated by middle dots (`ID #... · Version ... · Verified`) and a hairline technical summary row (`developer · category · size`) inside a unified single-elevation verification portal card (`rounded-3xl`).
+     - Upgraded all navigation and support links (`Back to details`, `WhatsApp Support`, `Telegram Support`) to `42px–48px` mobile touch hitboxes.
+  2. **Zero-CLS Turnstile Slot & 52px Primary Clearance Action (`src/components/ClearanceButton.tsx`):**
+     - Styled the `min-h-[65px]` visible Turnstile wrapper with a subtle bordered container (`rounded-xl bg-zinc-50/70 dark:bg-zinc-800/40 border border-zinc-200/60 dark:border-white/[0.06]`) so the 65px slot looks intentional from frame 0 before Cloudflare's iframe paints (`CLS = 0`).
+     - Upgraded the primary `PROCEED` / `VERIFYING…` / `CONNECTING…` button to `min-h-[52px]` with `focus-visible:ring-2` and retry actions to `min-h-[44px]`.
+  3. **Turnstile Script Packet-Drop Recovery (`src/hooks/useTurnstileVerification.ts`):**
+     - Updated `ensureTurnstileScriptLoaded(forceReload = false)` to attach `s.onerror = () => s.remove()` when injecting the Turnstile `<script>` tag and force-reload the script on manual verification retry (`restartVerification(true)`), ensuring cellular 4G/5G packet drops during initial script load never leave a dead `<script>` tag in `<head>`.

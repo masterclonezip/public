@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { useTranslation } from '../../i18n';
-import { Menu, Shield, ShieldCheck, Info, X, LayoutGrid, Newspaper, Sparkles, Send, MoreHorizontal, Search, Video, Users, Trash2 } from 'lucide-react';
+import { Menu, ShieldCheck, Info, Send, MoreHorizontal, Search, Video, Users, Trash2, HelpCircle, Sparkles } from 'lucide-react';
 import { useData } from '../../contexts/DataContextPublic';
 import { resolveSiteLogoUrl, getSizedLogoUrl } from '../../seo/utils';
 import LanguageSelector from '../LanguageSelector';
@@ -17,6 +17,7 @@ export function PublicHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
   const { scrollDirection, scrolled } = useScrollDirection();
   
   const isHeaderHidden = scrollDirection === 'down' && !menuOpen && !searchOpen;
@@ -31,6 +32,60 @@ export function PublicHeader() {
       }, 0);
     }
   };
+
+  const handleOpenSearch = () => {
+    triggerHaptic();
+    if (apps.length < 25 && fetchApps) fetchApps();
+    setSearchOpen(true);
+  };
+
+  useEffect(() => {
+    setMoreOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const handlePointerDown = (e: MouseEvent | TouchEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setMoreOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMoreOpen(false);
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown, { passive: true });
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [moreOpen]);
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        const target = e.target as HTMLElement | null;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+          return;
+        }
+        e.preventDefault();
+        if (apps.length < 25 && fetchApps) fetchApps();
+        setSearchOpen(true);
+      }
+    };
+    const handleOpenSearchEvent = () => {
+      if (apps.length < 25 && fetchApps) fetchApps();
+      setSearchOpen(true);
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    window.addEventListener('open-search-modal', handleOpenSearchEvent);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+      window.removeEventListener('open-search-modal', handleOpenSearchEvent);
+    };
+  }, [apps.length, fetchApps]);
 
   return (
     <>
@@ -76,30 +131,40 @@ export function PublicHeader() {
               {t('Home')}
               {pathname === '/' && <div className="absolute -bottom-1 left-2 right-2 h-[2px] bg-blue-600 rounded-t-full transition-all duration-300" />}
             </Link>
-            <Link to="/news" onClick={triggerHaptic} className={`transition-all p-2 tracking-wide relative ${pathname === '/news' ? 'text-blue-600' : 'text-zinc-600 hover:text-blue-500 dark:text-zinc-300'}`}>
+            <Link to="/news" onClick={triggerHaptic} className={`transition-all p-2 tracking-wide relative ${pathname.startsWith('/news') ? 'text-blue-600' : 'text-zinc-600 hover:text-blue-500 dark:text-zinc-300'}`}>
               {t('News')}
-              {pathname === '/news' && <div className="absolute -bottom-1 left-2 right-2 h-[2px] bg-blue-600 rounded-t-full transition-all duration-300" />}
+              {pathname.startsWith('/news') && <div className="absolute -bottom-1 left-2 right-2 h-[2px] bg-blue-600 rounded-t-full transition-all duration-300" />}
             </Link>
-            <div className="relative group/more" onMouseEnter={() => setMoreOpen(true)} onMouseLeave={() => setMoreOpen(false)}>
+            <div
+              ref={moreMenuRef}
+              className="relative group/more"
+              onMouseEnter={() => setMoreOpen(true)}
+              onMouseLeave={() => setMoreOpen(false)}
+            >
               <button 
                 type="button"
                 aria-expanded={moreOpen}
                 aria-haspopup="true"
                 aria-label="More navigation links"
-                className={`transition-all p-2 tracking-wide flex items-center gap-1 relative ${['/videos', '/contact', '/privacy', '/report-removal', '/terms', '/about', '/responsibility'].includes(pathname) ? 'text-blue-600' : 'text-zinc-600 hover:text-blue-500 dark:text-zinc-300'}`}
-                onClick={triggerHaptic}
+                className={`transition-all p-2 tracking-wide flex items-center gap-1 relative cursor-pointer ${['/new-apps', '/videos', '/faq', '/developers', '/contact', '/privacy', '/report-removal', '/terms', '/about', '/responsibility', '/notice', '/ethics', '/disclaimer'].includes(pathname) ? 'text-blue-600' : 'text-zinc-600 hover:text-blue-500 dark:text-zinc-300'}`}
+                onClick={() => {
+                  triggerHaptic();
+                  setMoreOpen(prev => !prev);
+                }}
               >
                 More <MoreHorizontal className="w-4 h-4 ml-1" />
               </button>
               
               {moreOpen && (
                 <div 
-                  className="absolute top-full right-0 mt-1 w-48 bg-white dark:bg-zinc-900 border border-black/10 dark:border-white/10 rounded-2xl shadow-lg overflow-hidden py-2 z-50 transition-all duration-200 animate-in fade-in slide-in-from-top-1"
+                  className="absolute top-full right-0 mt-1 w-52 bg-white dark:bg-zinc-900 border border-black/10 dark:border-white/10 rounded-2xl shadow-lg overflow-hidden py-1.5 z-50 transition-all duration-200 animate-in fade-in slide-in-from-top-1"
                 >
                   {[
+                    { to: '/new-apps', label: 'New Releases', icon: Sparkles },
                     { to: '/videos', label: 'Videos', icon: Video },
                     { to: '/about', label: 'About Us', icon: Info },
                     { to: '/developers', label: 'Our Team', icon: Users },
+                    { to: '/faq', label: 'FAQs', icon: HelpCircle },
                     { to: '/contact', label: 'Contact', icon: Send },
                     { to: '/responsibility', label: 'Safety', icon: ShieldCheck },
                     { to: '/privacy', label: 'Privacy', icon: ShieldCheck },
@@ -114,19 +179,19 @@ export function PublicHeader() {
                         key={`more-link-${item.to}-${idx}`}
                         to={item.to} 
                         onClick={() => { setMoreOpen(false); triggerHaptic(); }}
-                        className={`flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors ${pathname === item.to ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'text-zinc-700 dark:text-zinc-300 hover:bg-black/5 dark:hover:bg-white/5'}`}
+                        className={`flex items-center gap-3 px-4 py-2 text-[13px] font-medium transition-colors ${pathname === item.to ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'text-zinc-700 dark:text-zinc-300 hover:bg-black/5 dark:hover:bg-white/5'}`}
                       >
-                        <item.icon className="w-4 h-4 opacity-70" />
-                        {item.label}
+                        <item.icon className="w-4 h-4 opacity-70 shrink-0" />
+                        <span className="truncate">{item.label}</span>
                       </Link>
                     ) : (
                       <button 
                         key={`more-btn-${item.label}-${idx}`}
                         onClick={() => { setMoreOpen(false); triggerHaptic(); if (item.action) item.action(); }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors text-zinc-700 dark:text-zinc-300 hover:bg-black/5 dark:hover:bg-white/5`}
+                        className="w-full flex items-center gap-3 px-4 py-2 text-[13px] font-medium transition-colors text-zinc-700 dark:text-zinc-300 hover:bg-black/5 dark:hover:bg-white/5"
                       >
-                        <item.icon className="w-4 h-4 opacity-70" />
-                        {item.label}
+                        <item.icon className="w-4 h-4 opacity-70 shrink-0" />
+                        <span className="truncate">{item.label}</span>
                       </button>
                     )
                   ))}
@@ -137,12 +202,17 @@ export function PublicHeader() {
             <div className="flex items-center gap-3 ml-4 border-l border-zinc-200 dark:border-zinc-800 pl-4 h-6">
               <button 
                 type="button"
-                onClick={() => { triggerHaptic(); if (apps.length < 25 && fetchApps) fetchApps(); setSearchOpen(true); }}
-                className="flex items-center gap-2 bg-zinc-100/50 dark:bg-zinc-800/50 hover:bg-zinc-200/50 transition-all text-left px-4 py-1.5 w-44 lg:w-52 rounded-full group outline-none focus:ring-2 focus:ring-blue-500/20"
+                onClick={handleOpenSearch}
+                className="flex items-center justify-between gap-2 bg-zinc-100/70 dark:bg-zinc-800/60 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 transition-all text-left px-3.5 py-1.5 w-44 lg:w-56 rounded-full group outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer border border-black/5 dark:border-white/5"
                 aria-label="Search Store"
               >
-                <Search className="w-3.5 h-3.5 text-zinc-400 group-hover:text-blue-500 transition-colors shrink-0" />
-                <span className="text-[13px] text-zinc-500 group-hover:text-zinc-800 dark:group-hover:text-zinc-200 transition-colors truncate">{t('Search')}</span>
+                <span className="flex items-center gap-2 min-w-0">
+                  <Search className="w-3.5 h-3.5 text-zinc-400 group-hover:text-blue-500 transition-colors shrink-0" />
+                  <span className="text-[13px] text-zinc-500 group-hover:text-zinc-800 dark:group-hover:text-zinc-200 transition-colors truncate">{t('Search')}</span>
+                </span>
+                <kbd className="hidden lg:inline-block text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 bg-white/80 dark:bg-zinc-900/80 px-1.5 py-0.5 rounded border border-black/5 dark:border-white/5 shrink-0">
+                  ⌘K
+                </kbd>
               </button>
 
               <div className="w-40">
@@ -167,11 +237,11 @@ export function PublicHeader() {
           <div className="md:hidden flex items-center gap-1 xxs:gap-1.5 xs:gap-2 sm:gap-3 shrink-0">
             <button 
               type="button"
-              onClick={() => { triggerHaptic(); if (apps.length < 25 && fetchApps) fetchApps(); setSearchOpen(true); }}
-              className="flex items-center justify-center w-7 h-7 xxs:w-8 xxs:h-8 xs:w-9 xs:h-9 bg-zinc-100 dark:bg-zinc-800 rounded-full active:scale-95 transition-all text-zinc-600 dark:text-zinc-300"
+              onClick={handleOpenSearch}
+              className="flex items-center justify-center w-8 h-8 xs:w-9 xs:h-9 bg-zinc-100 dark:bg-zinc-800 rounded-full active:scale-95 transition-all text-zinc-600 dark:text-zinc-300 cursor-pointer"
               aria-label="Search"
             >
-              <Search className="w-3 h-3 xxs:w-3.5 xxs:h-3.5 xs:w-4 xs:h-4" />
+              <Search className="w-3.5 h-3.5 xs:w-4 xs:h-4" />
             </button>
 
             {settings.helpline_telegram && (
@@ -179,20 +249,20 @@ export function PublicHeader() {
                 href={settings.helpline_telegram.startsWith('http') ? settings.helpline_telegram : `https://t.me/${settings.helpline_telegram.replace('@', '')}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center w-7 h-7 xxs:w-8 xxs:h-8 xs:w-9 xs:h-9 bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 rounded-full"
+                className="flex items-center justify-center w-8 h-8 xs:w-9 xs:h-9 bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 rounded-full active:scale-95 transition-transform"
                 aria-label="Telegram"
               >
-                <Send className="w-3 h-3 xxs:w-3.5 xxs:h-3.5 xs:w-4 xs:h-4" />
+                <Send className="w-3.5 h-3.5 xs:w-4 xs:h-4" />
               </a>
             )}
             <SupportWidget />
             <button 
               type="button"
-              className="flex items-center justify-center w-7 h-7 xxs:w-8 xxs:h-8 xs:w-9 xs:h-9 bg-zinc-900 dark:bg-white rounded-full active:scale-95 transition-transform"
+              className="flex items-center justify-center w-8 h-8 xs:w-9 xs:h-9 bg-zinc-900 dark:bg-white rounded-full active:scale-95 transition-transform cursor-pointer"
               onClick={() => { triggerHaptic(); setMenuOpen(true); }}
               aria-label="Open menu"
             >
-              <Menu className="w-3 h-3 xxs:w-3.5 xxs:h-3.5 xs:w-4 xs:h-4 text-white dark:text-zinc-900" />
+              <Menu className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-white dark:text-zinc-900" />
             </button>
           </div>
         </div>
@@ -202,6 +272,10 @@ export function PublicHeader() {
         <MobileMenuModal
           isOpen={menuOpen}
           onClose={() => setMenuOpen(false)}
+          onOpenSearch={() => {
+            setMenuOpen(false);
+            handleOpenSearch();
+          }}
           siteTitle={settings.site_title || ''}
           logoUrl={resolvedLogoUrl}
           triggerHaptic={triggerHaptic}

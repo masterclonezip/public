@@ -134,7 +134,7 @@ export function buildMetaTags(params: MetaBuilderParams): string {
     <title>${escapedTitle}</title>
     <meta name="description" content="${escapedDesc}">
     ${keywords ? `<meta name="keywords" content="${escapedKeywords}">` : ''}
-    ${resolvedSiteName ? `<meta data-rh="true" name="application-name" content="${resolvedSiteName}">` : ''}
+    ${pageType === 'home' && resolvedSiteName ? `<meta data-rh="true" name="application-name" content="${resolvedSiteName}">` : ''}
     <meta data-rh="true" name="color-scheme" content="light dark">
     <meta data-rh="true" name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
     <meta data-rh="true" name="theme-color" media="(prefers-color-scheme: dark)" content="#090d16">
@@ -142,7 +142,7 @@ export function buildMetaTags(params: MetaBuilderParams): string {
       ? `<meta data-rh="true" name="robots" content="noindex, nofollow, noarchive, nosnippet">`
       : `<meta data-rh="true" name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">`
     }
-    ${resolvedSiteName ? `<meta data-rh="true" property="og:site_name" content="${resolvedSiteName}">` : ''}
+    ${pageType === 'home' && resolvedSiteName ? `<meta data-rh="true" property="og:site_name" content="${resolvedSiteName}">` : ''}
     <meta data-rh="true" property="og:locale" content="en_IN">
     <meta data-rh="true" property="og:title" content="${escapedTitle}">
     <meta data-rh="true" property="og:description" content="${escapedDesc}">

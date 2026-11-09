@@ -5,10 +5,7 @@
  * on hover, touch, or focus before the user even clicks.
  */
 
-import { lazyWithRetry } from './lazyWithRetry';
 import { getOptimizedImageUrl } from '../seo/utils';
-
-export const AppDetails = lazyWithRetry(() => import('../pages/AppDetails'));
 
 // Ultra-fast in-memory cache mapping normalized slugs and IDs to full app specs
 export const appDetailMemoryCache = new Map<string, any>();
@@ -18,19 +15,17 @@ const inFlightFetches = new Map<string, Promise<any>>();
 const prefetchedKeys = new Set<string>();
 
 /**
- * Preload AppDetails component chunk and rich JSON payload ahead of time
+ * Preload AppDetails rich JSON payload and icon image ahead of time
  */
 export const preloadAppDetails = (slugOrApp?: string | { slug?: string; id?: string; icon_url?: string } | any) => {
   if (!slugOrApp) return;
 
   let rawSlug = '';
   let iconUrl = '';
-  let passedObject: any = null;
 
   if (typeof slugOrApp === 'string') {
     rawSlug = slugOrApp;
   } else if (typeof slugOrApp === 'object' && slugOrApp !== null) {
-    passedObject = slugOrApp;
     rawSlug = slugOrApp.slug || slugOrApp.id || '';
     iconUrl = slugOrApp.icon_url || '';
 
@@ -48,12 +43,7 @@ export const preloadAppDetails = (slugOrApp?: string | { slug?: string; id?: str
   const cleanKey = String(rawSlug).toLowerCase().trim();
   if (!cleanKey) return;
 
-  // 1. Prefetch AppDetails dynamic chunk ahead of time for 0ms transitions
-  try {
-    import('../pages/AppDetails');
-  } catch (_) {}
-
-  // 2. Preload app icon image into browser memory cache if available
+  // 1. Preload app icon image into browser memory cache if available
   if (iconUrl && typeof Image !== 'undefined') {
     try {
       const img = new Image();

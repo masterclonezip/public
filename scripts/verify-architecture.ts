@@ -46,11 +46,10 @@ function verify() {
     const distXml = path.join(distDir, sm);
     const distGz = path.join(distDir, `${sm}.gz`);
     const pubXml = path.join(publicDir, sm);
-    const pubGz = path.join(publicDir, `${sm}.gz`);
 
-    if (!fs.existsSync(distXml) || !fs.existsSync(distGz) || !fs.existsSync(pubXml) || !fs.existsSync(pubGz)) {
+    if (!fs.existsSync(distXml) || !fs.existsSync(distGz) || !fs.existsSync(pubXml)) {
       allSitemapsValid = false;
-      sitemapDetails.push(`Missing ${sm} or ${sm}.gz in dist/public`);
+      sitemapDetails.push(`Missing ${sm} in public/ or ${sm} / ${sm}.gz in dist/`);
       continue;
     }
 

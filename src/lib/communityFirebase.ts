@@ -7,7 +7,7 @@
 
 import communityCatalogStatsJson from './communityCatalogStats.json';
 import communityStaticReviewsJson from './communityStaticReviews.json';
-import staticCatalogJson from './staticData.json';
+import { getCachedStaticDatasetSync, loadFullStaticDataset } from './lightFallback';
 import { generateNaturalStarDistribution } from '../seo/utils';
 
 // ============================================================================
@@ -31,11 +31,14 @@ export function registerCatalogAppsForReviews(apps?: any[]) {
 
 export function getCatalogAppsForReviews(): any[] {
   if (_hasRegisteredCatalogApps) return _registeredCatalogApps;
+  const cachedStatic = getCachedStaticDatasetSync();
+  if (cachedStatic && Array.isArray(cachedStatic.apps) && cachedStatic.apps.length > 0) {
+    return cachedStatic.apps;
+  }
   if (typeof window !== 'undefined' && Array.isArray((window as any).__INITIAL_DATA__?.apps)) {
     return (window as any).__INITIAL_DATA__.apps;
   }
-  const rawStatic = (staticCatalogJson as any)?.apps || (staticCatalogJson as any)?.mockApps || [];
-  return Array.isArray(rawStatic) ? rawStatic : [];
+  return [];
 }
 
 export interface CanonicalAppMeta {
@@ -95,16 +98,16 @@ export function resolveCanonicalAppMeta(
 }
 
 export async function getStaticReviewsBundle(): Promise<Record<string, any[]>> {
+  if (!_hasRegisteredCatalogApps && !getCachedStaticDatasetSync()) {
+    await loadFullStaticDataset().catch(() => null);
+  }
   if (_runtimeStaticReviews && Object.keys(_runtimeStaticReviews).length > 0) {
     return _runtimeStaticReviews;
   }
-  try {
-    const mod = await import('./communityStaticReviews.json');
-    const data = (mod.default || mod) as Record<string, any[]>;
-    if (data && typeof data === 'object') {
-      _runtimeStaticReviews = { ...data };
-    }
-  } catch (_) {}
+  const data = communityStaticReviewsJson as Record<string, any[]>;
+  if (data && typeof data === 'object') {
+    _runtimeStaticReviews = { ...data };
+  }
   return _runtimeStaticReviews || {};
 }
 
@@ -227,7 +230,7 @@ let runtimeCommunityConfig: { projectId?: string; apiKey?: string; databaseId?: 
 if (typeof window !== 'undefined') {
   window.addEventListener('firebase_runtime_hydrated', (e: any) => {
     const detail = e?.detail;
-    const cfg = detail?.communityFirebase || detail?.firebase;
+    const cfg = detail?.communityFirebase;
     if (cfg?.projectId && cfg?.apiKey) {
       runtimeCommunityConfig = {
         projectId: cfg.projectId,
@@ -260,16 +263,12 @@ export const getResolvedCommunityFirebaseConfig = () => {
   const rawProjectId =
     getEnvVal('VITE_COMMUNITY_FIREBASE_PROJECT_ID') ||
     getEnvVal('COMMUNITY_FIREBASE_PROJECT_ID') ||
-    getEnvVal('VITE_FIREBASE_PROJECT_ID') ||
-    getEnvVal('FIREBASE_PROJECT_ID') ||
     '';
   const projectId = (rawProjectId && !rawProjectId.includes('{') && rawProjectId.length < 50) ? rawProjectId : '';
 
   const rawDbId =
     getEnvVal('VITE_COMMUNITY_FIREBASE_DATABASE_ID') ||
-    getEnvVal('COMMUNITY_FIREBASE_DATABASE_ID') ||
-    getEnvVal('VITE_FIREBASE_DATABASE_ID') ||
-    getEnvVal('FIREBASE_DATABASE_ID');
+    getEnvVal('COMMUNITY_FIREBASE_DATABASE_ID');
   const firestoreDatabaseId = (rawDbId && !rawDbId.includes('{') && !rawDbId.includes('service_account') && rawDbId.length < 40)
     ? rawDbId
     : '(default)';
@@ -277,8 +276,6 @@ export const getResolvedCommunityFirebaseConfig = () => {
   const rawApiKey =
     getEnvVal('VITE_COMMUNITY_FIREBASE_API_KEY') ||
     getEnvVal('COMMUNITY_FIREBASE_API_KEY') ||
-    getEnvVal('VITE_FIREBASE_API_KEY') ||
-    getEnvVal('FIREBASE_API_KEY') ||
     '';
   const apiKey = (rawApiKey && rawApiKey.startsWith('AIza') && rawApiKey.length > 20)
     ? rawApiKey
@@ -287,8 +284,6 @@ export const getResolvedCommunityFirebaseConfig = () => {
   const rawAppId =
     getEnvVal('VITE_COMMUNITY_FIREBASE_APP_ID') ||
     getEnvVal('COMMUNITY_FIREBASE_APP_ID') ||
-    getEnvVal('VITE_FIREBASE_APP_ID') ||
-    getEnvVal('FIREBASE_APP_ID') ||
     '';
   const appId = (rawAppId && rawAppId.startsWith('1:') && rawAppId.length > 20)
     ? rawAppId
@@ -300,17 +295,14 @@ export const getResolvedCommunityFirebaseConfig = () => {
     apiKey,
     authDomain:
       getEnvVal('VITE_COMMUNITY_FIREBASE_AUTH_DOMAIN') ||
-      getEnvVal('VITE_FIREBASE_AUTH_DOMAIN') ||
       (projectId ? `${projectId}.firebaseapp.com` : ''),
     firestoreDatabaseId,
     storageBucket:
       getEnvVal('VITE_COMMUNITY_FIREBASE_STORAGE_BUCKET') ||
-      getEnvVal('VITE_FIREBASE_STORAGE_BUCKET') ||
       (projectId ? `${projectId}.firebasestorage.app` : ''),
     messagingSenderId:
       getEnvVal('VITE_COMMUNITY_FIREBASE_MESSAGING_ID') ||
       getEnvVal('VITE_COMMUNITY_FIREBASE_MESSAGING_SENDER_ID') ||
-      getEnvVal('VITE_FIREBASE_MESSAGING_SENDER_ID') ||
       '',
   };
 };

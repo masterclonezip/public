@@ -119,7 +119,7 @@ export const AppInspector = ({
 
         <div className="flex items-center gap-3.5 w-full">
           <img 
-            src={selectedApp.icon_url || 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=128&h=128&fit=crop'} 
+            src={selectedApp.icon_url || '/logo.png'} 
             loading="lazy"
             width={56}
             height={56}

@@ -26,18 +26,32 @@ export interface UseTurnstileVerificationOptions {
 const TURNSTILE_SCRIPT_SRC =
   'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 
-function ensureTurnstileScriptLoaded(): void {
+function ensureTurnstileScriptLoaded(forceReload = false): void {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
   if (window.turnstile) return;
   const existing = document.querySelector(
     'script[src*="challenges.cloudflare.com/turnstile/v0/api.js"]'
   );
-  if (existing) return;
+  if (existing) {
+    if (!forceReload) return;
+    try {
+      existing.remove();
+    } catch {
+      // Ignore removal error
+    }
+  }
   try {
     const s = document.createElement('script');
     s.src = TURNSTILE_SCRIPT_SRC;
     s.async = true;
     s.defer = true;
+    s.onerror = () => {
+      try {
+        s.remove();
+      } catch {
+        // Ignore removal error
+      }
+    };
     document.head.appendChild(s);
   } catch {
     // Ignore DOM injection errors
@@ -537,6 +551,7 @@ export function useTurnstileVerification({
         retryCountRef.current = 0;
         keyIndexRef.current = 0;
         failedSiteKeysRef.current.clear();
+        ensureTurnstileScriptLoaded(true);
       }
       void startSessionFlow(!manualReset);
     },

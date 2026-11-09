@@ -235,6 +235,19 @@ export default function UserReviews({
               <div className="text-center py-10 border border-dashed border-black/5 dark:border-white/10 rounded-2xl">
                 <span className="text-sm font-semibold text-zinc-400 dark:text-zinc-500">No community reviews yet. Be the first to share!</span>
               </div>
+            ) : displayedReviews.length === 0 ? (
+              <div className="text-center py-8 px-4 border border-dashed border-black/5 dark:border-white/10 rounded-2xl flex flex-col items-center gap-2.5">
+                <span className="text-xs sm:text-sm font-semibold text-zinc-500 dark:text-zinc-400">
+                  No {activeFilter === 'critical' ? 'critical (1–3 star)' : 'positive (4–5 star)'} reviews in the current view.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActiveFilter('all')}
+                  className="min-h-[36px] px-3.5 py-1.5 text-xs font-bold rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 transition-colors cursor-pointer"
+                >
+                  Show all reviews ({countAll})
+                </button>
+              </div>
             ) : (
               
               <div className="space-y-3">
@@ -257,7 +270,7 @@ export default function UserReviews({
                       type="button"
                       onClick={handleLoadMore}
                       disabled={loadingMore}
-                      className="px-6 py-2.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-xs uppercase tracking-wider rounded-xl transition-all disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-[0.98]"
+                      className="min-h-[42px] px-6 py-2.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-xs uppercase tracking-wider rounded-xl transition-all disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-[0.98]"
                     >
                       {loadingMore ? (
                         <>
