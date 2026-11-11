@@ -1,6 +1,136 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
+    <loc>https://yonoappdex.com/app/bingo-101</loc>
+    <lastmod>2026-11-11T13:51:19+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794040947/rj2x5dtvn0qsk1ict895.webp</image:loc>
+      <image:title>BINGO 101</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/jeet-spin</loc>
+    <lastmod>2026-11-11T13:50:42+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794328786/rgq6utau4hjyjpdtzgig.png</image:loc>
+      <image:title>JEET SPIN</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/jaiho-arcade</loc>
+    <lastmod>2026-11-11T13:49:59+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794324253/ebegrrpzrvc8juzsxb57.png</image:loc>
+      <image:title>JAIHO ARCADE</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/abc-rummy</loc>
+    <lastmod>2026-11-11T13:49:17+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794325341/vqkrxtnokavfpz33ao7c.webp</image:loc>
+      <image:title>ABC RUMMY</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/slots-spin</loc>
+    <lastmod>2026-11-11T13:47:04+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794329360/xalikbgto3zp6emkhas1.png</image:loc>
+      <image:title>SLOTS SPIN</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/boss-rummy</loc>
+    <lastmod>2026-11-11T13:46:26+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794328229/fcjhkc9vi7zrz3xtxifh.webp</image:loc>
+      <image:title>BOSS RUMMY</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/best-rummy</loc>
+    <lastmod>2026-11-11T13:45:54+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794329705/ywjwicdneyl9t5l4pxwn.png</image:loc>
+      <image:title>BEST RUMMY</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/yn-777</loc>
+    <lastmod>2026-11-10T18:32:14+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794333439/vsoypcp7xwrus6lz9nmd.webp</image:loc>
+      <image:title>YN 777</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/diwa-777</loc>
+    <lastmod>2026-11-10T18:30:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794334898/jjpgzbibh3m8ambfcxdo.webp</image:loc>
+      <image:title>DIWA 777</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/567-slots</loc>
+    <lastmod>2026-11-10T18:13:05+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794334017/u5u6ku7uvnavaghluxo6.webp</image:loc>
+      <image:title>567 SLOTS</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/dhan-game</loc>
+    <lastmod>2026-11-10T17:56:42+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794332836/hherdmhajalj6iogfpkj.webp</image:loc>
+      <image:title>DHAN GAME</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/rummy-zip</loc>
+    <lastmod>2026-11-10T17:40:14+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794331916/o5wppqb1h59ddc2vxnfd.webp</image:loc>
+      <image:title>RUMMY ZIP</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/mbm-bet</loc>
+    <lastmod>2026-11-10T15:40:25+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794324821/lspfzyxjpapssnrt4cqw.png</image:loc>
+      <image:title>MBM BET</image:title>
+    </image:image>
+  </url>
+  <url>
     <loc>https://yonoappdex.com/app/gogo-rummy</loc>
     <lastmod>2026-11-09T16:27:33+00:00</lastmod>
     <changefreq>weekly</changefreq>
@@ -8,16 +138,6 @@
     <image:image>
       <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794040627/b2rbqbpvjshpxcxhgvmv.png</image:loc>
       <image:title>GOGO RUMMY</image:title>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://yonoappdex.com/app/bingo-101</loc>
-    <lastmod>2026-11-09T16:25:09+00:00</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794040947/rj2x5dtvn0qsk1ict895.webp</image:loc>
-      <image:title>BINGO 101</image:title>
     </image:image>
   </url>
   <url>
