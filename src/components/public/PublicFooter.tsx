@@ -55,11 +55,11 @@ export function PublicFooter() {
   ];
 
   return (
-    <footer suppressHydrationWarning={true} className="w-full mt-8 sm:mt-12 bg-zinc-100 dark:bg-[#060913] text-zinc-600 dark:text-zinc-400 border-t border-zinc-200 dark:border-white/[0.08] transition-colors select-none">
-      <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+    <footer suppressHydrationWarning={true} className="w-full mt-6 sm:mt-10 bg-zinc-100 dark:bg-[#060913] text-zinc-600 dark:text-zinc-400 border-t border-zinc-200 dark:border-white/[0.08] transition-colors select-none">
+      <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-7">
         
         {/* Brand Header Line */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 pb-5 border-b border-zinc-200/80 dark:border-white/[0.08] mb-5 sm:mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 pb-4 border-b border-zinc-200/80 dark:border-white/[0.08] mb-4 sm:mb-6">
           <div className="flex items-center gap-2.5 flex-wrap">
             <Link 
               to="/" 
@@ -92,13 +92,12 @@ export function PublicFooter() {
         </div>
 
         {/* Compact 3-Column Navigation Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-5 sm:gap-8 mb-6 sm:mb-8 text-left">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-8 mb-5 sm:mb-7 text-left">
           
           {/* Column 1: Directory */}
-          <div className="flex flex-col gap-1.5">
-            <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-500" />
-              <span>Directory</span>
+          <div className="flex flex-col gap-0.5 sm:gap-1.5">
+            <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider mb-1">
+              Directory
             </h3>
             {directoryLinks.map((item, idx) => {
               const IconComponent = item.icon;
@@ -106,7 +105,7 @@ export function PublicFooter() {
                 <Link
                   key={`dir-${idx}`}
                   to={item.to}
-                  className="inline-flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-white py-0.5 transition-colors group"
+                  className="inline-flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-white py-1 sm:py-0.5 min-h-[32px] sm:min-h-0 transition-colors group"
                 >
                   <IconComponent className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 group-hover:text-cyan-500 dark:group-hover:text-cyan-400 transition-colors shrink-0" />
                   <span className="truncate">{item.label}</span>
@@ -116,10 +115,9 @@ export function PublicFooter() {
           </div>
 
           {/* Column 2: Compliance & Legal */}
-          <div className="flex flex-col gap-1.5">
-            <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span>Compliance</span>
+          <div className="flex flex-col gap-0.5 sm:gap-1.5">
+            <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider mb-1">
+              Compliance
             </h3>
             {complianceLinks.map((item, idx) => {
               const IconComponent = item.icon;
@@ -127,7 +125,7 @@ export function PublicFooter() {
                 <Link
                   key={`comp-${idx}`}
                   to={item.to}
-                  className="inline-flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-white py-0.5 transition-colors group"
+                  className="inline-flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-white py-1 sm:py-0.5 min-h-[32px] sm:min-h-0 transition-colors group"
                 >
                   <IconComponent className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 group-hover:text-emerald-500 dark:group-hover:text-emerald-400 transition-colors shrink-0" />
                   <span className="truncate">{item.label}</span>
@@ -137,10 +135,9 @@ export function PublicFooter() {
           </div>
 
           {/* Column 3: Company */}
-          <div className="flex flex-col gap-1.5 col-span-2 sm:col-span-1">
-            <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-              <span>Company</span>
+          <div className="flex flex-col gap-0.5 sm:gap-1.5 col-span-2 sm:col-span-1">
+            <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider mb-1">
+              Company
             </h3>
             {companyLinks.map((item, idx) => {
               const IconComponent = item.icon;
@@ -148,7 +145,7 @@ export function PublicFooter() {
                 <Link
                   key={`comp-co-${idx}`}
                   to={item.to}
-                  className="inline-flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-white py-0.5 transition-colors group"
+                  className="inline-flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-white py-1 sm:py-0.5 min-h-[32px] sm:min-h-0 transition-colors group"
                 >
                   <IconComponent className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 group-hover:text-purple-500 dark:group-hover:text-purple-400 transition-colors shrink-0" />
                   <span className="truncate">{item.label}</span>
@@ -161,20 +158,20 @@ export function PublicFooter() {
 
         {/* Bottom Bar: Copyright & Social Links */}
         <div className="pt-4 border-t border-zinc-200/80 dark:border-white/[0.08] flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-500 text-center sm:text-left">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center sm:text-left">
             &copy; {new Date().getFullYear()} <span className="font-semibold text-zinc-700 dark:text-zinc-300">{siteTitle}</span>. All rights reserved.
           </p>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             {settings?.social_links?.facebook ? (
               <a 
                 aria-label="Facebook" 
                 href={settings.social_links.facebook} 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="w-7 h-7 rounded-full bg-zinc-200 dark:bg-white/[0.06] hover:bg-blue-600 text-zinc-600 dark:text-zinc-300 hover:text-white flex items-center justify-center transition-all"
+                className="w-9 h-9 rounded-full bg-zinc-200 dark:bg-white/[0.06] hover:bg-blue-600 text-zinc-600 dark:text-zinc-300 hover:text-white flex items-center justify-center transition-all"
               >
-                <Facebook className="w-3.5 h-3.5 fill-current" />
+                <Facebook className="w-4 h-4 fill-current" />
               </a>
             ) : (
               <a 
@@ -182,9 +179,9 @@ export function PublicFooter() {
                 href="https://facebook.com" 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="w-7 h-7 rounded-full bg-zinc-200 dark:bg-white/[0.06] hover:bg-blue-600 text-zinc-600 dark:text-zinc-300 hover:text-white flex items-center justify-center transition-all"
+                className="w-9 h-9 rounded-full bg-zinc-200 dark:bg-white/[0.06] hover:bg-blue-600 text-zinc-600 dark:text-zinc-300 hover:text-white flex items-center justify-center transition-all"
               >
-                <Facebook className="w-3.5 h-3.5 fill-current" />
+                <Facebook className="w-4 h-4 fill-current" />
               </a>
             )}
 
@@ -194,9 +191,9 @@ export function PublicFooter() {
                 href={settings.social_links.instagram} 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="w-7 h-7 rounded-full bg-zinc-200 dark:bg-white/[0.06] hover:bg-pink-600 text-zinc-600 dark:text-zinc-300 hover:text-white flex items-center justify-center transition-all"
+                className="w-9 h-9 rounded-full bg-zinc-200 dark:bg-white/[0.06] hover:bg-pink-600 text-zinc-600 dark:text-zinc-300 hover:text-white flex items-center justify-center transition-all"
               >
-                <Instagram className="w-3.5 h-3.5" />
+                <Instagram className="w-4 h-4" />
               </a>
             ) : (
               <a 
@@ -204,9 +201,9 @@ export function PublicFooter() {
                 href="https://instagram.com" 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="w-7 h-7 rounded-full bg-zinc-200 dark:bg-white/[0.06] hover:bg-pink-600 text-zinc-600 dark:text-zinc-300 hover:text-white flex items-center justify-center transition-all"
+                className="w-9 h-9 rounded-full bg-zinc-200 dark:bg-white/[0.06] hover:bg-pink-600 text-zinc-600 dark:text-zinc-300 hover:text-white flex items-center justify-center transition-all"
               >
-                <Instagram className="w-3.5 h-3.5" />
+                <Instagram className="w-4 h-4" />
               </a>
             )}
 
@@ -216,9 +213,9 @@ export function PublicFooter() {
                 href={settings.social_links.youtube} 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="w-7 h-7 rounded-full bg-zinc-200 dark:bg-white/[0.06] hover:bg-red-600 text-zinc-600 dark:text-zinc-300 hover:text-white flex items-center justify-center transition-all"
+                className="w-9 h-9 rounded-full bg-zinc-200 dark:bg-white/[0.06] hover:bg-red-600 text-zinc-600 dark:text-zinc-300 hover:text-white flex items-center justify-center transition-all"
               >
-                <Youtube className="w-3.5 h-3.5 fill-current" />
+                <Youtube className="w-4 h-4 fill-current" />
               </a>
             ) : (
               <a 
@@ -226,9 +223,9 @@ export function PublicFooter() {
                 href="https://youtube.com" 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="w-7 h-7 rounded-full bg-zinc-200 dark:bg-white/[0.06] hover:bg-red-600 text-zinc-600 dark:text-zinc-300 hover:text-white flex items-center justify-center transition-all"
+                className="w-9 h-9 rounded-full bg-zinc-200 dark:bg-white/[0.06] hover:bg-red-600 text-zinc-600 dark:text-zinc-300 hover:text-white flex items-center justify-center transition-all"
               >
-                <Youtube className="w-3.5 h-3.5 fill-current" />
+                <Youtube className="w-4 h-4 fill-current" />
               </a>
             )}
 
@@ -238,9 +235,9 @@ export function PublicFooter() {
                 href={settings.social_links.twitter} 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="w-7 h-7 rounded-full bg-zinc-200 dark:bg-white/[0.06] hover:bg-sky-500 text-zinc-600 dark:text-zinc-300 hover:text-white flex items-center justify-center transition-all"
+                className="w-9 h-9 rounded-full bg-zinc-200 dark:bg-white/[0.06] hover:bg-sky-500 text-zinc-600 dark:text-zinc-300 hover:text-white flex items-center justify-center transition-all"
               >
-                <Twitter className="w-3.5 h-3.5 fill-current" />
+                <Twitter className="w-4 h-4 fill-current" />
               </a>
             )}
 
@@ -250,9 +247,9 @@ export function PublicFooter() {
                 href={settings.social_links.linkedin} 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="w-7 h-7 rounded-full bg-zinc-200 dark:bg-white/[0.06] hover:bg-blue-700 text-zinc-600 dark:text-zinc-300 hover:text-white flex items-center justify-center transition-all"
+                className="w-9 h-9 rounded-full bg-zinc-200 dark:bg-white/[0.06] hover:bg-blue-700 text-zinc-600 dark:text-zinc-300 hover:text-white flex items-center justify-center transition-all"
               >
-                <Linkedin className="w-3.5 h-3.5 fill-current" />
+                <Linkedin className="w-4 h-4 fill-current" />
               </a>
             )}
           </div>

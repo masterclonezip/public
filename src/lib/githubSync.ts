@@ -88,11 +88,10 @@ export function compileCanonicalApp(app: any, options?: { stripDownloadLinks?: b
   copy.seo_title = cleanTitle;
   copy.meta_title = cleanTitle;
 
-  if (typeof copy.canonical_url === 'string' && copy.canonical_url.trim()) {
-    copy.canonical_url = copy.canonical_url
-      .trim()
-      .replace(/^http:\/\/(?!localhost|127\.0\.0\.1)/i, 'https://')
-      .replace(/^(https?:\/\/)(?:www\.|admin\.|masterworld\.)+/i, '$1');
+  if (copy.slug) {
+    copy.canonical_url = `/app/${copy.slug}`;
+  } else {
+    delete copy.canonical_url;
   }
 
   // Keep seo_description and meta_description strictly synchronized
@@ -141,11 +140,10 @@ export function compileCanonicalNews(item: any, siteTitle?: string): any {
   if (typeof copy.id === 'string') {
     copy.id = copy.id.trim();
   }
-  if (typeof copy.canonical_url === 'string' && copy.canonical_url.trim()) {
-    copy.canonical_url = copy.canonical_url
-      .trim()
-      .replace(/^http:\/\/(?!localhost|127\.0\.0\.1)/i, 'https://')
-      .replace(/^(https?:\/\/)(?:www\.|admin\.|masterworld\.)+/i, '$1');
+  if (copy.slug) {
+    copy.canonical_url = `/news/${copy.slug}`;
+  } else {
+    delete copy.canonical_url;
   }
   if (typeof copy.title === 'string' && copy.title.trim()) {
     copy.title = formatPageTitle(copy.title, copy.title.trim(), siteTitle);
@@ -245,7 +243,7 @@ export function generateCommunityReviewsFileCode(reviews: any[] = []): string {
  */
 export function sanitizePublicSettings(settings: any): any {
   if (!settings || typeof settings !== 'object') return {};
-  const copy = JSON.parse(JSON.stringify(settings));
+  const copy = cleanSettingsMetaTitles(JSON.parse(JSON.stringify(settings)));
   delete copy.turnstile_secret_key;
   delete copy.turnstile_site_key;
   delete copy.admin_password;
@@ -336,19 +334,23 @@ export function generateStaticDataFileCode(
   const cleanSettings = sanitizePublicSettings(
     cleanSettingsMetaTitles(ensureDefaultSettings({ ...defaultSettings, ...JSON.parse(JSON.stringify(settings || {})) }))
   );
-  const cleanNews = (news || []).map((item: any) => compileCanonicalNews(item, siteTitle));
-  const cleanVideos = JSON.parse(JSON.stringify(videos || [])).map((v: any) => {
-    if (!v || typeof v !== 'object') return v;
-    const rawSeoTitle = (v.seo_title !== undefined ? v.seo_title : (v.meta_title || '')).trim();
-    const cleanVideoSeoTitle = rawSeoTitle ? formatPageTitle(rawSeoTitle, '', siteTitle) : '';
-    return {
-      ...v,
-      ...(typeof v.title === 'string' && v.title.trim() ? { title: formatPageTitle(v.title, v.title.trim(), siteTitle) } : {}),
-      ...(rawSeoTitle || v.seo_title !== undefined || v.meta_title !== undefined
-        ? { seo_title: cleanVideoSeoTitle, meta_title: cleanVideoSeoTitle }
-        : {})
-    };
-  });
+  const cleanNews = (news || [])
+    .filter(isPublicReadyNews)
+    .map((item: any) => compileCanonicalNews(item, siteTitle));
+  const cleanVideos = JSON.parse(JSON.stringify(videos || []))
+    .filter((v: any) => v && v.sync_to_public !== false && v.sync_to_public !== 'false' && v.is_published !== false && v.is_draft !== true)
+    .map((v: any) => {
+      if (!v || typeof v !== 'object') return v;
+      const rawSeoTitle = (v.seo_title !== undefined ? v.seo_title : (v.meta_title || '')).trim();
+      const cleanVideoSeoTitle = rawSeoTitle ? formatPageTitle(rawSeoTitle, '', siteTitle) : '';
+      return {
+        ...v,
+        ...(typeof v.title === 'string' && v.title.trim() ? { title: formatPageTitle(v.title, v.title.trim(), siteTitle) } : {}),
+        ...(rawSeoTitle || v.seo_title !== undefined || v.meta_title !== undefined
+          ? { seo_title: cleanVideoSeoTitle, meta_title: cleanVideoSeoTitle }
+          : {})
+      };
+    });
 
   return `// No secureStorage import to avoid Vercel build errors when secureStorage is stripped
 
@@ -461,6 +463,8 @@ export interface NewsItem {
   is_new?: boolean;
   is_pinned?: boolean;
   sync_to_public?: boolean;
+  is_published?: boolean;
+  is_draft?: boolean;
 }
 
 export interface AppConfig {
@@ -521,13 +525,19 @@ export interface VideoItem {
   title: string;
   description: string;
   youtube_url: string;
+  thumbnail_url?: string;
+  image_url?: string;
   seo_title: string;
+  meta_title?: string;
   seo_description: string;
   meta_description?: string;
   seo_keywords?: string;
   canonical_url?: string;
   og_image_url?: string;
   created_at: string;
+  sync_to_public?: boolean;
+  is_published?: boolean;
+  is_draft?: boolean;
 }
 
 export const mockApps: any[] = ${JSON.stringify(cleanApps, null, 2)};

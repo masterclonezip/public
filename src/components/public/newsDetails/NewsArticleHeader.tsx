@@ -24,12 +24,14 @@ export const NewsArticleHeader: React.FC<NewsArticleHeaderProps> = ({
   copied,
   onShare
 }) => {
+  const [heroError, setHeroError] = React.useState(false);
+
   return (
     <>
-      <div className="flex items-center justify-between gap-3 px-1 sm:px-4 mb-4">
+      <div className="flex items-center justify-between gap-3 px-0 sm:px-4 mb-4">
         <Link 
           to="/news" 
-          className="inline-flex items-center gap-2 text-xs xs:text-sm font-medium text-blue-500 hover:text-blue-600 transition-colors group shrink-0"
+          className="inline-flex items-center gap-2 min-h-[40px] py-1 text-xs xs:text-sm font-medium text-blue-500 hover:text-blue-600 transition-colors group shrink-0"
         >
           <div className="p-1.5 rounded-full bg-blue-50 dark:bg-blue-900/20 group-hover:-translate-x-1 transition-transform">
             <ArrowLeft className="w-4 h-4" />
@@ -40,7 +42,7 @@ export const NewsArticleHeader: React.FC<NewsArticleHeaderProps> = ({
         <button
           type="button"
           onClick={onShare}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-zinc-700 dark:text-zinc-200 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-all border border-black/5 dark:border-white/10 shrink-0 cursor-pointer"
+          className="inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-1.5 rounded-full text-xs font-semibold text-zinc-700 dark:text-zinc-200 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-all border border-black/5 dark:border-white/10 shrink-0 cursor-pointer"
           title="Share article"
         >
           {copied ? (
@@ -57,11 +59,11 @@ export const NewsArticleHeader: React.FC<NewsArticleHeaderProps> = ({
         </button>
       </div>
 
-      <header className="mb-4 text-left px-1 sm:px-4">
+      <header className="mb-4 text-left px-0 sm:px-4">
         <div className="flex flex-wrap items-center gap-2 mb-2 text-xs">
           <Link
             to={`/news?category=${encodeURIComponent(category)}`}
-            className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors no-underline"
+            className="inline-flex items-center min-h-[26px] px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors no-underline"
           >
             {category}
           </Link>
@@ -90,7 +92,7 @@ export const NewsArticleHeader: React.FC<NewsArticleHeaderProps> = ({
         </div>
       </header>
 
-      {logoUrl && (
+      {logoUrl && !heroError && (
         <div className="w-full aspect-video max-h-[420px] overflow-hidden mb-5 sm:mb-6 rounded-2xl bg-zinc-100 dark:bg-zinc-800/80 border border-black/5 dark:border-white/5 relative">
           <img 
             src={getOptimizedImageUrl(logoUrl, 800) || logoUrl} 
@@ -102,6 +104,7 @@ export const NewsArticleHeader: React.FC<NewsArticleHeaderProps> = ({
             loading="eager"
             fetchPriority="high"
             decoding="async"
+            onError={() => setHeroError(true)}
             className="w-full h-full object-cover block rounded-2xl"
           />
         </div>

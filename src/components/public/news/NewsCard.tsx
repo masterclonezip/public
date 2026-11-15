@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Clock, Calendar, Pin, Share2 } from 'lucide-react';
 import { getOptimizedImageUrl } from '../../../seo/utils';
@@ -12,6 +12,7 @@ interface NewsCardProps {
 
 function NewsCardComponent({ item, index, onShare }: NewsCardProps) {
   const navigate = useNavigate();
+  const [imgError, setImgError] = useState(false);
   const coverImage = item.og_image_url || item.image_url || item.logo_url || item.image || '';
   const optimizedCover = coverImage ? (getOptimizedImageUrl(coverImage, 600) || coverImage) : '';
   const readingTime = calculateReadingTime(item.content || item.description_html || item.description);
@@ -39,7 +40,7 @@ function NewsCardComponent({ item, index, onShare }: NewsCardProps) {
         className="relative w-full aspect-[16/9] overflow-hidden bg-zinc-100 dark:bg-zinc-800/60 block shrink-0 no-underline"
         aria-label={`Read full news article: ${item.title || 'News Article'}`}
       >
-        {optimizedCover ? (
+        {optimizedCover && !imgError ? (
           <img 
             src={optimizedCover} 
             alt={item.title || 'News article thumbnail'} 
@@ -48,6 +49,7 @@ function NewsCardComponent({ item, index, onShare }: NewsCardProps) {
             decoding="async"
             width={600}
             height={338}
+            onError={() => setImgError(true)}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500/10 to-indigo-500/10">
@@ -96,15 +98,15 @@ function NewsCardComponent({ item, index, onShare }: NewsCardProps) {
         </Link>
 
         {snippet && (
-          <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 line-clamp-3 leading-relaxed mb-4 flex-1">
+          <p className="text-[13px] sm:text-sm text-zinc-600 dark:text-zinc-400 line-clamp-3 leading-relaxed mb-4 flex-1">
             {snippet}
           </p>
         )}
 
-        <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between text-xs font-semibold mt-auto">
+        <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between text-xs font-semibold mt-auto">
           <Link 
             to={articleUrl}
-            className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 no-underline"
+            className="min-h-[38px] text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 no-underline"
           >
             <span>Read Article →</span>
           </Link>
@@ -115,11 +117,11 @@ function NewsCardComponent({ item, index, onShare }: NewsCardProps) {
               e.stopPropagation();
               onShare(item);
             }}
-            className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+            className="w-10 h-10 -mr-1.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-colors cursor-pointer"
             title="Share article"
             aria-label="Share article"
           >
-            <Share2 className="w-3.5 h-3.5" />
+            <Share2 className="w-4 h-4" />
           </button>
         </div>
       </div>

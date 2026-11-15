@@ -95,23 +95,27 @@ export async function buildJsonLdSchema(params: BuildSchemaParams): Promise<stri
       const feed = seoFeed || await fetchSEOReviewsForApp(appIdentifier, getField(app, 'slug'), clampedRating, name);
       if (feed && Array.isArray(feed.reviews) && feed.reviews.length > 0) {
         validReviews = feed.reviews
-          .filter((rev: any) => rev && stripHtml(rev.reviewText || '').trim().length >= 3)
+          .filter((rev: any) => rev && stripHtml(rev.reviewText || rev.comment || '').trim().length >= 3)
           .slice(0, 10)
-          .map((rev: any) => ({
-            "@type": "Review",
-            "author": {
-              "@type": "Person",
-              "name": rev.userName ? String(rev.userName).trim() : 'Verified Player'
-            },
-            "datePublished": (rev.timestamp ? new Date(rev.timestamp).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
-            "reviewBody": stripHtml(rev.reviewText || '').trim(),
-            "reviewRating": {
-              "@type": "Rating",
-              "ratingValue": Math.max(1, Math.min(5, Number(rev.rating) || 5)),
-              "bestRating": 5,
-              "worstRating": 1
-            }
-          }));
+          .map((rev: any) => {
+            const rawAuthor = rev.userName || rev.username;
+            const revDateRaw = rev.created_at || rev.timestamp;
+            return {
+              "@type": "Review",
+              "author": {
+                "@type": "Person",
+                "name": rawAuthor && String(rawAuthor).trim() ? String(rawAuthor).trim() : 'Player'
+              },
+              "datePublished": normalizeIsoDate(revDateRaw, '2026-09-01T00:00:00+05:30').split('T')[0],
+              "reviewBody": stripHtml(rev.reviewText || rev.comment || '').trim(),
+              "reviewRating": {
+                "@type": "Rating",
+                "ratingValue": Math.max(1, Math.min(5, Number(rev.rating) || 5)),
+                "bestRating": 5,
+                "worstRating": 1
+              }
+            };
+          });
       }
     } catch (_) {}
 
@@ -227,7 +231,7 @@ export async function buildJsonLdSchema(params: BuildSchemaParams): Promise<stri
     const rawDatePublished = getField(item, 'published_at') || getField(item, 'publish_date') || getField(item, 'created_at') || getField(item, 'date') || '2026-09-01T00:00:00.000Z';
     const datePublished = normalizeIsoDate(rawDatePublished);
     const dateModified = normalizeIsoDate(getField(item, 'updated_at') || rawDatePublished, datePublished);
-    const authorName = getField(item, 'author') || getField(item, 'ceo_name') || 'Editorial Team';
+    const authorName = getField(item, 'ceo_name') || getField(item, 'author') || 'Editorial Team';
 
     const rawNewsImg = getField(item, 'og_image_url') || getField(item, 'image_url') || getField(item, 'logo_url') || params.logoUrl;
     const newsImg = optimizeImageUrl(rawNewsImg, 1200) || rawNewsImg;
@@ -308,15 +312,59 @@ export async function buildJsonLdSchema(params: BuildSchemaParams): Promise<stri
   } else if (params.pageType === 'video' && params.videoItem) {
     const v = params.videoItem;
     const youtubeUrl = getField(v, 'youtube_url') || getField(v, 'video_url') || getField(v, 'url');
+    const ytMatch = String(youtubeUrl || '').match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|shorts\/|live\/|watch\?v=|watch\?.+&v=))([^&?\s]+)/);
+    const ytId = ytMatch && ytMatch[1] ? ytMatch[1] : '';
+    const embedUrl = ytId ? `https://www.youtube.com/embed/${ytId}` : undefined;
     const uploadDate = normalizeIsoDate(getField(v, 'updated_at') || getField(v, 'created_at') || getField(v, 'published_at') || getField(v, 'date'));
+    const videoUrl = params.url || `${hostOrigin}/videos/${getField(v, 'slug') || getField(v, 'id')}`;
+    const videoTitle = getField(v, 'seo_title') || getField(v, 'meta_title') || getField(v, 'title');
+    const videoDesc = cleanSeoDescription(
+      getField(v, 'seo_description') || getField(v, 'meta_description') || getField(v, 'description') || videoTitle
+    );
+    const thumb =
+      getField(v, 'og_image_url') ||
+      getField(v, 'thumbnail_url') ||
+      getField(v, 'image_url') ||
+      getYoutubeThumbnail(youtubeUrl) ||
+      params.logoUrl;
+    const sameOriginLogo = hostOrigin ? `${hostOrigin}/logo.png` : (params.logoUrl || '/logo.png');
+
     schemas.push({
       "@context": "https://schema.org",
       "@type": "VideoObject",
-      "name": getField(v, 'title'),
-      "description": getField(v, 'description') || getField(v, 'title'),
-      "thumbnailUrl": getYoutubeThumbnail(youtubeUrl) || params.logoUrl,
+      "@id": `${videoUrl}#video`,
+      "name": videoTitle,
+      "description": videoDesc,
+      "thumbnailUrl": thumb,
       "uploadDate": uploadDate,
-      "contentUrl": youtubeUrl
+      "url": videoUrl,
+      ...(youtubeUrl ? { "contentUrl": youtubeUrl } : {}),
+      ...(embedUrl ? { "embedUrl": embedUrl } : {}),
+      "publisher": {
+        "@type": "Organization",
+        "@id": `${hostOrigin}/#organization`,
+        "name": params.siteTitle,
+        "url": hostOrigin,
+        "logo": {
+          "@type": "ImageObject",
+          "url": sameOriginLogo,
+          "width": 512,
+          "height": 512
+        }
+      }
+    });
+    schemas.push({
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "@id": `${videoUrl}#webpage`,
+      "url": videoUrl,
+      "name": params.title || videoTitle,
+      "headline": params.title || videoTitle,
+      "description": videoDesc,
+      "inLanguage": "en",
+      "mainEntity": {
+        "@id": `${videoUrl}#video`
+      }
     });
     schemas.push({
       "@context": "https://schema.org",
@@ -338,7 +386,7 @@ export async function buildJsonLdSchema(params: BuildSchemaParams): Promise<stri
           "@type": "ListItem",
           "position": 3,
           "name": getField(v, 'title'),
-          "item": `${hostOrigin}/videos/${getField(v, 'slug')}`
+          "item": videoUrl
         }
       ]
     });

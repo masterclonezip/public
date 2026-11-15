@@ -12,8 +12,13 @@ interface AppScreenshotsProps {
 export default function AppScreenshots({ app }: AppScreenshotsProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const totalCount = app.screenshots?.length || 0;
+
+  const markImageFailed = (idx: number) => {
+    setFailedImages((prev) => (prev[idx] ? prev : { ...prev, [idx]: true }));
+  };
 
   const openLightbox = (index: number) => {
     setCurrentIndex(index);
@@ -86,28 +91,31 @@ export default function AppScreenshots({ app }: AppScreenshotsProps) {
   return (
     <div className="w-full mb-6">
       {/* Inline Gallery */}
-      <div className="flex overflow-x-auto hide-scrollbar gap-3 px-4 sm:px-0 pb-3 snap-x items-center -mx-4 sm:-mx-0">
+      <div className="flex overflow-x-auto hide-scrollbar gap-3 px-2.5 sm:px-4 md:px-6 pb-3 snap-x items-center -mx-2.5 sm:mx-0">
         {app.video_url && (
           <YouTubePlayer videoUrl={app.video_url} />
         )}
         {app.screenshots && app.screenshots.map((imgUrl, i) => (
-          <button 
-            type="button"
-            key={`screenshot-${i}`} 
-            onClick={() => openLightbox(i)}
-            className="flex-none w-[150px] sm:w-[220px] aspect-[9/16] rounded-xl overflow-hidden snap-center bg-zinc-100 dark:bg-zinc-800 shadow-sm border border-black/5 dark:border-white/10 active:scale-95 transition-transform cursor-pointer"
-            aria-label={`View screenshot ${i + 1} fullscreen`}
-          >
-            <img 
-              src={getOptimizedImageUrl(imgUrl, 400)} 
-              alt={`${app.name} screenshot ${i + 1} - gameplay preview`} 
-              width={150}
-              height={267}
-              loading="lazy" 
-              decoding="async"
-              className="w-full h-full object-cover select-none pointer-events-none" 
-            />
-          </button>
+          failedImages[i] ? null : (
+            <button 
+              type="button"
+              key={`screenshot-${i}`} 
+              onClick={() => openLightbox(i)}
+              className="flex-none w-[150px] sm:w-[220px] aspect-[9/16] rounded-xl overflow-hidden snap-center bg-zinc-100 dark:bg-zinc-800 shadow-sm border border-black/5 dark:border-white/10 active:scale-95 transition-transform cursor-pointer"
+              aria-label={`View screenshot ${i + 1} fullscreen`}
+            >
+              <img 
+                src={getOptimizedImageUrl(imgUrl, 400)} 
+                alt={`${app.name} screenshot ${i + 1} - gameplay preview`} 
+                width={150}
+                height={267}
+                loading="lazy" 
+                decoding="async"
+                onError={() => markImageFailed(i)}
+                className="w-full h-full object-cover select-none pointer-events-none" 
+              />
+            </button>
+          )
         ))}
       </div>
 
@@ -121,27 +129,27 @@ export default function AppScreenshots({ app }: AppScreenshotsProps) {
           style={{ position: 'fixed' }}
         >
           {/* Header */}
-          <div className="absolute top-0 inset-x-0 flex justify-between items-center p-4 text-zinc-900 dark:text-zinc-100 z-20 pointer-events-none">
-            <span className="font-semibold text-sm px-3 py-1 rounded-full bg-black/5 dark:bg-white/10 backdrop-blur-md">
+          <div className="absolute top-0 inset-x-0 flex justify-between items-center px-4 pb-3 pt-[max(1rem,env(safe-area-inset-top))] text-zinc-900 dark:text-zinc-100 z-20 pointer-events-none">
+            <span className="font-semibold text-sm px-3.5 py-1.5 rounded-full bg-black/5 dark:bg-white/10 backdrop-blur-md">
               {currentIndex + 1} / {app.screenshots.length}
             </span>
             <button 
               type="button"
               onClick={closeLightbox}
-              className="p-2.5 rounded-full bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors pointer-events-auto cursor-pointer active:scale-95"
+              className="w-11 h-11 flex items-center justify-center rounded-full bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors pointer-events-auto cursor-pointer active:scale-95"
               aria-label="Close gallery"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Desktop/Tablet Prev & Next Controls */}
+          {/* Mobile & Desktop Prev/Next Controls */}
           {app.screenshots.length > 1 && (
             <>
               <button
                 type="button"
                 onClick={() => scrollToIndex(currentIndex - 1)}
-                className="hidden sm:flex items-center justify-center absolute left-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20 text-zinc-900 dark:text-white transition-all cursor-pointer active:scale-95"
+                className="flex items-center justify-center absolute left-3 sm:left-4 bottom-[max(1.25rem,env(safe-area-inset-bottom))] sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 z-20 w-11 h-11 rounded-full bg-black/10 dark:bg-white/15 hover:bg-black/20 dark:hover:bg-white/25 backdrop-blur-md text-zinc-900 dark:text-white transition-all cursor-pointer active:scale-95"
                 aria-label="Previous screenshot"
               >
                 <ChevronLeft className="w-6 h-6" />
@@ -149,7 +157,7 @@ export default function AppScreenshots({ app }: AppScreenshotsProps) {
               <button
                 type="button"
                 onClick={() => scrollToIndex(currentIndex + 1)}
-                className="hidden sm:flex items-center justify-center absolute right-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20 text-zinc-900 dark:text-white transition-all cursor-pointer active:scale-95"
+                className="flex items-center justify-center absolute right-3 sm:right-4 bottom-[max(1.25rem,env(safe-area-inset-bottom))] sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 z-20 w-11 h-11 rounded-full bg-black/10 dark:bg-white/15 hover:bg-black/20 dark:hover:bg-white/25 backdrop-blur-md text-zinc-900 dark:text-white transition-all cursor-pointer active:scale-95"
                 aria-label="Next screenshot"
               >
                 <ChevronRight className="w-6 h-6" />
@@ -167,16 +175,26 @@ export default function AppScreenshots({ app }: AppScreenshotsProps) {
               <div 
                 key={`full-screenshot-${i}`}
                 onClick={closeLightbox}
-                className="flex-none w-screen h-[100dvh] snap-center flex items-center justify-center p-2 sm:p-8"
+                className="flex-none w-screen h-[100dvh] snap-center flex items-center justify-center p-4 sm:p-8"
               >
-                <img 
-                  src={getOptimizedImageUrl(imgUrl, 1200)} 
-                  alt={`${app.name} screenshot ${i + 1} - gameplay preview`} 
-                  onClick={(e) => e.stopPropagation()}
-                  className="max-w-full max-h-[88vh] object-contain rounded-xl shadow-lg border border-black/5 dark:border-white/5 select-none"
-                  loading={i === currentIndex ? "eager" : "lazy"}
-                  draggable={false}
-                />
+                {failedImages[i] ? (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="px-6 py-8 rounded-2xl bg-zinc-100 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 text-sm font-medium border border-black/5 dark:border-white/10"
+                  >
+                    Preview image unavailable
+                  </div>
+                ) : (
+                  <img 
+                    src={getOptimizedImageUrl(imgUrl, 1200)} 
+                    alt={`${app.name} screenshot ${i + 1} - gameplay preview`} 
+                    onClick={(e) => e.stopPropagation()}
+                    onError={() => markImageFailed(i)}
+                    className="max-w-full max-h-[82dvh] sm:max-h-[88vh] object-contain rounded-xl shadow-lg border border-black/5 dark:border-white/5 select-none"
+                    loading={i === currentIndex ? "eager" : "lazy"}
+                    draggable={false}
+                  />
+                )}
               </div>
             ))}
           </div>

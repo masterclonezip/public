@@ -494,9 +494,10 @@ export function optimizeInitialDataForRoute(
   }
 
   // Optimized Videos: Only include on Home and Video routes to keep initial HTML and JSON.parse ultra-light across all other pages
-  const isVideoPage = cleanPathLower === '/videos' || cleanPathLower.startsWith('/videos/');
+  const isVideoPage = cleanPathLower === '/videos' || cleanPathLower.startsWith('/videos/') || cleanPathLower.startsWith('/video/');
   const rawVideos = (isHomePage || isVideoPage)
     ? (Array.isArray(data.videos) ? data.videos : (Array.isArray(data.mockVideos) ? data.mockVideos : []))
+        .filter((v: any) => v && v.sync_to_public !== false && v.sync_to_public !== 'false' && v.is_published !== false && v.is_draft !== true)
     : [];
   const optimizedVideos: any[] = rawVideos.map((item: any) => {
     if (!item) return null;

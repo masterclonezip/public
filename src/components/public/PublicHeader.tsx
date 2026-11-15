@@ -18,9 +18,7 @@ export function PublicHeader() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
-  const { scrollDirection, scrolled } = useScrollDirection();
-  
-  const isHeaderHidden = scrollDirection === 'down' && !menuOpen && !searchOpen;
+  const { scrolled } = useScrollDirection();
 
   const resolvedLogoUrl = resolveSiteLogoUrl(settings);
   const triggerHaptic = () => {
@@ -65,11 +63,11 @@ export function PublicHeader() {
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-        const target = e.target as HTMLElement | null;
-        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
-          return;
-        }
+      const target = e.target as HTMLElement | null;
+      const isEditable = Boolean(target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable));
+      if (isEditable) return;
+
+      if (((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') || (!e.metaKey && !e.ctrlKey && !e.altKey && e.key === '/')) {
         e.preventDefault();
         if (apps.length < 25 && fetchApps) fetchApps();
         setSearchOpen(true);
@@ -91,16 +89,14 @@ export function PublicHeader() {
     <>
       <header 
         suppressHydrationWarning={true}
-        className={`sticky top-0 z-50 transition-transform duration-200 ease-out will-change-transform ${
-          isHeaderHidden ? '-translate-y-full pointer-events-none' : 'translate-y-0 pointer-events-auto'
-        } ${
+        className={`sticky top-0 z-50 h-14 sm:h-16 flex items-center transition-shadow duration-200 ${
           scrolled 
-            ? 'bg-white dark:bg-[#090d16] sm:bg-white/95 sm:dark:bg-[#090d16]/95 border-b border-black/10 dark:border-white/10 shadow-sm py-2' 
-            : 'bg-white dark:bg-[#090d16] sm:bg-white/90 sm:dark:bg-[#090d16]/90 border-b border-black/5 dark:border-white/10 py-2.5 sm:py-3'
+            ? 'bg-white dark:bg-[#090d16] sm:bg-white/95 sm:dark:bg-[#090d16]/95 border-b border-black/10 dark:border-white/10 shadow-sm' 
+            : 'bg-white dark:bg-[#090d16] sm:bg-white/90 sm:dark:bg-[#090d16]/90 border-b border-black/5 dark:border-white/10'
         }`}
       >
-        <div className="w-full max-w-7xl px-1.5 xxs:px-2.5 xs:px-4 sm:px-6 lg:px-8 mx-auto relative flex justify-between items-center">
-          <Link to="/" onClick={triggerHaptic} className="flex items-center gap-1 xxs:gap-1.5 xs:gap-2.5 sm:gap-3 group min-w-0">
+        <div className="w-full max-w-7xl px-2.5 sm:px-6 lg:px-8 mx-auto relative flex justify-between items-center gap-2">
+          <Link to="/" onClick={triggerHaptic} className="flex items-center gap-2 sm:gap-3 group min-w-0">
             <div className="p-0 transition-transform group-hover:scale-[1.03] duration-300 shrink-0">
               {resolvedLogoUrl ? (
                 <img 
@@ -110,17 +106,17 @@ export function PublicHeader() {
                   loading="eager" 
                   fetchPriority="high" 
                   decoding="async" 
-                  className="w-6 h-6 xxs:w-7 xxs:h-7 xs:w-8 xs:h-8 sm:w-11 sm:h-11 object-contain drop-shadow-sm" 
+                  className="w-8 h-8 sm:w-10 sm:h-10 object-contain drop-shadow-sm" 
                   alt={`${settings.site_title || 'Official'} Logo`} 
                 />
               ) : (
-                <div className="w-6 h-6 xxs:w-7 xxs:h-7 xs:w-8 xs:h-8 sm:w-11 sm:h-11 bg-blue-500 rounded-xl flex items-center justify-center text-white font-semibold text-xs sm:text-base">
-                  {settings.site_title?.substring(0, 1)}
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-500 rounded-xl flex items-center justify-center text-white font-semibold text-sm sm:text-base">
+                  {(settings.site_title || 'A').substring(0, 1).toUpperCase()}
                 </div>
               )}
             </div>
             <div className="flex flex-col leading-none min-w-0">
-              <span className="text-xs xxs:text-sm xs:text-base sm:text-xl md:text-2xl font-bold tracking-tight text-zinc-900 dark:text-white truncate max-w-[90px] xxs:max-w-[120px] xs:max-w-[170px] sm:max-w-none">
+              <span className="text-[15px] xs:text-base sm:text-xl md:text-2xl font-bold tracking-tight text-zinc-900 dark:text-white truncate max-w-[165px] xs:max-w-[195px] sm:max-w-none">
                 {settings.site_title}
               </span>
             </div>
@@ -234,14 +230,14 @@ export function PublicHeader() {
             </div>
           </nav>
 
-          <div className="md:hidden flex items-center gap-1 xxs:gap-1.5 xs:gap-2 sm:gap-3 shrink-0">
+          <div className="md:hidden flex items-center gap-1.5 shrink-0">
             <button 
               type="button"
               onClick={handleOpenSearch}
-              className="flex items-center justify-center w-8 h-8 xs:w-9 xs:h-9 bg-zinc-100 dark:bg-zinc-800 rounded-full active:scale-95 transition-all text-zinc-600 dark:text-zinc-300 cursor-pointer"
+              className="flex items-center justify-center w-9 h-9 bg-zinc-100 dark:bg-zinc-800 rounded-full active:scale-95 transition-all text-zinc-700 dark:text-zinc-200 cursor-pointer"
               aria-label="Search"
             >
-              <Search className="w-3.5 h-3.5 xs:w-4 xs:h-4" />
+              <Search className="w-[17px] h-[17px]" />
             </button>
 
             {settings.helpline_telegram && (
@@ -249,20 +245,20 @@ export function PublicHeader() {
                 href={settings.helpline_telegram.startsWith('http') ? settings.helpline_telegram : `https://t.me/${settings.helpline_telegram.replace('@', '')}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center w-8 h-8 xs:w-9 xs:h-9 bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 rounded-full active:scale-95 transition-transform"
+                className="hidden xs:flex items-center justify-center w-9 h-9 bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 rounded-full active:scale-95 transition-transform"
                 aria-label="Telegram"
               >
-                <Send className="w-3.5 h-3.5 xs:w-4 xs:h-4" />
+                <Send className="w-[17px] h-[17px]" />
               </a>
             )}
             <SupportWidget />
             <button 
               type="button"
-              className="flex items-center justify-center w-8 h-8 xs:w-9 xs:h-9 bg-zinc-900 dark:bg-white rounded-full active:scale-95 transition-transform cursor-pointer"
+              className="flex items-center justify-center w-9 h-9 bg-zinc-900 dark:bg-white rounded-full active:scale-95 transition-transform cursor-pointer"
               onClick={() => { triggerHaptic(); setMenuOpen(true); }}
               aria-label="Open menu"
             >
-              <Menu className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-white dark:text-zinc-900" />
+              <Menu className="w-[17px] h-[17px] text-white dark:text-zinc-900" />
             </button>
           </div>
         </div>

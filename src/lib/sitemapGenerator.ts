@@ -144,11 +144,38 @@ export const isSitemapPublicNews = (n: any): boolean => {
   return true;
 };
 
+export const isSitemapPublicVideo = (v: any): boolean => {
+  if (!v || typeof v !== 'object') return false;
+  if (!v.slug && !v.id) return false;
+  if (v.sync_to_public === false || v.sync_to_public === 'false' || v.sync_to_public === 0 || v.sync_to_public === '0') return false;
+  if (v.is_published === false || v.is_published === 'false') return false;
+  if (v.is_draft === true || v.is_draft === 'true') return false;
+  if (v.is_hidden === true || v.is_hidden === 'true') return false;
+  if (typeof v.status === 'string') {
+    const st = v.status.trim().toLowerCase();
+    if (st === 'draft' || st === 'unpublished' || st === 'hidden' || st === 'archived') return false;
+  }
+  return true;
+};
+
+const isItemVisibleForDate = (item: any): boolean => {
+  if (!item || typeof item !== 'object') return false;
+  if (item.sync_to_public === false || item.sync_to_public === 'false' || item.sync_to_public === 0 || item.sync_to_public === '0') return false;
+  if (item.is_published === false || item.is_published === 'false') return false;
+  if (item.is_draft === true || item.is_draft === 'true') return false;
+  if (item.is_hidden === true || item.is_hidden === 'true') return false;
+  if (typeof item.status === 'string') {
+    const st = item.status.trim().toLowerCase();
+    if (st === 'draft' || st === 'unpublished' || st === 'hidden' || st === 'archived') return false;
+  }
+  return true;
+};
+
 export const getLatestItemDate = (items: any[], fallbackDate: string = STABLE_BASELINE_DATE): string => {
   if (!Array.isArray(items) || items.length === 0) return fallbackDate;
   let maxTs = 0;
   for (const item of items) {
-    if (!item || !isSitemapPublicApp(item)) continue;
+    if (!isItemVisibleForDate(item)) continue;
     const raw = item.updated_at || item.published_at || item.publish_date || item.created_at || item.added_date || item.date;
     if (raw) {
       const d = new Date(formatSitemapDate(raw, fallbackDate)).getTime();
@@ -372,7 +399,7 @@ export function generateVideosSitemapXml(
 
   const seenUrls = new Set<string>();
   for (const item of (videos || [])) {
-    if (!item || item.sync_to_public === false) continue;
+    if (!isSitemapPublicVideo(item)) continue;
     const slug = item.slug || item.id;
     if (!slug) continue;
     const cSlug = cleanSlug(String(slug));
@@ -556,7 +583,7 @@ export function generateAllSitemaps(
   const candidateHost = isValidPublicProductionDomain(host)
     ? host
     : resolvePublicSiteDomain(settings, apps, news);
-  const resolvedHost = normalizeSitemapHost(candidateHost || 'https://yonoappdex.com');
+  const resolvedHost = normalizeSitemapHost(candidateHost || 'https://example.com');
 
   return {
     'sitemap.xml': enforceNonWwwXml(generateMasterSitemapXml(apps, news, videos, resolvedHost, settings)),

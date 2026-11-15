@@ -67,7 +67,7 @@ export const ReportAppModal: React.FC<ReportAppModalProps> = ({ app, onClose }) 
       aria-labelledby="report-app-modal-title"
     >
       <div
-        className="bg-white dark:bg-zinc-900 w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl overflow-hidden shadow-2xl border-t sm:border border-black/5 dark:border-white/10 flex flex-col max-h-[90vh] sm:max-h-none animate-in slide-in-from-bottom-4 duration-200 pb-[env(safe-area-inset-bottom,0px)]"
+        className="bg-white dark:bg-zinc-900 w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl overflow-hidden shadow-2xl border-t sm:border border-black/5 dark:border-white/10 flex flex-col max-h-[90dvh] sm:max-h-none animate-in slide-in-from-bottom-4 duration-200 pb-[env(safe-area-inset-bottom,0px)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Mobile Bottom-Sheet Handle Bar */}
@@ -99,7 +99,7 @@ export const ReportAppModal: React.FC<ReportAppModalProps> = ({ app, onClose }) 
         </div>
 
         {/* Content Wrapper */}
-        <div className="p-5 overflow-y-auto max-h-[65vh] sm:max-h-[70vh] no-scrollbar">
+        <div className="p-5 overflow-y-auto max-h-[68dvh] sm:max-h-[70vh] no-scrollbar">
           {submitted ? (
             <div className="text-center py-6">
               <div className="w-14 h-14 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -180,7 +180,7 @@ export const ReportAppModal: React.FC<ReportAppModalProps> = ({ app, onClose }) 
                   onChange={(e) => setComment(e.target.value)}
                   placeholder="Provide specific details to help our moderators review this application..."
                   rows={3}
-                  className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 rounded-xl p-3 text-xs sm:text-sm font-medium text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 outline-none resize-none transition-all"
+                  className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 rounded-xl p-3 text-base sm:text-sm font-medium text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 outline-none resize-none transition-all"
                   maxLength={500}
                 />
               </div>
@@ -190,14 +190,14 @@ export const ReportAppModal: React.FC<ReportAppModalProps> = ({ app, onClose }) 
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 min-h-[44px] py-2.5 text-zinc-700 dark:text-zinc-300 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 rounded-xl font-bold text-xs sm:text-sm transition-colors cursor-pointer"
+                  className="flex-1 min-h-[46px] py-2.5 text-zinc-700 dark:text-zinc-300 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 rounded-xl font-bold text-sm transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 min-h-[44px] py-2.5 text-white bg-rose-600 hover:bg-rose-700 disabled:bg-rose-500/50 rounded-xl font-bold text-xs sm:text-sm transition-all shadow-sm active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5"
+                  className="flex-1 min-h-[46px] py-2.5 text-white bg-rose-600 hover:bg-rose-700 disabled:bg-rose-500/50 rounded-xl font-bold text-sm transition-all shadow-sm active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   {submitting ? (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

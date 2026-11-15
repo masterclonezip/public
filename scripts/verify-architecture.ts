@@ -583,34 +583,41 @@ async function verifyModulesAndLiveServer() {
       `NoGlobalTurnstile: ${noGlobalTurnstile}, NoMoreinfoDist: ${noMoreinfoDistDir}, ZeroMoreinfoAnchors: ${zeroMoreinfoAnchors}, TitleFidelity: ${titlePreservesBrand}, Hero512+nosnippet: ${heroImage512Ok}, SimilarRotated: ${similarRotatedOk}, ReachableApps: ${reachableApps}/${allApps.length}, ReachableNews: ${reachableNews}/${allNews.length}, ReviewFidelity: ${reviewFallbackOk}`
     );
 
-    // 8b. Non-WWW Sitemap, Canonical, Admin Subdomain Strip & Edge Middleware Verification
+    // 8b. Non-WWW Sitemap, Canonical, Admin Subdomain Strip, Edge Middleware & Zero Legacy Clone History Verification
     const { normalizeSitemapHost } = await import('../src/lib/sitemapGenerator');
     const { normalizeNonWwwDomain, getCleanCanonicalUrl } = await import('../src/lib/seoUtils');
 
-    const hostWwwTest = normalizeSitemapHost('https://www.yonoappdex.com/') === 'https://yonoappdex.com';
-    const hostAdminTest = normalizeSitemapHost('https://admin.yonoappdex.com') === 'https://yonoappdex.com';
-    const hostHttpTest = normalizeSitemapHost('http://www.yonoappdex.com') === 'https://yonoappdex.com';
-    const canonicalWwwTest = getCleanCanonicalUrl('https://www.yonoappdex.com/app/maha-games', '/app/maha-games', 'https://www.yonoappdex.com') === 'https://yonoappdex.com/app/maha-games';
-    const domainNormTest = normalizeNonWwwDomain('http://www.yonoappdex.com/') === 'https://yonoappdex.com';
+    const hostWwwTest = normalizeSitemapHost('https://www.platform-verify.org/') === 'https://platform-verify.org';
+    const hostAdminTest = normalizeSitemapHost('https://admin.platform-verify.org') === 'https://platform-verify.org';
+    const hostHttpTest = normalizeSitemapHost('http://www.platform-verify.org') === 'https://platform-verify.org';
+    const canonicalWwwTest = getCleanCanonicalUrl('https://www.platform-verify.org/app/maha-games', '/app/maha-games', 'https://www.platform-verify.org') === 'https://platform-verify.org/app/maha-games';
+    const domainNormTest = normalizeNonWwwDomain('http://www.platform-verify.org/') === 'https://platform-verify.org';
 
     const generatedTestSitemaps = generateAllSitemaps(
       { apps: [{ id: '1', slug: 'maha-games', name: 'Maha Games', sync_to_public: true }], news: [], videos: [], settings: {} },
-      'https://www.yonoappdex.com'
+      'https://www.platform-verify.org'
     );
     const allGeneratedXml = Object.values(generatedTestSitemaps).join('\n');
-    const zeroWwwInGeneratedSitemaps = !allGeneratedXml.includes('://www.yonoappdex.com') && allGeneratedXml.includes('https://yonoappdex.com/app/maha-games');
+    const zeroWwwInGeneratedSitemaps = !allGeneratedXml.includes('://www.platform-verify.org') && allGeneratedXml.includes('https://platform-verify.org/app/maha-games');
 
     const distAppsXml = fs.readFileSync(path.join(distDir, 'sitemap-apps.xml'), 'utf8');
+    const distRobotsTxt = fs.readFileSync(path.join(distDir, 'robots.txt'), 'utf8');
+    const distOpenSearchXml = fs.readFileSync(path.join(distDir, 'opensearch.xml'), 'utf8');
     const zeroWwwInDistSitemaps = !/https?:\/\/www\.(?!sitemaps\.org|google\.com|w3\.org)/i.test(distAppsXml);
+    const zeroLegacyHistoryInDist =
+      !/yonoappdex|potup3yi/i.test(distAppsXml) &&
+      !/yonoappdex|potup3yi/i.test(distRobotsTxt) &&
+      !/yonoappdex|potup3yi/i.test(distOpenSearchXml) &&
+      !/yonoappdex|potup3yi/i.test(homeDistHtml);
 
     const middlewareSrc = fs.readFileSync(path.resolve(process.cwd(), 'functions/_middleware.js'), 'utf8');
     const middlewareRewritesXmlAndHtml = middlewareSrc.includes('isSeoAsset') && middlewareSrc.includes('text/html') && middlewareSrc.includes('s-maxage=60');
 
     record(
       'SEO-NON-WWW',
-      'Strict Non-WWW Enforcement (Sitemaps, Canonicals, Admin Subdomain Strip & Edge Middleware)',
-      hostWwwTest && hostAdminTest && hostHttpTest && canonicalWwwTest && domainNormTest && zeroWwwInGeneratedSitemaps && zeroWwwInDistSitemaps && middlewareRewritesXmlAndHtml,
-      `HostNorm(www/admin/http): ${hostWwwTest && hostAdminTest && hostHttpTest}, CanonicalNorm: ${canonicalWwwTest && domainNormTest}, ZeroWwwSitemaps: ${zeroWwwInGeneratedSitemaps && zeroWwwInDistSitemaps}, EdgeMiddleware: ${middlewareRewritesXmlAndHtml}`
+      'Strict Non-WWW Enforcement, Edge Canonical Normalization & Zero Legacy Clone History',
+      hostWwwTest && hostAdminTest && hostHttpTest && canonicalWwwTest && domainNormTest && zeroWwwInGeneratedSitemaps && zeroWwwInDistSitemaps && zeroLegacyHistoryInDist && middlewareRewritesXmlAndHtml,
+      `HostNorm(www/admin/http): ${hostWwwTest && hostAdminTest && hostHttpTest}, CanonicalNorm: ${canonicalWwwTest && domainNormTest}, ZeroWwwSitemaps: ${zeroWwwInGeneratedSitemaps && zeroWwwInDistSitemaps}, ZeroLegacyCloneHistory: ${zeroLegacyHistoryInDist}, EdgeMiddleware: ${middlewareRewritesXmlAndHtml}`
     );
   } catch (isoErr: any) {
     record('SEO-ISOLATION-1..8', 'Zero /moreinfo Leak & Attribution Isolation', false, isoErr?.message || String(isoErr));

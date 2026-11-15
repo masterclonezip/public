@@ -5,7 +5,7 @@ import path from 'path';
 import zlib from 'zlib';
 import { injectSeoTags, fetchStoreData, cleanRootContainer } from '../src/seoHelper';
 import { generateAllSitemaps, normalizeSitemapHost, escapeXml } from '../src/lib/sitemapGenerator';
-import { formatPageTitle, isPublicReadyApp, isPublicReadyNews, resolvePublicSiteDomain } from '../src/lib/seoUtils';
+import { formatPageTitle, cleanSettingsMetaTitles, isPublicReadyApp, isPublicReadyNews, resolvePublicSiteDomain } from '../src/lib/seoUtils';
 import { getAllSiteIconUrls, wrapPngsInIco } from '../src/seo/utils';
 import { safeDecrypt, safeEncrypt, getAesSecret } from '../src/lib/cryptoUtils';
 
@@ -27,22 +27,9 @@ function decodeCandidateUrl(raw: unknown): string {
 function resolveBuildHost(settings?: any, apps?: any[], news?: any[]): string {
   const resolved = resolvePublicSiteDomain(settings, apps, news);
   if (resolved && !resolved.includes('localhost') && !resolved.includes('127.0.0.1')) {
-    return normalizeSitemapHost(resolved) || 'https://yonoappdex.com';
+    return normalizeSitemapHost(resolved) || 'https://example.com';
   }
-
-  try {
-    const publicSitemapPath = path.resolve(process.cwd(), 'public/sitemap.xml');
-    if (fs.existsSync(publicSitemapPath)) {
-      const xml = fs.readFileSync(publicSitemapPath, 'utf8');
-      const m = xml.match(/<loc>\s*(https?:\/\/[^/<]+)\/sitemap-apps\.xml\s*<\/loc>/i);
-      if (m && m[1] && !m[1].includes('localhost') && !m[1].includes('127.0.0.1') && !m[1].includes('.pages.dev')) {
-        const normalized = normalizeSitemapHost(m[1]);
-        if (normalized) return normalized;
-      }
-    }
-  } catch {}
-
-  return 'https://yonoappdex.com';
+  return 'https://example.com';
 }
 
 function sanitizePublicApp(app: any): any {
@@ -67,11 +54,10 @@ function sanitizePublicApp(app: any): any {
   if (typeof copy.slug === 'string') {
     copy.slug = copy.slug.trim().replace(/^\/+|\/+$/g, '');
   }
-  if (typeof copy.canonical_url === 'string' && copy.canonical_url.trim()) {
-    copy.canonical_url = copy.canonical_url
-      .trim()
-      .replace(/^http:\/\/(?!localhost|127\.0\.0\.1)/i, 'https://')
-      .replace(/^(https?:\/\/)(?:www\.|admin\.|masterworld\.)+/i, '$1');
+  if (copy.slug) {
+    copy.canonical_url = `/app/${copy.slug}`;
+  } else {
+    delete copy.canonical_url;
   }
   const rawSeoTitle = String(copy.seo_title || copy.meta_title || '').trim();
   if (rawSeoTitle) {
@@ -88,11 +74,10 @@ function sanitizePublicNews(newsItem: any): any {
   if (typeof copy.slug === 'string') {
     copy.slug = copy.slug.trim().replace(/^\/+|\/+$/g, '');
   }
-  if (typeof copy.canonical_url === 'string' && copy.canonical_url.trim()) {
-    copy.canonical_url = copy.canonical_url
-      .trim()
-      .replace(/^http:\/\/(?!localhost|127\.0\.0\.1)/i, 'https://')
-      .replace(/^(https?:\/\/)(?:www\.|admin\.|masterworld\.)+/i, '$1');
+  if (copy.slug) {
+    copy.canonical_url = `/news/${copy.slug}`;
+  } else {
+    delete copy.canonical_url;
   }
   if (typeof copy.title === 'string' && copy.title.trim()) {
     copy.title = formatPageTitle(copy.title.trim(), '');
@@ -217,8 +202,18 @@ async function syncStaticDataAndSitemaps() {
     .filter(isPublicReadyNews)
     .map((n: any) => sanitizePublicNews(n));
 
-  const publicSettings = { ...(data.settings || {}) };
+  const publicVideos = (data.videos || []).filter(
+    (v: any) => v && v.sync_to_public !== false && v.sync_to_public !== 'false' && v.is_published !== false && v.is_draft !== true
+  );
+
+  const publicSettings = cleanSettingsMetaTitles({ ...(data.settings || {}) });
   delete publicSettings.turnstile_secret_key;
+  delete publicSettings.admin_password;
+  delete publicSettings.admin_totp_secret;
+  delete publicSettings.cloudinary_api_secret;
+  delete publicSettings.cloudinary_api_key;
+  delete publicSettings.gemini_api_key;
+  delete publicSettings._rest_admin_bypass;
   const envSiteKey = [
     process.env.VITE_TURNSTILE_SITE_KEY,
     process.env.TURNSTILE_SITE_KEY,
@@ -245,7 +240,7 @@ async function syncStaticDataAndSitemaps() {
       apps: publicApps,
       settings: publicSettings,
       news: publicNews,
-      videos: data.videos || [],
+      videos: publicVideos,
       reviews: data.reviews || []
     };
     if (sealedEncryptedLinks) {
@@ -262,7 +257,7 @@ async function syncStaticDataAndSitemaps() {
   const host = resolveBuildHost(publicSettings, publicApps, publicNews);
   const distPath = path.resolve(process.cwd(), 'dist');
   if (fs.existsSync(publicPath)) {
-    const sitemaps = generateAllSitemaps({ ...data, apps: publicApps, news: publicNews, settings: publicSettings }, host);
+    const sitemaps = generateAllSitemaps({ ...data, apps: publicApps, news: publicNews, videos: publicVideos, settings: publicSettings }, host);
     for (const [filename, xmlContent] of Object.entries(sitemaps)) {
       const xmlStr = xmlContent as string;
       try {
@@ -281,8 +276,7 @@ async function syncStaticDataAndSitemaps() {
         let robotsTxt = fs.readFileSync(robotsPath, 'utf-8');
         robotsTxt = robotsTxt
           .replace(/Sitemap:\s*(?:https?:\/\/[^/\s]+)?\/sitemap-categories\.xml/gi, `Sitemap: ${host}/sitemap-developers.xml`)
-          .replace(/^Sitemap:\s*\/([^\s]+)$/gm, `Sitemap: ${host}/$1`)
-          .replace(/^Sitemap:\s*https?:\/\/localhost(?::\d+)?\/([^\s]+)$/gm, `Sitemap: ${host}/$1`);
+          .replace(/^Sitemap:\s*(?:https?:\/\/[^/\s]+)?\/([^\s]+)$/gm, `Sitemap: ${host}/$1`);
         fs.writeFileSync(robotsPath, robotsTxt, 'utf-8');
         if (fs.existsSync(distPath)) {
           fs.writeFileSync(path.join(distPath, 'robots.txt'), robotsTxt, 'utf-8');
@@ -382,7 +376,7 @@ async function syncStaticDataAndSitemaps() {
     } catch (_) {}
   }
 
-  return { ...data, apps: publicApps, news: publicNews, settings: publicSettings };
+  return { ...data, apps: publicApps, news: publicNews, videos: publicVideos, settings: publicSettings };
 }
 
 async function prerender() {
@@ -533,8 +527,17 @@ async function prerender() {
       }
     }
 
-    // 5. Generate Video Routes
+    // 5. Generate Video Routes (Only for public synced videos)
     for (const videoItem of data.videos || []) {
+      if (
+        !videoItem ||
+        videoItem.sync_to_public === false ||
+        videoItem.sync_to_public === 'false' ||
+        videoItem.is_published === false ||
+        videoItem.is_draft === true
+      ) {
+        continue;
+      }
       const cleanVideoSlug = String(videoItem.slug || '').trim();
       if (cleanVideoSlug) {
         await generateRoute(`/videos/${cleanVideoSlug}`);

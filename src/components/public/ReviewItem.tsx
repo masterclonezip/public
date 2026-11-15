@@ -115,7 +115,7 @@ export function ReviewItem({
 
         {/* Expandable Review Text */}
         <div 
-          className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed break-words whitespace-pre-wrap flex flex-col relative select-text"
+          className="text-[13.5px] sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed break-words whitespace-pre-wrap flex flex-col relative select-text"
         >
           <p>{displayedComment}</p>
           
@@ -124,21 +124,21 @@ export function ReviewItem({
               type="button"
               onClick={() => onToggleExpand(rev.id)}
               aria-label={isExpanded ? 'Show less review text' : `Read full review by ${rev.username || 'user'}`}
-              className="self-start inline-flex items-center gap-0.5 text-[11px] font-black text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 mt-2 cursor-pointer transition-all uppercase tracking-wide select-none outline-none"
+              className="self-start inline-flex items-center gap-1 min-h-[36px] px-1 -ml-1 text-xs font-black text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 mt-1 cursor-pointer transition-all uppercase tracking-wide select-none outline-none"
             >
               <span>{isExpanded ? 'Show less' : 'Read more'}</span>
-              {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
           )}
 
           {rev.adminReply && rev.adminReply.text && (
-            <div className="mt-3 p-3 bg-zinc-100/80 dark:bg-zinc-800/60 rounded-xl border border-black/5 dark:border-white/5 text-[11px] text-zinc-700 dark:text-zinc-300">
+            <div className="mt-3 p-3 bg-zinc-100/80 dark:bg-zinc-800/60 rounded-xl border border-black/5 dark:border-white/5 text-xs sm:text-[13px] text-zinc-700 dark:text-zinc-300">
               <div className="flex items-center justify-between gap-2 mb-1">
                 <span className="font-bold text-zinc-900 dark:text-white">
                   {rev.adminReply.author || 'Developer Response'}
                 </span>
                 {rev.adminReply.timestamp && (
-                  <span className="text-[9px] text-zinc-400">
+                  <span className="text-[10px] text-zinc-400">
                     {formatReviewDate(rev.adminReply.timestamp)}
                   </span>
                 )}
@@ -149,22 +149,22 @@ export function ReviewItem({
         </div>
 
         {/* Footer Help voting Panel */}
-        <div className="flex items-center gap-3 xs:gap-4 mt-4 pt-3.5 border-t border-black/[0.03] dark:border-white/[0.03]">
-          <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
-            Was this review helpful?
+        <div className="flex flex-wrap items-center gap-2 xs:gap-3 mt-3 pt-3 border-t border-black/[0.03] dark:border-white/[0.03]">
+          <span className="text-[11px] text-zinc-400 dark:text-zinc-500 hidden xs:inline">
+            Was this helpful?
           </span>
           <button
             type="button"
             onClick={() => onHelpfulVote(rev.id)}
             disabled={isVoted}
             aria-label={`Vote helpful for review by ${rev.username || 'user'}`}
-            className={`flex items-center gap-1.5 min-h-[32px] px-3 py-1.5 text-[11px] font-bold rounded-lg tabular-nums transition-all ${
+            className={`flex items-center gap-1.5 min-h-[36px] px-3 py-1.5 text-xs font-bold rounded-lg tabular-nums transition-all ${
               isVoted
                 ? 'bg-blue-500/10 text-blue-500 cursor-default'
-                : 'bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-zinc-500 dark:text-zinc-400 active:scale-95 cursor-pointer'
+                : 'bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-zinc-600 dark:text-zinc-300 active:scale-95 cursor-pointer'
             }`}
           >
-            <ThumbsUp className="w-3 h-3" />
+            <ThumbsUp className="w-3.5 h-3.5" />
             <span>Helpful {rev.helpful_count > 0 && `(${rev.helpful_count})`}</span>
           </button>
 
@@ -173,13 +173,13 @@ export function ReviewItem({
             onClick={() => onReport(rev.id)}
             disabled={isReported || rev.reported}
             aria-label={`Report review by ${rev.username || 'user'}`}
-            className={`flex items-center gap-1.5 min-h-[32px] px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all ml-auto ${
+            className={`flex items-center gap-1.5 min-h-[36px] px-3 py-1.5 text-xs font-bold rounded-lg transition-all ml-auto ${
               isReported || rev.reported
                 ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 cursor-default font-black'
-                : 'bg-black/5 hover:bg-rose-500/10 hover:text-rose-600 dark:bg-white/5 dark:hover:bg-rose-500/15 text-zinc-500 dark:text-zinc-400 active:scale-95 cursor-pointer'
+                : 'bg-black/5 hover:bg-rose-500/10 hover:text-rose-600 dark:bg-white/5 dark:hover:bg-rose-500/15 text-zinc-600 dark:text-zinc-300 active:scale-95 cursor-pointer'
             }`}
           >
-            <Flag className="w-3 h-3" />
+            <Flag className="w-3.5 h-3.5" />
             <span>{isReported || rev.reported ? 'Reported' : 'Report'}</span>
           </button>
         </div>

@@ -171,8 +171,17 @@ export default function AdminDashboard() {
         
         const cleanLogo = String(formSettings.logo_url || '').trim();
         const cleanFavicon = String(formSettings.favicon_url || '').trim();
+        const rawDomain = String(formSettings.canonical_domain || '').trim().replace(/\/+$/, '');
+        const cleanDomain = rawDomain && !rawDomain.toLowerCase().includes('yonoappdex.com')
+          ? (rawDomain.startsWith('http://') || rawDomain.startsWith('https://') ? rawDomain : `https://${rawDomain}`).replace(/^(https?:\/\/)(?:www\.|admin\.|masterworld\.)+/i, '$1')
+          : '';
+        const cleanSiteTitle = String(formSettings.site_title || '').trim();
         await saveSettingsSection('general', {
           ...formSettings,
+          site_name: cleanSiteTitle,
+          canonical_domain: cleanDomain,
+          site_domain: cleanDomain,
+          public_domain: cleanDomain,
           logo_url: cleanLogo || cleanFavicon,
           favicon_url: cleanFavicon || cleanLogo,
           meta_description: formSettings.meta_description || formSettings.seo_description || '',

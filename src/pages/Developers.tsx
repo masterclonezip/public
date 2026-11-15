@@ -3,9 +3,12 @@ import Meta from '../components/Meta';
 import { useData } from '../contexts/DataContextPublic';
 import { Github, Twitter } from 'lucide-react';
 import { getOptimizedImageUrl } from '../seo/utils';
+import { normalizeNonWwwDomain } from '../lib/seoUtils';
 
 export default function Developers() {
   const { settings, fetchSettings } = useData();
+  const [failedAvatars, setFailedAvatars] = React.useState<Record<number, boolean>>({});
+  const origin = typeof window !== 'undefined' ? normalizeNonWwwDomain(window.location.origin) : '';
 
   React.useEffect(() => {
     if ((!settings.developers || settings.developers.length === 0) && fetchSettings) {
@@ -16,15 +19,15 @@ export default function Developers() {
   if (!settings.developers || settings.developers.length === 0) {
     return (
       <div className="animate-fade-in">
-        <div className="w-full max-w-5xl mx-auto px-1 xs:px-2 sm:px-4 py-8 sm:py-12 pb-16 min-h-[60vh] flex flex-col items-center justify-center text-center">
+        <div className="w-full max-w-5xl mx-auto px-0 sm:px-4 py-8 sm:py-12 pb-16 min-h-[60vh] flex flex-col items-center justify-center text-center">
           <Meta 
             title={settings?.developers_meta_title || "Developer Profiles"}
             description={settings?.developers_meta_description || "Browse profiles of top app developers."}
-            canonical={window.location.origin + "/developers"}
+            canonical={origin ? `${origin}/developers` : "/developers"}
           />
           <div className="max-w-lg mx-auto py-8">
             <h1 className="text-2xl sm:text-3xl font-black mb-3 text-zinc-900 dark:text-white uppercase tracking-tight">Our Developers</h1>
-            <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 font-medium">Information about our developers is not available at this moment. Please check back later.</p>
+            <p className="text-[15px] sm:text-base text-zinc-600 dark:text-zinc-400 font-medium">Information about our developers is not available at this moment. Please check back later.</p>
           </div>
         </div>
       </div>
@@ -33,11 +36,11 @@ export default function Developers() {
 
   return (
     <div className="animate-fade-in">
-      <div className="w-full max-w-5xl mx-auto px-1 xs:px-2 sm:px-4 py-4 sm:py-8 pb-16 min-h-[70vh]">
+      <div className="w-full max-w-5xl mx-auto px-0 sm:px-4 py-4 sm:py-8 pb-16 min-h-[70vh]">
         <Meta 
           title={settings?.developers_meta_title || "Developer Profiles"}
           description={settings?.developers_meta_description || "Browse profiles of top app developers."}
-          canonical={window.location.origin + "/developers"}
+          canonical={origin ? `${origin}/developers` : "/developers"}
         />
 
         <div className="w-full">
@@ -57,26 +60,33 @@ export default function Developers() {
                 className="border border-zinc-200/80 dark:border-zinc-800/80 rounded-2xl p-5 sm:p-6 transition-all flex flex-col items-center text-center group animate-fade-in"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
-                <div className="w-32 h-32 rounded-full overflow-hidden mb-6 border-4 border-white dark:border-zinc-800 shadow-xl group-hover:scale-105 transition-transform duration-500">
-                  <img 
-                    src={dev.image_url ? getOptimizedImageUrl(dev.image_url, 256) : `https://ui-avatars.com/api/?name=${encodeURIComponent(dev.name)}&background=random`} 
-                    alt={dev.name} 
-                    loading="lazy"
-                    decoding="async"
-                    width={128}
-                    height={128}
-                    className="w-full h-full object-cover"
-                  />
+                <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden mb-5 sm:mb-6 border-4 border-white dark:border-zinc-800 shadow-xl group-hover:scale-105 transition-transform duration-500 bg-gradient-to-br from-blue-600/15 to-indigo-600/15 flex items-center justify-center">
+                  {dev.image_url && !failedAvatars[index] ? (
+                    <img 
+                      src={getOptimizedImageUrl(dev.image_url, 256)} 
+                      alt={dev.name} 
+                      loading="lazy"
+                      decoding="async"
+                      width={128}
+                      height={128}
+                      onError={() => setFailedAvatars((prev) => ({ ...prev, [index]: true }))}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-3xl font-black text-blue-600 dark:text-blue-400 select-none">
+                      {(dev.name || 'D').trim().charAt(0).toUpperCase()}
+                    </span>
+                  )}
                 </div>
                 
-                <h3 className="text-2xl font-black text-zinc-900 dark:text-white mb-2 tracking-tight">{dev.name}</h3>
+                <h3 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white mb-2 tracking-tight">{dev.name}</h3>
                 
                 <div className="bg-pink-500/10 text-pink-600 dark:text-pink-400 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest mb-4">
                   {dev.role}
                 </div>
                 
                 {dev.bio && (
-                  <p className="text-slate-600 dark:text-slate-400 mb-8 flex-grow font-medium text-sm leading-relaxed">
+                  <p className="text-slate-600 dark:text-slate-400 mb-8 flex-grow font-medium text-[15px] sm:text-sm leading-relaxed">
                     {dev.bio}
                   </p>
                 )}
@@ -87,7 +97,7 @@ export default function Developers() {
                       href={dev.github} 
                       target="_blank" 
                       rel="noopener noreferrer" 
-                      className="p-3 bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 rounded-xl transition-colors text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white"
+                      className="w-11 h-11 flex items-center justify-center bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 rounded-xl transition-colors text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white"
                       title="GitHub"
                       aria-label={`${dev.name || 'Developer'} GitHub Profile`}
                     >
@@ -99,7 +109,7 @@ export default function Developers() {
                       href={dev.twitter} 
                       target="_blank" 
                       rel="noopener noreferrer" 
-                      className="p-3 bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 rounded-xl transition-colors text-zinc-700 dark:text-zinc-300 hover:text-blue-500 dark:hover:text-blue-400"
+                      className="w-11 h-11 flex items-center justify-center bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 rounded-xl transition-colors text-zinc-700 dark:text-zinc-300 hover:text-blue-500 dark:hover:text-blue-400"
                       title="Twitter"
                       aria-label={`${dev.name || 'Developer'} Twitter Profile`}
                     >

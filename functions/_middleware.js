@@ -270,7 +270,6 @@ export async function onRequest(context) {
       envObj.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
       envObj.VITE_TURNSTILE_KEY,
       envObj.TURNSTILE_KEY,
-      ...Object.values(envObj),
     ];
     let edgeSiteKey = '';
     for (const raw of rawEdgeCandidates) {
@@ -413,7 +412,9 @@ export async function onRequest(context) {
           .replace(/^Sitemap:\s*https?:\/\/[^/\s]+\/([^\s]+)$/gm, `Sitemap: ${canonicalOrigin}/$1`)
           .replace(/^Sitemap:\s*\/([^\s]+)$/gm, `Sitemap: ${canonicalOrigin}/$1`);
       } else if (pathname === '/opensearch.xml') {
-        text = text.replace(/template="(?:https?:\/\/[^/"]+)?\/\?s=\{searchTerms\}"/g, `template="${canonicalOrigin}/?s={searchTerms}"`);
+        text = text
+          .replace(/template="(?:https?:\/\/[^/"]+)?\/\?s=\{searchTerms\}"/g, `template="${canonicalOrigin}/?s={searchTerms}"`)
+          .replace(/<Image([^>]*)>(?:https?:\/\/[^/<]+)?(\/[^<]+)<\/Image>/gi, `<Image$1>${canonicalOrigin}$2</Image>`);
       }
 
       const headers = new Headers();
@@ -442,17 +443,18 @@ export async function onRequest(context) {
     html = html
       .replace(hostVariantRegex, canonicalOrigin)
       .replace(/https?:\/\/localhost(?::\d+)?/gi, canonicalOrigin)
+      .replace(/https?:\/\/example\.com(?=[/"'<])/gi, canonicalOrigin)
       .replace(
-        /(<link[^>]+rel=["']canonical["'][^>]+href=["'])\/([^"']*["'])/gi,
-        `$1${canonicalOrigin}/$2`
+        /(<link[^>]+rel=["']canonical["'][^>]+href=["'])(?:https?:\/\/[^/"']+)?(\/[^"']*)?(["'])/gi,
+        (_, p1, pathPart, p3) => `${p1}${canonicalOrigin}${pathPart && pathPart !== '/' ? pathPart : (pathname === '/' ? '' : pathname)}${p3}`
       )
       .replace(
-        /(<meta[^>]+property=["']og:url["'][^>]+content=["'])\/([^"']*["'])/gi,
-        `$1${canonicalOrigin}/$2`
+        /(<meta[^>]+property=["']og:url["'][^>]+content=["'])(?:https?:\/\/[^/"']+)?(\/[^"']*)?(["'])/gi,
+        (_, p1, pathPart, p3) => `${p1}${canonicalOrigin}${pathPart && pathPart !== '/' ? pathPart : (pathname === '/' ? '' : pathname)}${p3}`
       )
       .replace(
-        /(<meta[^>]+name=["']twitter:url["'][^>]+content=["'])\/([^"']*["'])/gi,
-        `$1${canonicalOrigin}/$2`
+        /(<meta[^>]+name=["']twitter:url["'][^>]+content=["'])(?:https?:\/\/[^/"']+)?(\/[^"']*)?(["'])/gi,
+        (_, p1, pathPart, p3) => `${p1}${canonicalOrigin}${pathPart && pathPart !== '/' ? pathPart : (pathname === '/' ? '' : pathname)}${p3}`
       );
 
     // Normalize Cloudinary og:image / twitter:image URLs to ensure .jpg extension for WhatsApp / Facebook / Twitter

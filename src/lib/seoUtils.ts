@@ -106,6 +106,19 @@ export function cleanSettingsMetaTitles<T extends Record<string, any>>(settings:
       copy[key] = formatPageTitle(copy[key], '', brand);
     }
   }
+  if (typeof copy.site_name === 'string' && copy.site_name.trim().toLowerCase() === 'yonoappdex' && brand.toLowerCase() !== 'yonoappdex') {
+    copy.site_name = brand || '';
+  }
+  for (const domainKey of ['canonical_domain', 'site_domain', 'public_domain', 'domain']) {
+    if (typeof copy[domainKey] === 'string' && copy[domainKey].toLowerCase().includes('yonoappdex.com')) {
+      copy[domainKey] = '';
+    }
+  }
+  for (const iconKey of ['logo_url', 'favicon_url', 'og_image']) {
+    if (typeof copy[iconKey] === 'string' && copy[iconKey].includes('potup3yi/image/upload/v1793499107/vvqemcm3gkjsko5m6unw')) {
+      copy[iconKey] = '';
+    }
+  }
   return copy as T;
 }
 
@@ -258,6 +271,7 @@ export function isValidPublicProductionDomain(rawHost: string): boolean {
       h === 'localhost' ||
       h === '127.0.0.1' ||
       h === 'example.com' ||
+      h === 'yonoappdex.com' ||
       h.endsWith('.pages.dev') ||
       h.endsWith('.workers.dev') ||
       h.endsWith('.run.app') ||
@@ -275,14 +289,10 @@ export function isValidPublicProductionDomain(rawHost: string): boolean {
   }
 }
 
-export function resolvePublicSiteDomain(settings?: any, apps?: any[], news?: any[]): string {
-  const candidates: string[] = [
-    settings?.site_domain,
-    settings?.domain,
-    settings?.public_domain,
-    settings?.canonical_domain,
-  ].filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+export function resolvePublicSiteDomain(settings?: any, _apps?: any[], _news?: any[]): string {
+  const candidates: string[] = [];
 
+  // 1. Explicit deployment environment variables take highest priority for Master-Clone portability
   try {
     if (typeof __APP_BUILD_ENV__ !== 'undefined' && __APP_BUILD_ENV__) {
       if (__APP_BUILD_ENV__.PUBLIC_DOMAIN) candidates.push(__APP_BUILD_ENV__.PUBLIC_DOMAIN);
@@ -305,33 +315,21 @@ export function resolvePublicSiteDomain(settings?: any, apps?: any[], news?: any
     }
   } catch {}
 
-  if (Array.isArray(apps)) {
-    for (const a of apps) {
-      if (a && typeof a.canonical_url === 'string' && a.canonical_url.startsWith('http')) {
-        try {
-          const u = new URL(a.canonical_url.trim());
-          candidates.push(u.origin);
-          break;
-        } catch {}
-      }
-    }
-  }
-
-  if (Array.isArray(news)) {
-    for (const n of news) {
-      if (n && typeof n.canonical_url === 'string' && n.canonical_url.startsWith('http')) {
-        try {
-          const u = new URL(n.canonical_url.trim());
-          candidates.push(u.origin);
-          break;
-        } catch {}
-      }
-    }
-  }
-
+  // 2. Live browser origin (when running on a valid production domain)
   if (typeof window !== 'undefined' && window.location?.origin) {
-    candidates.push(window.location.origin);
+    if (isValidPublicProductionDomain(window.location.origin)) {
+      candidates.push(window.location.origin);
+    }
   }
+
+  // 3. Admin-configured settings domain
+  const settingDomains = [
+    settings?.site_domain,
+    settings?.domain,
+    settings?.public_domain,
+    settings?.canonical_domain,
+  ].filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+  candidates.push(...settingDomains);
 
   for (const c of candidates) {
     if (isValidPublicProductionDomain(c)) {
@@ -339,7 +337,7 @@ export function resolvePublicSiteDomain(settings?: any, apps?: any[], news?: any
     }
   }
 
-  return 'https://yonoappdex.com';
+  return '';
 }
 
 

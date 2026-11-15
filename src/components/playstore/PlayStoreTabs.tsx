@@ -59,15 +59,31 @@ export const PlayStoreTabs = React.memo(({ activeTab, onTabChange, hideOnSearch 
   };
 
   const activeLower = (activeTab || '').toLowerCase().trim();
+  const tabListRef = React.useRef<HTMLDivElement | null>(null);
+  const activeTabRef = React.useRef<HTMLAnchorElement | null>(null);
+
+  React.useEffect(() => {
+    const container = tabListRef.current;
+    const activeEl = activeTabRef.current;
+    if (container && activeEl) {
+      const targetLeft = activeEl.offsetLeft - (container.clientWidth / 2) + (activeEl.offsetWidth / 2);
+      try {
+        container.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
+      } catch (e) {
+        container.scrollLeft = Math.max(0, targetLeft);
+      }
+    }
+  }, [activeLower]);
 
   return (
-    <div className="mb-2 sticky top-[42px] xxs:top-[46px] xs:top-[50px] sm:top-16 z-40 bg-[var(--bg-primary)] py-1 xxs:py-1.5 xs:py-2 px-0">
-      <div className="flex overflow-x-auto no-scrollbar gap-1 xxs:gap-1.5 xs:gap-2">
+    <div className="mb-2.5 sm:mb-3 sticky top-14 sm:top-16 z-30 bg-[var(--bg-primary)] -mx-2.5 px-2.5 sm:mx-0 sm:px-0 py-1.5 border-b border-black/[0.05] dark:border-white/[0.06]">
+      <div ref={tabListRef} className="flex overflow-x-auto no-scrollbar gap-1.5 sm:gap-2">
         {uniqueTabs.map((tab) => {
           const isSelected = tab.toLowerCase().trim() === activeLower;
           return (
             <a
               key={tab}
+              ref={isSelected ? activeTabRef : undefined}
               href={getTabHref(tab)}
               onClick={(e) => {
                 if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0) {
@@ -76,9 +92,9 @@ export const PlayStoreTabs = React.memo(({ activeTab, onTabChange, hideOnSearch 
                 }
               }}
               className={cn(
-                "whitespace-nowrap px-2.5 xxs:px-3 xs:px-4 py-1 xxs:py-1.5 xs:py-2 text-[11px] xxs:text-xs xs:text-sm font-medium transition-all rounded-full border no-underline inline-flex items-center cursor-pointer",
+                "whitespace-nowrap min-h-[34px] px-3 sm:px-3.5 text-xs sm:text-[13px] font-semibold transition-colors rounded-full border no-underline inline-flex items-center cursor-pointer shrink-0",
                 isSelected 
-                  ? "bg-blue-600 text-white border-blue-600 shadow-sm" 
+                  ? "bg-blue-600 text-white border-blue-600 shadow-xs" 
                   : "bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border-zinc-200/80 dark:border-zinc-700/60 hover:bg-zinc-200/80 dark:hover:bg-zinc-700"
               )}
             >

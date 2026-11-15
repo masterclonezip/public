@@ -618,11 +618,18 @@ export function useGitHubSync(
       log(`GitHub Sync Notice: Rating harmonization note: ${e?.message || 'bypassed'}`);
     }
 
-    // Filter apps and news based on isPublicReadyApp and isPublicReadyNews (strictly excludes draft, unpublished, and unsynced items)
+    // Filter apps, news, and videos (strictly excludes draft, unpublished, and unsynced items)
     const publicApps = finalApps.filter(isPublicReadyApp);
     const publicNews = targetNews
       .filter(isPublicReadyNews)
       .map((item: any) => compileCanonicalNews(item));
+    const publicVideos = (targetVideos || []).filter((v: any) =>
+      v &&
+      v.sync_to_public !== false &&
+      v.sync_to_public !== 'false' &&
+      v.is_published !== false &&
+      v.is_draft !== true
+    );
     const unpushedAppsCount = finalApps.length - publicApps.length;
     const unpushedNewsCount = targetNews.length - publicNews.length;
 
@@ -633,7 +640,7 @@ export function useGitHubSync(
     const finalSettings = ensureDefaultSettings(targetSettings);
     delete (finalSettings as any).turnstile_site_key;
     delete (finalSettings as any).turnstile_secret_key;
-    const updatedCode = generateStaticDataFileCode(publicApps, finalSettings, publicNews, targetVideos);
+    const updatedCode = generateStaticDataFileCode(publicApps, finalSettings, publicNews, publicVideos);
 
     // Server backup retains AES-encrypted link fields for backend resolution
     const safeBackupApps = publicApps.map((app: any) => compileCanonicalApp(app, { stripDownloadLinks: false }));
@@ -658,7 +665,7 @@ export function useGitHubSync(
       apps: safeBackupApps,
       settings: finalSettings,
       news: publicNews,
-      videos: targetVideos,
+      videos: publicVideos,
       reviews: []
     };
 
@@ -666,7 +673,7 @@ export function useGitHubSync(
       apps: cleanPublicStaticApps,
       settings: sanitizePublicSettings(finalSettings),
       news: publicNews,
-      videos: targetVideos,
+      videos: publicVideos,
       reviews: []
     };
 
@@ -694,7 +701,7 @@ export function useGitHubSync(
               apps: safeBackupApps,
               settings: finalSettings,
               news: publicNews,
-              videos: targetVideos,
+              videos: publicVideos,
               catalogStats: communityStatsPayload || null,
               staticReviews: communityReviewsPayload || null
             })
@@ -849,13 +856,13 @@ export function useGitHubSync(
       try {
         const publicDomain = normalizeSitemapHost(
           resolvePublicSiteDomain(finalSettings, publicApps, publicNews)
-        ) || 'https://yonoappdex.com';
+        ) || 'https://example.com';
         const sitemaps = generateAllSitemaps(
           {
             apps: publicApps,
             settings: finalSettings,
             news: publicNews,
-            videos: targetVideos
+            videos: publicVideos
           },
           publicDomain
         );
@@ -869,7 +876,7 @@ export function useGitHubSync(
         const sitemapLines = publicDomain
           ? `\nSitemap: ${publicDomain}/sitemap.xml\nSitemap: ${publicDomain}/sitemap-news.xml\nSitemap: ${publicDomain}/sitemap-apps.xml\nSitemap: ${publicDomain}/sitemap-static.xml\nSitemap: ${publicDomain}/sitemap-videos.xml\nSitemap: ${publicDomain}/sitemap-developers.xml\n`
           : '';
-        const robotsContent = `User-agent: Googlebot\nAllow: /\nAllow: /api/v1/public/\nDisallow: /api/\nDisallow: /admin/\nDisallow: /login/\nDisallow: /masterworld/\nDisallow: /moreinfo/\nDisallow: /moreinfo/*\n\nUser-agent: Googlebot-Image\nAllow: /\n\nUser-agent: Google-Favicon\nAllow: /\n\nUser-agent: *\nAllow: /\nAllow: /api/v1/public/\nDisallow: /api/\nDisallow: /admin/\nDisallow: /login/\nDisallow: /masterworld/\nDisallow: /moreinfo/\nDisallow: /moreinfo/*\n${sitemapLines}`;
+        const robotsContent = `User-agent: Googlebot\nAllow: /\nAllow: /api/v1/public/\nDisallow: /api/\nDisallow: /admin/\nDisallow: /login/\nDisallow: /masterworld/\nDisallow: /moreinfo/\nDisallow: /moreinfo/*\nDisallow: /safety\nDisallow: /safety-status\n\nUser-agent: Googlebot-Image\nAllow: /\n\nUser-agent: Google-Favicon\nAllow: /\n\nUser-agent: *\nAllow: /\nAllow: /api/v1/public/\nDisallow: /api/\nDisallow: /admin/\nDisallow: /login/\nDisallow: /masterworld/\nDisallow: /moreinfo/\nDisallow: /moreinfo/*\nDisallow: /safety\nDisallow: /safety-status\n${sitemapLines}`;
         primaryBatchFiles.push({
           path: 'public/robots.txt',
           content: robotsContent

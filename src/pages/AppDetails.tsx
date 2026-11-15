@@ -443,7 +443,7 @@ export default function AppDetails() {
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-5 py-3 rounded-full shadow-xl flex items-center gap-2 border border-white/10 dark:border-black/5 animate-fade-in transition-all"
+          className="fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-50 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-5 py-3 rounded-full shadow-xl flex items-center gap-2 border border-white/10 dark:border-black/5 animate-fade-in transition-all"
         >
           <Check className="w-4 h-4 text-green-500 font-bold animate-bounce" />
           <span className="text-sm font-semibold tracking-wide">Link copied to clipboard!</span>
@@ -499,7 +499,7 @@ export default function AppDetails() {
       </div>
 
       {relatedNewsArticles.length > 0 && (
-        <aside data-nosnippet aria-labelledby="app-related-news-heading" className="px-1 xs:px-2 sm:px-4 md:px-6 mb-6 xs:mb-8 text-left">
+        <aside data-nosnippet aria-labelledby="app-related-news-heading" className="px-0 sm:px-4 md:px-6 mb-6 xs:mb-8 text-left">
           <div className="py-5 border-t border-black/5 dark:border-white/5">
             <h2 id="app-related-news-heading" className="text-base xs:text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-3">
               Related News &amp; Updates
@@ -516,9 +516,9 @@ export default function AppDetails() {
                       e.preventDefault();
                       navigate(`/news/${encodeURIComponent(rnSlug)}`);
                     }}
-                    className="p-3 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/50 hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80 transition-colors flex items-center justify-between gap-2 no-underline"
+                    className="p-3.5 min-h-[52px] rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/50 hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80 transition-colors flex items-center justify-between gap-2.5 no-underline"
                   >
-                    <span className="text-xs sm:text-sm font-semibold text-zinc-800 dark:text-zinc-200 line-clamp-2">{rnTitle}</span>
+                    <span className="text-[13px] sm:text-sm font-semibold text-zinc-800 dark:text-zinc-200 line-clamp-2">{rnTitle}</span>
                     <span className="text-xs font-bold text-blue-600 dark:text-blue-400 shrink-0">Read →</span>
                   </a>
                 );
@@ -528,7 +528,7 @@ export default function AppDetails() {
         </aside>
       )}
 
-      <div className="px-1 xs:px-2 sm:px-4 md:px-6 mb-6 xs:mb-8">
+      <div className="px-0 sm:px-4 md:px-6 mb-6 xs:mb-8">
         <UserReviews 
           key={`${app.id}_${app.slug || ''}_${reviewsRefreshKey}`} 
           appId={app.id} 

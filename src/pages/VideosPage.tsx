@@ -9,6 +9,7 @@ import Meta from '../components/Meta';
 import { useData } from '../contexts/DataContextPublic';
 import { Video, Search, ArrowLeft, ArrowRight, Play, Calendar, ShieldCheck, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { normalizeNonWwwDomain } from '../lib/seoUtils';
 
 const ITEMS_PER_PAGE = 6;
 
@@ -44,29 +45,39 @@ export default function VideosPage() {
 
   const urlPage = parseInt(searchParams.get('page') || '1', 10);
   const currentPage = isNaN(urlPage) || urlPage < 1 ? 1 : urlPage;
-  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
+  const searchTerm = searchParams.get('q') || '';
+  const [failedThumbs, setFailedThumbs] = useState<Record<string, boolean>>({});
+  const origin = typeof window !== 'undefined' ? normalizeNonWwwDomain(window.location.origin) : '';
 
-  // Keep search in URL query
-  useEffect(() => {
+  const handleSearchChange = (val: string) => {
     const params = new URLSearchParams(searchParams);
-    if (searchTerm.trim()) {
-      params.set('q', searchTerm.trim());
+    if (val.trim()) {
+      params.set('q', val);
     } else {
       params.delete('q');
     }
+    params.delete('page');
     setSearchParams(params, { replace: true });
-  }, [searchTerm]);
+  };
+
+  const publicVideos = useMemo(() => {
+    return (mockVideos || []).filter(video =>
+      video &&
+      video.sync_to_public !== false &&
+      String(video.sync_to_public) !== 'false' &&
+      video.is_published !== false &&
+      video.is_draft !== true
+    );
+  }, [mockVideos]);
 
   const filteredVideos = useMemo(() => {
-    return mockVideos.filter(video => {
-      if (!searchTerm) return true;
-      const term = searchTerm.toLowerCase();
-      return (
-        video.title?.toLowerCase().includes(term) ||
-        video.description?.toLowerCase().includes(term)
-      );
-    });
-  }, [mockVideos, searchTerm]);
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return publicVideos;
+    return publicVideos.filter(video => (
+      video.title?.toLowerCase().includes(term) ||
+      video.description?.toLowerCase().includes(term)
+    ));
+  }, [publicVideos, searchTerm]);
 
   const totalPages = Math.max(1, Math.ceil(filteredVideos.length / ITEMS_PER_PAGE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -89,14 +100,14 @@ export default function VideosPage() {
   };
 
   return (
-    <div className="animate-fade-in min-h-screen max-w-[1550px] mx-auto pt-1 sm:pt-3 pb-16 px-3 sm:px-6 md:px-10">
-      <div className="mb-3 sm:mb-5">
+    <div className="animate-fade-in min-h-screen max-w-[1550px] mx-auto pt-1 sm:pt-3 pb-16 px-0 sm:px-2 md:px-4">
+      <div className="mb-2 sm:mb-4">
         <Link 
           to="/" 
-          className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline transition-colors group"
+          className="inline-flex items-center gap-1.5 min-h-[36px] py-1 text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline transition-colors group"
         >
-          <div className="p-1.5 rounded-full bg-blue-50 dark:bg-blue-950/50 group-hover:-translate-x-1 transition-transform">
-            <ArrowLeft className="w-4 h-4" />
+          <div className="p-1 rounded-full bg-blue-50 dark:bg-blue-950/50 group-hover:-translate-x-1 transition-transform">
+            <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </div>
           Home
         </Link>
@@ -105,7 +116,7 @@ export default function VideosPage() {
       <Meta 
         title={mockSettings?.videos_meta_title || "Video Reviews"}
         description={mockSettings?.videos_meta_description || "Watch deep-dive reviews and gameplay analysis."}
-        canonical={window.location.origin + "/videos"}
+        canonical={origin ? `${origin}/videos` : "/videos"}
       />
 
       <div className="mb-6 sm:mb-8">
@@ -127,18 +138,16 @@ export default function VideosPage() {
           <div className="relative w-full sm:w-80">
             <input
               type="text"
-              className="block w-full py-2.5 bg-zinc-50 dark:bg-zinc-900 border border-black/10 dark:border-white/10 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 transition-all font-medium text-sm rounded-xl px-4 pr-10 text-zinc-900 dark:text-zinc-100"
+              className="block w-full min-h-[44px] py-2.5 bg-zinc-50 dark:bg-zinc-900 border border-black/10 dark:border-white/10 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 transition-all font-medium text-base sm:text-sm rounded-xl px-4 pr-11 text-zinc-900 dark:text-zinc-100"
               placeholder="Search videos..."
               value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setPage(1);
-              }}
+              onChange={(e) => handleSearchChange(e.target.value)}
             />
             {searchTerm ? (
               <button 
-                onClick={() => { setSearchTerm(''); setPage(1); }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                type="button"
+                onClick={() => handleSearchChange('')}
+                className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
                 aria-label="Clear search"
               >
                 <X className="w-4 h-4" />
@@ -166,7 +175,7 @@ export default function VideosPage() {
           </p>
           {searchTerm && (
             <button
-              onClick={() => { setSearchTerm(''); setPage(1); }}
+              onClick={() => handleSearchChange('')}
               className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 transition-all"
             >
               Clear filter
@@ -177,28 +186,35 @@ export default function VideosPage() {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {paginatedVideos.map((video, index) => {
+              const videoKey = String(video.id || video.slug || `vid-${index}`);
               const ytId = getYoutubeId(video.youtube_url);
-              const thumbUrl = ytId 
-                ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` 
-                : '/logo.png';
+              const thumbUrl = (video as any).og_image_url || (video as any).thumbnail_url || (video as any).image_url || (ytId
+                ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`
+                : '');
+              const showFallback = !thumbUrl || failedThumbs[videoKey];
 
               return (
                 <div
-                  key={video.id || video.slug || `vid-${index}`}
+                  key={videoKey}
                   className="group flex flex-col bg-white dark:bg-zinc-900 border border-black/5 dark:border-white/10 rounded-2xl overflow-hidden hover:shadow-lg hover:border-blue-500/30 transition-all duration-300 animate-fade-in"
                 >
                   {/* Visual Thumbnail Frame */}
                   <Link to={`/videos/${video.slug || video.id}`} className="relative aspect-video w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800 block">
-                    <img 
-                      src={thumbUrl} 
-                      alt={video.title}
-                      referrerPolicy="no-referrer"
-                      decoding="async"
-                      loading="lazy"
-                      width={400}
-                      height={225}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
+                    {showFallback ? (
+                      <div className="w-full h-full bg-gradient-to-br from-blue-600/20 via-indigo-500/15 to-zinc-900/20 flex items-center justify-center" />
+                    ) : (
+                      <img 
+                        src={thumbUrl} 
+                        alt={video.title}
+                        referrerPolicy="no-referrer"
+                        decoding="async"
+                        loading="lazy"
+                        width={400}
+                        height={225}
+                        onError={() => setFailedThumbs((prev) => ({ ...prev, [videoKey]: true }))}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent opacity-70 group-hover:opacity-90 transition-opacity" />
                     
                     {/* Play Button */}
@@ -269,9 +285,10 @@ export default function VideosPage() {
 
               <div className="flex items-center gap-1.5 flex-wrap justify-center">
                 <button
+                  type="button"
                   onClick={() => setPage(safeCurrentPage - 1)}
                   disabled={safeCurrentPage === 1}
-                  className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:pointer-events-none transition-all"
+                  className="min-h-[40px] min-w-[40px] flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer"
                   aria-label="Previous page"
                 >
                   <ChevronLeft className="w-4 h-4" />
@@ -287,9 +304,10 @@ export default function VideosPage() {
                   ) {
                     return (
                       <button
+                        type="button"
                         key={p}
                         onClick={() => setPage(p)}
-                        className={`w-9 h-9 rounded-xl text-xs font-bold transition-all ${
+                        className={`w-10 h-10 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                           isCurrent
                             ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
                             : 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'
@@ -314,9 +332,10 @@ export default function VideosPage() {
                 })}
 
                 <button
+                  type="button"
                   onClick={() => setPage(safeCurrentPage + 1)}
                   disabled={safeCurrentPage === totalPages}
-                  className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:pointer-events-none transition-all"
+                  className="min-h-[40px] min-w-[40px] flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer"
                   aria-label="Next page"
                 >
                   <span className="hidden sm:inline">Next</span>

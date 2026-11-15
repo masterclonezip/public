@@ -401,10 +401,19 @@ async function startServer() {
       return res.redirect(301, '/developers/' + rest + query);
     }
 
-    // 2.3 Canonical 301 Redirect /faqs to /faq and legacy app prefixes (/apps/, /game/, /apk/) to /app/
+    // 2.3 Canonical 301 Redirect /faqs to /faq, /video/* to /videos/*, and legacy app prefixes (/apps/, /game/, /apk/) to /app/
     if (pathLower === '/faqs' || pathLower === '/faqs/') {
       const query = req.originalUrl.includes('?') ? '?' + req.originalUrl.split('?')[1] : '';
       return res.redirect(301, '/faq' + query);
+    }
+    if (pathLower === '/video' || pathLower === '/video/') {
+      const query = req.originalUrl.includes('?') ? '?' + req.originalUrl.split('?')[1] : '';
+      return res.redirect(301, '/videos' + query);
+    }
+    if (pathLower.startsWith('/video/')) {
+      const rest = rawPath.substring('/video/'.length).replace(/^\/+|\/+$/g, '');
+      const query = req.originalUrl.includes('?') ? '?' + req.originalUrl.split('?')[1] : '';
+      return res.redirect(301, (rest ? `/videos/${rest}` : '/videos') + query);
     }
     if (pathLower.startsWith('/apps/') || pathLower.startsWith('/game/') || pathLower.startsWith('/apk/')) {
       const rest = rawPath.replace(/^\/(apps|game|apk)\//i, '').replace(/^\/+|\/+$/g, '');
@@ -505,17 +514,26 @@ async function startServer() {
     ) {
       try {
         const storeData = await fetchStoreData();
-        const resolvedApp = resolveAppSlug(cleanSegment, storeData.apps || []);
+        const publicApps = (storeData.apps || []).filter((a: any) => a && a.sync_to_public !== false);
+        const resolvedApp = resolveAppSlug(cleanSegment, publicApps);
         if (resolvedApp && (resolvedApp.slug || resolvedApp.id)) {
           return res.redirect(301, `/app/${resolvedApp.slug || resolvedApp.id}`);
         }
 
-        const newsItem = (storeData.news || []).find((n: any) => n.slug?.toLowerCase() === cleanSegment);
+        const newsItem = (storeData.news || []).find((n: any) => n && n.sync_to_public !== false && n.slug?.toLowerCase() === cleanSegment);
         if (newsItem && newsItem.slug) {
           return res.redirect(301, `/news/${newsItem.slug}`);
         }
 
-        const videoItem = (storeData.videos || []).find((v: any) => v.slug?.toLowerCase() === cleanSegment);
+        const videoItem = (storeData.videos || []).find(
+          (v: any) =>
+            v &&
+            v.sync_to_public !== false &&
+            v.sync_to_public !== 'false' &&
+            v.is_published !== false &&
+            v.is_draft !== true &&
+            v.slug?.toLowerCase() === cleanSegment
+        );
         if (videoItem && videoItem.slug) {
           return res.redirect(301, `/videos/${videoItem.slug}`);
         }

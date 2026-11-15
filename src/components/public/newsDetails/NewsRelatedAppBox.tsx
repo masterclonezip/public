@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Download, FileText, ExternalLink } from 'lucide-react';
 import { getOptimizedImageUrl } from '../../../seo/utils';
@@ -11,6 +12,7 @@ interface NewsRelatedAppBoxProps {
 
 export function NewsRelatedAppBox({ downloadTarget, relatedApp, newsItem, className = '' }: NewsRelatedAppBoxProps) {
   const navigate = useNavigate();
+  const [iconError, setIconError] = useState(false);
   if (!downloadTarget && !relatedApp) return null;
 
   const appSlug = relatedApp?.slug || relatedApp?.id || '';
@@ -24,12 +26,13 @@ export function NewsRelatedAppBox({ downloadTarget, relatedApp, newsItem, classN
   return (
     <div className={`p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-blue-50/80 dark:from-blue-950/40 dark:via-indigo-950/30 dark:to-blue-950/40 border border-blue-100 dark:border-blue-900/50 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm ${className}`}>
       <div className="flex items-center gap-3.5 w-full sm:w-auto">
-        {appIcon ? (
+        {appIcon && !iconError ? (
           <img
             src={getOptimizedImageUrl(appIcon, 128) || appIcon}
             alt={appName}
             width={52}
             height={52}
+            onError={() => setIconError(true)}
             className="w-[52px] h-[52px] rounded-2xl object-cover shadow-sm shrink-0 border border-black/5 dark:border-white/10"
             loading="lazy"
             decoding="async"
@@ -54,7 +57,7 @@ export function NewsRelatedAppBox({ downloadTarget, relatedApp, newsItem, classN
               e.preventDefault();
               navigate(detailUrl);
             }}
-            className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-500/20 active:scale-95 no-underline"
+            className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm sm:text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-500/20 active:scale-95 no-underline"
             title="View App Details"
           >
             <FileText className="w-4 h-4" />
@@ -65,7 +68,7 @@ export function NewsRelatedAppBox({ downloadTarget, relatedApp, newsItem, classN
             href={downloadTarget?.url || '#'}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-500/20 active:scale-95"
+            className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm sm:text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-500/20 active:scale-95"
           >
             <Download className="w-4 h-4" />
             <span>Download</span>

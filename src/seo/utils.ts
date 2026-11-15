@@ -104,7 +104,7 @@ export function getYoutubeThumbnail(urlStr: string): string {
     if (m && m[1]) id = m[1];
     else id = urlStr.split('/').pop()?.split('?')[0] || '';
   }
-  return id ? `https://img.youtube.com/vi/${id}/mqdefault.jpg` : '';
+  return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : '';
 }
 
 export const getDefaultOrigin = (): string => {

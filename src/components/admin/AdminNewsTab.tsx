@@ -88,7 +88,18 @@ function createBlankDraft(): any {
   };
 }
 
-function normalizeDraftForSave(raw: any): any {
+function trimAtWordBoundary(text: string, maxLen: number): string {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!clean || clean.length <= maxLen) return clean;
+  const slice = clean.slice(0, maxLen + 1);
+  const lastSpace = slice.lastIndexOf(' ');
+  if (lastSpace >= Math.floor(maxLen * 0.6)) {
+    return slice.slice(0, lastSpace).trim();
+  }
+  return clean.slice(0, maxLen).trim();
+}
+
+function normalizeDraftForSave(raw: any, options: { preserveBlankSeo?: boolean } = {}): any {
   const nowIso = new Date().toISOString();
   const title = String(raw.title || '').trim() || 'Untitled News Article';
   const rawSlug = String(raw.slug || '').trim();
@@ -108,11 +119,15 @@ function normalizeDraftForSave(raw: any): any {
     .trim();
   const summaryText = String(raw.description || '').trim();
 
-  // Auto-populate SEO title & description if left blank so mobile publishing is 1-step
-  const seoTitle = String(raw.seo_title || raw.meta_title || title.slice(0, 58)).trim();
-  const seoDesc = String(
-    raw.seo_description || raw.meta_description || (summaryText || plainBody).slice(0, 155)
-  ).trim();
+  // Auto-populate SEO title & description if left blank during full edit save; keep blank fields untouched on quick Live/Pin toggles
+  const explicitSeoTitle = String(raw.seo_title || raw.meta_title || '').trim();
+  const explicitSeoDesc = String(raw.seo_description || raw.meta_description || '').trim();
+  const seoTitle = options.preserveBlankSeo
+    ? explicitSeoTitle
+    : (explicitSeoTitle || trimAtWordBoundary(title, 58));
+  const seoDesc = options.preserveBlankSeo
+    ? explicitSeoDesc
+    : (explicitSeoDesc || trimAtWordBoundary(summaryText || plainBody, 155));
 
   const authorName = String(raw.ceo_name || raw.author || 'Admin Team').trim();
   const pubDate = raw.date || raw.published_at || raw.created_at || nowIso;
@@ -311,13 +326,13 @@ export const AdminNewsTab: React.FC<AdminNewsTabProps> = ({
   };
 
   const handleAutoFillSeoFromArticle = () => {
-    const cleanHeadline = String(draft.title || '').trim().slice(0, 58);
+    const cleanHeadline = trimAtWordBoundary(String(draft.title || '').trim(), 58);
     const rawSummary = String(draft.description || '').trim();
     const plainBody = String(draft.content || '')
       .replace(/<[^>]+>/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-    const cleanDesc = (rawSummary || plainBody).slice(0, 155);
+    const cleanDesc = trimAtWordBoundary(rawSummary || plainBody, 155);
     const coverImg = String(draft.logo_url || draft.image_url || '').trim();
 
     setDraft((prev: any) => ({
@@ -411,7 +426,7 @@ export const AdminNewsTab: React.FC<AdminNewsTabProps> = ({
     const updatedItem = normalizeDraftForSave({
       ...item,
       sync_to_public: nextSync
-    });
+    }, { preserveBlankSeo: true });
     if (saveNewsSingle) {
       await saveNewsSingle(updatedItem);
       return;
@@ -430,7 +445,7 @@ export const AdminNewsTab: React.FC<AdminNewsTabProps> = ({
     const updatedItem = normalizeDraftForSave({
       ...item,
       is_pinned: nextPin
-    });
+    }, { preserveBlankSeo: true });
     if (saveNewsSingle) {
       await saveNewsSingle(updatedItem);
       return;

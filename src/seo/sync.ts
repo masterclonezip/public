@@ -211,15 +211,17 @@ export async function syncFromFirestore(): Promise<any> {
       delete remoteSettings.turnstile_secret_key;
       delete remoteSettings.turnstile_site_key;
       delete remoteSettings.cloudinary_api_secret;
+      delete remoteSettings.cloudinary_api_key;
       delete remoteSettings.gemini_api_key;
       delete remoteSettings.admin_password;
       delete remoteSettings.admin_totp_secret;
+      delete remoteSettings._rest_admin_bypass;
 
       const sanitizeSiteKey = (raw: unknown): string => {
         let s = String(raw || '').replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '').trim();
         s = s.replace(/^[A-Za-z0-9_]+\s*=\s*/, '').trim();
         s = s.replace(/^["'`]+|["'`]+$/g, '').trim();
-        const match = s.match(/(0x4[A-Za-z0-9_-]{16,25})/);
+        const match = s.match(/^(0x4[A-Za-z0-9_-]{16,25})$/);
         return match ? match[1] : '';
       };
 
@@ -294,8 +296,11 @@ export async function syncFromFirestore(): Promise<any> {
       });
       const news = allNews.filter(isPublicReadyNews);
 
+      const isPublicReadyVideo = (v: any) =>
+        Boolean(v && v.sync_to_public !== false && v.sync_to_public !== 'false' && v.is_published !== false && v.is_draft !== true);
       const videosParsed = videosRes?.fields ? parseFirestoreDoc(videosRes.fields) : null;
-      const videos = Array.isArray(videosParsed?.items) ? videosParsed.items : fallbackData.videos;
+      const rawVideos = Array.isArray(videosParsed?.items) ? videosParsed.items : (fallbackData.videos || []);
+      const videos = rawVideos.filter(isPublicReadyVideo);
 
       const secLinksParsed = secLinksRes?.fields ? parseFirestoreDoc(secLinksRes.fields) : null;
       const secureLinks = secLinksParsed?.items || secLinksParsed?.links || secLinksParsed || null;
@@ -323,12 +328,14 @@ export async function syncFromFirestore(): Promise<any> {
 
   const rawAllApps = fallbackData.apps || [];
   const rawAllNews = fallbackData.news || [];
+  const rawAllVideos = fallbackData.videos || [];
   return {
     ...fallbackData,
     apps: rawAllApps.filter(isPublicReadyApp),
     allApps: rawAllApps,
     news: rawAllNews.filter(isPublicReadyNews),
     allNews: rawAllNews,
+    videos: rawAllVideos.filter((v: any) => v && v.sync_to_public !== false && v.sync_to_public !== 'false' && v.is_published !== false && v.is_draft !== true),
     fromFirestore: false,
     newsFromFirestore: false
   };

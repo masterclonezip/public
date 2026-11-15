@@ -308,7 +308,11 @@ export const AdminSettingsTab = React.memo(({ settings: rawSettings, handleSaveS
             <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Global SEO Keywords (Comma Separated)</label>
             <input type="text" name="seo_keywords" defaultValue={settings.seo_keywords} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm dark:text-white focus:ring-2 focus:ring-blue-500 transition-all" />
           </div>
-          <div className="sm:col-span-2">
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Public Website Domain (Optional — Auto-Detected if Blank)</label>
+            <input type="text" name="canonical_domain" defaultValue={settings.canonical_domain || settings.site_domain || ''} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm dark:text-white focus:ring-2 focus:ring-blue-500 transition-all" placeholder="https://yourdomain.com" />
+          </div>
+          <div>
             <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Google Analytics ID</label>
             <input type="text" name="ga_tracking_id" defaultValue={settings.ga_tracking_id || settings.google_analytics_id} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm dark:text-white focus:ring-2 focus:ring-blue-500 transition-all" placeholder="G-XXXXXXXXXX" />
           </div>

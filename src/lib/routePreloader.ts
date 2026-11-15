@@ -8,50 +8,20 @@
  * All public routes are bundled directly in the main public bundle,
  * guaranteeing 0ms route transitions with zero network delay and zero Suspense fallbacks.
  */
-export function preloadRoute(_rawPath: string): Promise<any> {
+export function preloadRoute(_rawPath: string): Promise<void> {
   return Promise.resolve();
 }
 
 /**
- * Automatically preloads primary public routes during browser idle time
+ * Retained as a no-op export for callers; public routes are bundled directly so idle timers are unnecessary.
  */
-export function startIdleRoutePreloader(): void {
-  if (typeof window === 'undefined') return;
-
-  const isCrawler = typeof navigator !== 'undefined' && /googlebot|google-inspectiontool|bingbot|slurp|duckduckbot|baiduspider|yandexbot|crawler|spider|lighthouse|chrome-lighthouse|headless/i.test(navigator.userAgent || '');
-  if (isCrawler) return;
-
-  const runIdle = () => {
-    const priorityRoutes = [
-      '/app/', '/news', '/news/', '/videos', '/about', '/developers',
-      '/contact', '/privacy', '/terms', '/disclaimer', '/notice',
-      '/ethics', '/responsibility', '/report-removal', '/faq'
-    ];
-    let delay = 1200;
-
-    priorityRoutes.forEach(r => {
-      setTimeout(() => {
-        if ('requestIdleCallback' in window) {
-          (window as any).requestIdleCallback(() => preloadRoute(r), { timeout: 4000 });
-        } else {
-          preloadRoute(r);
-        }
-      }, delay);
-      delay += 350;
-    });
-  };
-
-  if (document.readyState === 'complete') {
-    setTimeout(runIdle, 8000);
-  } else {
-    window.addEventListener('load', () => setTimeout(runIdle, 8000), { once: true });
-  }
-}
+export function startIdleRoutePreloader(): void {}
 
 const preloadedSet = new Set<string>();
 
 /**
- * Listens for touchstart, pointerover, or focus on anchor links to trigger instant preloading
+ * Listens for mouse/pen hover or keyboard focus on anchor links to warm image caches
+ * without triggering network work during mobile touch scrolling.
  */
 export function setupInteractionPreloader(): () => void {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
@@ -59,14 +29,12 @@ export function setupInteractionPreloader(): () => void {
   }
 
   const handleInteraction = (e: Event) => {
+    if ('pointerType' in e && (e as PointerEvent).pointerType === 'touch') return;
     const target = (e.target as HTMLElement)?.closest('a');
     if (!target) return;
 
     const href = target.getAttribute('href');
     if (href && (href.startsWith('/') || href.startsWith(window.location.origin))) {
-      preloadRoute(href);
-
-      // Pre-warm the browser image cache for the hero image inside this link
       try {
         const img = target.querySelector('img');
         if (img && img.src && !preloadedSet.has(img.src)) {
@@ -78,13 +46,10 @@ export function setupInteractionPreloader(): () => void {
     }
   };
 
-  // Passive touchstart triggers ~150ms-300ms before click on mobile!
-  document.addEventListener('touchstart', handleInteraction, { passive: true });
   document.addEventListener('pointerover', handleInteraction, { passive: true });
   document.addEventListener('focusin', handleInteraction, { passive: true });
 
   return () => {
-    document.removeEventListener('touchstart', handleInteraction);
     document.removeEventListener('pointerover', handleInteraction);
     document.removeEventListener('focusin', handleInteraction);
   };

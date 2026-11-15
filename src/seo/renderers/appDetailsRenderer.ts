@@ -92,7 +92,7 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
 
   const totalCount = Math.max(finalCount, validReviews.length);
   const hasRealReviews = totalCount > 0;
-  const ratingVal = finalRating || 4.8;
+  const ratingVal = finalRating || 4.5;
   const rating = ratingVal.toFixed(1);
 
   const starCounts: Record<string, number> = rawStarCounts || (hasRealReviews ? generateNaturalStarDistribution(ratingVal, totalCount) : { '5': 0, '4': 0, '3': 0, '2': 0, '1': 0 });

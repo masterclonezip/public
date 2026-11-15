@@ -9,6 +9,7 @@ export interface MetaBuilderParams {
   siteTitle: string;
   targetApp?: any;
   targetNews?: any;
+  targetVideo?: any;
   collectionItems?: any[];
   settings?: any;
   faviconIco: string;
@@ -18,6 +19,7 @@ export interface MetaBuilderParams {
   cssPreloadTag?: string;
   jsonLdSchema: string;
   isNotFound: boolean;
+  isNoIndex?: boolean;
   getField: (obj: any, key: string, fallback?: any) => any;
   pageType?: string;
 }
@@ -32,6 +34,7 @@ export function buildMetaTags(params: MetaBuilderParams): string {
     siteTitle,
     targetApp,
     targetNews,
+    targetVideo,
     collectionItems,
     settings,
     faviconIco,
@@ -40,9 +43,12 @@ export function buildMetaTags(params: MetaBuilderParams): string {
     favicon180,
     jsonLdSchema,
     isNotFound,
+    isNoIndex = false,
     getField,
     pageType
   } = params;
+
+  const hideIndex = Boolean(isNotFound || isNoIndex);
 
   let origin = '';
   if (canonicalUrl) {
@@ -71,12 +77,19 @@ export function buildMetaTags(params: MetaBuilderParams): string {
   const ogImageHeight = '630';
   const ogType = pageType === 'news' ? 'article' : 'website';
 
-  // Search engine thumbnails: exact 1:1 icon for app pages, clean 1200w banner for news articles without c_pad padding
+  // Search engine thumbnails: exact 1:1 icon for app pages, clean 1200w banner for news/video pages
   const rawTargetIcon = targetApp ? (getField(targetApp, 'icon_url') || getField(targetApp, 'og_image_url')) : '';
   const rawNewsHero = (pageType === 'news' && targetNews) ? (getField(targetNews, 'image') || getField(targetNews, 'image_url') || getField(targetNews, 'logo_url') || getField(targetNews, 'og_image_url')) : '';
+  const rawVideoThumb = (pageType === 'video' && targetVideo)
+    ? (getField(targetVideo, 'og_image_url') || getField(targetVideo, 'thumbnail_url') || getField(targetVideo, 'image_url') || '')
+    : '';
   const searchThumbnail = rawTargetIcon
     ? getOptimizedImageUrl(rawTargetIcon, 512)
-    : (rawNewsHero ? getOptimizedImageUrl(rawNewsHero, 1200) : (iconSet.masterLogo ? iconSet.searchLogo512 : pageOgImage));
+    : (rawNewsHero
+        ? getOptimizedImageUrl(rawNewsHero, 1200)
+        : (rawVideoThumb
+            ? getOptimizedImageUrl(rawVideoThumb, 1200)
+            : (pageType === 'video' ? pageOgImage : (iconSet.masterLogo ? iconSet.searchLogo512 : pageOgImage))));
   const ogSquareImage = rawTargetIcon ? getOgSquareImageUrl(rawTargetIcon, origin) : '';
 
   const articleMetaTags = (() => {
@@ -138,7 +151,7 @@ export function buildMetaTags(params: MetaBuilderParams): string {
     <meta data-rh="true" name="color-scheme" content="light dark">
     <meta data-rh="true" name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
     <meta data-rh="true" name="theme-color" media="(prefers-color-scheme: dark)" content="#090d16">
-    ${isNotFound
+    ${hideIndex
       ? `<meta data-rh="true" name="robots" content="noindex, nofollow, noarchive, nosnippet">`
       : `<meta data-rh="true" name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">`
     }
@@ -147,7 +160,7 @@ export function buildMetaTags(params: MetaBuilderParams): string {
     <meta data-rh="true" property="og:title" content="${escapedTitle}">
     <meta data-rh="true" property="og:description" content="${escapedDesc}">
     <meta data-rh="true" property="og:type" content="${ogType}">
-    <meta data-rh="true" property="og:url" content="${canonicalUrl}">
+    ${canonicalUrl ? `<meta data-rh="true" property="og:url" content="${canonicalUrl}">` : ''}
     <meta data-rh="true" property="og:image" content="${pageOgImage}">
     <meta data-rh="true" property="og:image:secure_url" content="${pageOgImage}">
     <meta data-rh="true" property="og:image:type" content="image/jpeg">
@@ -163,7 +176,7 @@ export function buildMetaTags(params: MetaBuilderParams): string {
     <meta data-rh="true" property="og:image:alt" content="${escapedTitle}">` : ''}
     ${articleMetaTags}
     <meta data-rh="true" name="twitter:card" content="summary_large_image">
-    <meta data-rh="true" name="twitter:url" content="${canonicalUrl}">
+    ${canonicalUrl ? `<meta data-rh="true" name="twitter:url" content="${canonicalUrl}">` : ''}
     <meta data-rh="true" name="twitter:title" content="${escapedTitle}">
     <meta data-rh="true" name="twitter:description" content="${escapedDesc}">
     <meta data-rh="true" name="twitter:image" content="${pageOgImage}">
@@ -171,18 +184,18 @@ export function buildMetaTags(params: MetaBuilderParams): string {
     <meta data-rh="true" itemprop="image" content="${pageOgImage}">
     <meta data-rh="true" itemprop="thumbnailUrl" content="${searchThumbnail}">
     <link data-rh="true" rel="image_src" href="${pageOgImage}">
-    ${!isNotFound ? `<link data-rh="true" rel="canonical" href="${canonicalUrl}">` : ''}
+    ${!hideIndex && canonicalUrl ? `<link data-rh="true" rel="canonical" href="${canonicalUrl}">` : ''}
     ${iconLinksHtml}
     ${(() => {
       if (targetApp && getField(targetApp, 'icon_url')) {
         return `<link rel="preload" as="image" href="${escapeHtml(getOptimizedImageUrl(getField(targetApp, 'icon_url'), 512))}" fetchpriority="high">`;
       }
       if (pageType === 'news' && targetNews) {
-        const rawNewsHero = getField(targetNews, 'image') || getField(targetNews, 'image_url') || getField(targetNews, 'logo_url') || getField(targetNews, 'og_image_url');
-        if (rawNewsHero) {
-          const hero480 = escapeHtml(getOptimizedImageUrl(rawNewsHero, 480));
-          const hero800 = escapeHtml(getOptimizedImageUrl(rawNewsHero, 800));
-          const hero1200 = escapeHtml(getOptimizedImageUrl(rawNewsHero, 1200));
+        const rawNewsHeroPreload = getField(targetNews, 'image') || getField(targetNews, 'image_url') || getField(targetNews, 'logo_url') || getField(targetNews, 'og_image_url');
+        if (rawNewsHeroPreload) {
+          const hero480 = escapeHtml(getOptimizedImageUrl(rawNewsHeroPreload, 480));
+          const hero800 = escapeHtml(getOptimizedImageUrl(rawNewsHeroPreload, 800));
+          const hero1200 = escapeHtml(getOptimizedImageUrl(rawNewsHeroPreload, 1200));
           return `<link rel="preload" as="image" href="${hero800}" imagesrcset="${hero480} 480w, ${hero800} 800w, ${hero1200} 1200w" imagesizes="(max-width: 640px) 100vw, 768px" fetchpriority="high">`;
         }
       }
@@ -201,7 +214,7 @@ export function buildMetaTags(params: MetaBuilderParams): string {
       }
       return '';
     })()}
-    ${!isNotFound ? jsonLdSchema : ''}
+    ${!hideIndex ? jsonLdSchema : ''}
   `;
 }
 

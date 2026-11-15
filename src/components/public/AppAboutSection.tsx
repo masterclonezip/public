@@ -39,38 +39,38 @@ export default function AppAboutSection({ app, isFetching }: AppAboutSectionProp
 
   // Shared rich HTML typography class string for clean, professional rendering with bold blue highlights
   const richHtmlContentStyle = `
-    rich-html-boundary open-page-body w-full text-xs xs:text-sm sm:text-base text-zinc-700 dark:text-zinc-300 leading-relaxed
+    rich-html-boundary open-page-body w-full text-[15px] sm:text-base text-zinc-700 dark:text-zinc-300 leading-[1.7]
     [&_strong]:text-blue-600 dark:[&_strong]:text-blue-400 [&_strong]:font-semibold
     [&_b]:text-blue-600 dark:[&_b]:text-blue-400 [&_b]:font-semibold
-    [&_p]:mb-3 [&_p]:leading-relaxed [&_p]:text-zinc-700 dark:[&_p]:text-zinc-300
+    [&_p]:mb-3 [&_p]:leading-[1.7] [&_p]:text-zinc-700 dark:[&_p]:text-zinc-300
     [&_a]:text-blue-600 dark:[&_a]:text-blue-400 [&_a]:font-semibold [&_a]:underline [&_a]:hover:text-blue-700
-    [&_h1]:text-base sm:[&_h1]:text-2xl [&_h1]:font-black [&_h1]:tracking-tight [&_h1]:text-zinc-900 dark:[&_h1]:text-zinc-100 [&_h1]:mt-4 [&_h1]:mb-2
-    [&_h2]:text-sm sm:[&_h2]:text-xl [&_h2]:font-extrabold [&_h2]:tracking-tight [&_h2]:text-zinc-900 dark:[&_h2]:text-zinc-100 [&_h2]:mt-4 [&_h2]:mb-2 [&_h2]:pt-2.5 [&_h2]:border-t [&_h2]:border-zinc-200/80 dark:[&_h2]:border-zinc-800/80 [&_h2:first-child]:border-t-0 [&_h2:first-child]:pt-0 [&_h2:first-child]:mt-0
-    [&_h3]:text-xs sm:[&_h3]:text-lg [&_h3]:font-bold [&_h3]:tracking-tight [&_h3]:text-zinc-900 dark:[&_h3]:text-zinc-100 [&_h3]:mt-3.5 [&_h3]:mb-1.5
-    [&_h4]:text-[11px] sm:[&_h4]:text-base [&_h4]:font-semibold [&_h4]:tracking-tight [&_h4]:text-zinc-900 dark:[&_h4]:text-zinc-100 [&_h4]:mt-3 [&_h4]:mb-1
-    [&_ul]:my-2.5 [&_ul]:space-y-1 [&_ul]:list-disc [&_ul]:pl-4 xs:[&_ul]:pl-5
-    [&_ol]:my-2.5 [&_ol]:space-y-1 [&_ol]:list-decimal [&_ol]:pl-4 xs:[&_ol]:pl-5
-    [&_li]:leading-relaxed [&_li]:pl-1 [&_li::marker]:text-blue-600 dark:[&_li::marker]:text-blue-400 [&_li::marker]:font-bold
+    [&_h1]:text-lg sm:[&_h1]:text-2xl [&_h1]:font-black [&_h1]:tracking-tight [&_h1]:text-zinc-900 dark:[&_h1]:text-zinc-100 [&_h1]:mt-4 [&_h1]:mb-2
+    [&_h2]:text-base sm:[&_h2]:text-xl [&_h2]:font-extrabold [&_h2]:tracking-tight [&_h2]:text-zinc-900 dark:[&_h2]:text-zinc-100 [&_h2]:mt-4 [&_h2]:mb-2 [&_h2]:pt-2.5 [&_h2]:border-t [&_h2]:border-zinc-200/80 dark:[&_h2]:border-zinc-800/80 [&_h2:first-child]:border-t-0 [&_h2:first-child]:pt-0 [&_h2:first-child]:mt-0
+    [&_h3]:text-[15px] sm:[&_h3]:text-lg [&_h3]:font-bold [&_h3]:tracking-tight [&_h3]:text-zinc-900 dark:[&_h3]:text-zinc-100 [&_h3]:mt-3.5 [&_h3]:mb-1.5
+    [&_h4]:text-sm sm:[&_h4]:text-base [&_h4]:font-semibold [&_h4]:tracking-tight [&_h4]:text-zinc-900 dark:[&_h4]:text-zinc-100 [&_h4]:mt-3 [&_h4]:mb-1
+    [&_ul]:my-2.5 [&_ul]:space-y-1.5 [&_ul]:list-disc [&_ul]:pl-5
+    [&_ol]:my-2.5 [&_ol]:space-y-1.5 [&_ol]:list-decimal [&_ol]:pl-5
+    [&_li]:leading-[1.65] [&_li]:pl-1 [&_li::marker]:text-blue-600 dark:[&_li::marker]:text-blue-400 [&_li::marker]:font-bold
     [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500 [&_blockquote]:pl-3.5 [&_blockquote]:py-1.5 [&_blockquote]:my-3 [&_blockquote]:bg-blue-50/50 dark:[&_blockquote]:bg-blue-950/20 [&_blockquote]:rounded-r-xl [&_blockquote]:italic
   `.trim().replace(/\s+/g, ' ');
 
   const defaultDescription = `<p>Comprehensive application profile and details for <strong>${app.name}</strong>.</p>`;
 
   return (
-    <section aria-labelledby="app-overview-heading" className="w-full my-3 px-1 xs:px-2 sm:px-4 md:px-6 text-left">
+    <section aria-labelledby="app-overview-heading" className="w-full my-3 px-0 sm:px-4 md:px-6 text-left">
       <div className="py-4 sm:py-6 border-t border-black/5 dark:border-white/5">
         
         {/* Header Bar */}
         <div className="w-full pb-3 xs:pb-3.5 sm:pb-4 mb-3 xs:mb-4 sm:mb-5 flex items-center justify-between text-left select-none group border-b border-black/5 dark:border-white/5">
-          <div className="flex items-center gap-2 xs:gap-2.5 sm:gap-3 flex-1 pr-2 sm:pr-3">
-            <div className="w-7 h-7 xs:w-8 xs:h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-              <FileText className="w-3.5 h-3.5 xs:w-4 xs:h-4 sm:w-5 sm:h-5" />
+          <div className="flex items-center gap-2.5 sm:gap-3 flex-1 pr-2 sm:pr-3">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+              <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h2 id="app-overview-heading" className="text-xs sm:text-base font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
+              <h2 id="app-overview-heading" className="text-sm sm:text-base font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
                 About this app
               </h2>
-              <p className="text-[10px] xs:text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+              <p className="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                 Overview & features
               </p>
             </div>
@@ -132,7 +132,7 @@ export default function AppAboutSection({ app, isFetching }: AppAboutSectionProp
                 <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 sm:mb-3">
                   What's New in Version {app.version || 'Latest'}
                 </h3>
-                <div className="bg-slate-50 dark:bg-zinc-900 rounded-xl p-3 sm:p-4 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap border border-black/5 dark:border-white/5">
+                <div className="bg-slate-50 dark:bg-zinc-900 rounded-xl p-3.5 sm:p-4 text-[14px] sm:text-[15px] text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap border border-black/5 dark:border-white/5">
                   {app.release_notes}
                 </div>
               </div>

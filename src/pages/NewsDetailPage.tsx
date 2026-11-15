@@ -8,22 +8,22 @@ import { safeHtml } from '../lib/safeHtmlPublic';
 import { NewsArticleHeader } from '../components/public/newsDetails/NewsArticleHeader';
 import { NewsRelatedAppBox } from '../components/public/newsDetails/NewsRelatedAppBox';
 import { formatNewsDate, calculateReadingTime, getNextNewsChain, getPlainTextSnippet, resolveRelatedAppForNews } from '../lib/newsUtils';
-import { getOptimizedImageUrl, normalizeIsoDate } from '../seo/utils';
+import { getOptimizedImageUrl, normalizeIsoDate, getAllSiteIconUrls } from '../seo/utils';
 import { getCleanCanonicalUrl, normalizeNonWwwDomain } from '../lib/seoUtils';
 
 const RICH_HTML_CONTENT_STYLE = `
-  rich-html-boundary w-full text-sm sm:text-base text-zinc-800 dark:text-zinc-200 leading-relaxed
+  rich-html-boundary w-full text-[15px] sm:text-base text-zinc-800 dark:text-zinc-200 leading-[1.7]
   [&_strong]:text-blue-600 dark:[&_strong]:text-blue-400 [&_strong]:font-semibold
   [&_b]:text-blue-600 dark:[&_b]:text-blue-400 [&_b]:font-semibold
-  [&_p]:mb-4 [&_p]:leading-relaxed [&_p]:text-zinc-800 dark:[&_p]:text-zinc-200
+  [&_p]:mb-4 [&_p]:leading-[1.7] [&_p]:text-zinc-800 dark:[&_p]:text-zinc-200
   [&_a]:text-blue-600 dark:[&_a]:text-blue-400 [&_a]:font-semibold [&_a]:underline [&_a]:hover:text-blue-700
   [&_h1]:text-lg sm:[&_h1]:text-2xl [&_h1]:font-black [&_h1]:tracking-tight [&_h1]:text-zinc-900 dark:[&_h1]:text-zinc-100 [&_h1]:mt-5 [&_h1]:mb-2.5
   [&_h2]:text-base sm:[&_h2]:text-xl [&_h2]:font-extrabold [&_h2]:tracking-tight [&_h2]:text-zinc-900 dark:[&_h2]:text-zinc-100 [&_h2]:mt-5 [&_h2]:mb-2.5 [&_h2]:pt-3 [&_h2]:border-t [&_h2]:border-zinc-200/80 dark:[&_h2]:border-zinc-800/80 [&_h2:first-child]:border-t-0 [&_h2:first-child]:pt-0 [&_h2:first-child]:mt-0
-  [&_h3]:text-sm sm:[&_h3]:text-lg [&_h3]:font-bold [&_h3]:tracking-tight [&_h3]:text-zinc-900 dark:[&_h3]:text-zinc-100 [&_h3]:mt-4 [&_h3]:mb-2
-  [&_h4]:text-xs sm:[&_h4]:text-base [&_h4]:font-semibold [&_h4]:tracking-tight [&_h4]:text-zinc-900 dark:[&_h4]:text-zinc-100 [&_h4]:mt-3.5 [&_h4]:mb-1.5
+  [&_h3]:text-[15px] sm:[&_h3]:text-lg [&_h3]:font-bold [&_h3]:tracking-tight [&_h3]:text-zinc-900 dark:[&_h3]:text-zinc-100 [&_h3]:mt-4 [&_h3]:mb-2
+  [&_h4]:text-sm sm:[&_h4]:text-base [&_h4]:font-semibold [&_h4]:tracking-tight [&_h4]:text-zinc-900 dark:[&_h4]:text-zinc-100 [&_h4]:mt-3.5 [&_h4]:mb-1.5
   [&_ul]:my-3 [&_ul]:space-y-1.5 [&_ul]:list-disc [&_ul]:pl-5
   [&_ol]:my-3 [&_ol]:space-y-1.5 [&_ol]:list-decimal [&_ol]:pl-5
-  [&_li]:leading-relaxed [&_li]:pl-1 [&_li::marker]:text-blue-600 dark:[&_li::marker]:text-blue-400 [&_li::marker]:font-bold
+  [&_li]:leading-[1.65] [&_li]:pl-1 [&_li::marker]:text-blue-600 dark:[&_li::marker]:text-blue-400 [&_li::marker]:font-bold
   [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4 [&_blockquote]:bg-blue-50/50 dark:[&_blockquote]:bg-blue-950/20 [&_blockquote]:rounded-r-xl [&_blockquote]:italic
 `.trim().replace(/\s+/g, ' ');
 
@@ -40,7 +40,7 @@ export default function NewsDetailPage() {
     if (href.startsWith('/') && !href.startsWith('//')) {
       e.preventDefault();
       navigate(href);
-    } else if (typeof window !== 'undefined' && href.startsWith(window.location.origin)) {
+    } else if (typeof window !== 'undefined' && (href.startsWith(window.location.origin) || href.startsWith(normalizeNonWwwDomain(window.location.origin)))) {
       try {
         const url = new URL(href);
         e.preventDefault();
@@ -314,7 +314,9 @@ export default function NewsDetailPage() {
       "url": origin,
       "logo": {
         "@type": "ImageObject",
-        "url": mockSettings?.logo_url || `${origin}/logo.png`
+        "url": getAllSiteIconUrls(mockSettings, origin).searchLogo512 || mockSettings?.logo_url || `${origin}/logo.png`,
+        "width": 512,
+        "height": 512
       }
     }
   };
@@ -358,7 +360,7 @@ export default function NewsDetailPage() {
   const recentNews = getNextNewsChain(newsItem, mockNews, 6);
 
   return (
-    <article className="max-w-3xl mx-auto px-3 sm:px-0 pb-20 text-left">
+    <article className="max-w-3xl mx-auto px-0 pb-20 text-left">
       <Meta 
         title={articleTitle}
         description={articleDesc}
@@ -397,34 +399,34 @@ export default function NewsDetailPage() {
       {/* Article Body */}
       <div 
         onClick={handleHtmlClick}
-        className={`mt-6 px-1 sm:px-4 ${RICH_HTML_CONTENT_STYLE}`}
+        className={`mt-6 px-0 sm:px-4 ${RICH_HTML_CONTENT_STYLE}`}
         dangerouslySetInnerHTML={{ __html: safeHtml(rawBody) }}
       />
 
       {/* Contextual Topic & Hub Navigation Links */}
-      <nav aria-label="Article Topic Navigation" className="mt-8 pt-5 border-t border-zinc-200/80 dark:border-zinc-800/80 px-1 sm:px-4 flex flex-wrap items-center gap-2 text-xs">
+      <nav aria-label="Article Topic Navigation" className="mt-8 pt-5 border-t border-zinc-200/80 dark:border-zinc-800/80 px-0 sm:px-4 flex flex-wrap items-center gap-2 text-xs">
         <span className="font-bold text-zinc-500 dark:text-zinc-400 mr-1">Explore Topics:</span>
         <Link
           to={`/news?category=${encodeURIComponent(articleCategory)}`}
-          className="px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold border border-blue-200/50 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors no-underline"
+          className="min-h-[36px] inline-flex items-center px-3.5 py-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold border border-blue-200/50 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors no-underline"
         >
           {articleCategory} News
         </Link>
         <Link
           to="/news"
-          className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors no-underline"
+          className="min-h-[36px] inline-flex items-center px-3.5 py-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors no-underline"
         >
           All News &amp; Updates
         </Link>
         <Link
           to="/new-apps"
-          className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors no-underline"
+          className="min-h-[36px] inline-flex items-center px-3.5 py-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors no-underline"
         >
           New Apps
         </Link>
         <Link
           to="/categories"
-          className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors no-underline"
+          className="min-h-[36px] inline-flex items-center px-3.5 py-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors no-underline"
         >
           App Categories
         </Link>
@@ -432,12 +434,12 @@ export default function NewsDetailPage() {
 
       {/* Latest News & Updates Internal Linking ("Next, Next, Next" Daisy-Chain Engine) */}
       {recentNews.length > 0 && (
-        <section aria-labelledby="recent-news-heading" className="mt-8 pt-6 border-t border-zinc-200/80 dark:border-zinc-800/80 px-1 sm:px-4 text-left">
+        <section aria-labelledby="recent-news-heading" className="mt-8 pt-6 border-t border-zinc-200/80 dark:border-zinc-800/80 px-0 sm:px-4 text-left">
           <div className="flex items-center justify-between gap-2 mb-4">
             <h2 id="recent-news-heading" className="text-base sm:text-lg font-bold text-zinc-900 dark:text-zinc-100">
               Latest News &amp; Updates
             </h2>
-            <Link to="/news" className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline no-underline">
+            <Link to="/news" className="min-h-[36px] inline-flex items-center text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline no-underline">
               View all news →
             </Link>
           </div>
@@ -452,7 +454,7 @@ export default function NewsDetailPage() {
                 <Link
                   key={rn.id || rnSlug}
                   to={`/news/${encodeURIComponent(rnSlug)}`}
-                  className="p-3.5 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/50 hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80 transition-colors flex flex-col justify-between gap-1.5 no-underline"
+                  className="p-3.5 min-h-[56px] rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/50 hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80 transition-colors flex flex-col justify-between gap-1.5 no-underline"
                 >
                   <div>
                     <div className="flex items-center gap-2 text-[10px] font-medium text-zinc-500 dark:text-zinc-400 mb-1">
@@ -464,11 +466,11 @@ export default function NewsDetailPage() {
                         </>
                       )}
                     </div>
-                    <h3 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-zinc-100 line-clamp-2 leading-snug">
+                    <h3 className="text-[13px] sm:text-sm font-bold text-zinc-900 dark:text-zinc-100 line-clamp-2 leading-snug">
                       {rnTitle}
                     </h3>
                     {rnDesc && (
-                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 line-clamp-2 mt-1 leading-relaxed">
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2 mt-1 leading-relaxed">
                         {rnDesc}
                       </p>
                     )}

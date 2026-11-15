@@ -253,7 +253,11 @@ export function useDataActions(
       const publicPayload = { ...payloadToSave } as any;
       delete publicPayload.turnstile_secret_key;
       delete publicPayload.cloudinary_api_secret;
+      delete publicPayload.cloudinary_api_key;
       delete publicPayload.gemini_api_key;
+      delete publicPayload.admin_password;
+      delete publicPayload.admin_totp_secret;
+      delete publicPayload._rest_admin_bypass;
       await writeFirestoreDoc('store_data', 'public_settings', publicPayload, true);
 
       // Keep dedicated collection documents in sync when saving those specific sections
@@ -327,11 +331,14 @@ export function useDataActions(
       const prev = (idKey && existingById.get(idKey)) || (slugKey && existingBySlug.get(slugKey));
       const rawTitle = (a?.seo_title || a?.meta_title || '').trim();
       const exactTitle = rawTitle ? formatPageTitle(rawTitle, '', settings?.site_title || '') : '';
+      const rawDesc = (a?.seo_description || a?.meta_description || '').trim();
       const candidate = {
         ...a,
         slug: typeof a?.slug === 'string' ? a.slug.trim().replace(/^\/+|\/+$/g, '') : a?.slug,
         seo_title: exactTitle,
         meta_title: exactTitle,
+        seo_description: rawDesc,
+        meta_description: rawDesc,
         description_html: typeof a?.description_html === 'string' && a.description_html.trim()
           ? structureHtmlFragment(a.description_html)
           : (a?.description_html ?? ''),
@@ -472,7 +479,11 @@ export function useDataActions(
       const publicPayload = { ...payloadToSave } as any;
       delete publicPayload.turnstile_secret_key;
       delete publicPayload.cloudinary_api_secret;
+      delete publicPayload.cloudinary_api_key;
       delete publicPayload.gemini_api_key;
+      delete publicPayload.admin_password;
+      delete publicPayload.admin_totp_secret;
+      delete publicPayload._rest_admin_bypass;
       await writeFirestoreDoc('store_data', 'public_settings', publicPayload, true);
       if (ok) {
         savedToFirestore = true;

@@ -67,6 +67,7 @@ export default function Home() {
   });
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const tabBarRef = useRef<HTMLDivElement | null>(null);
 
   const deferredSearchTerm = useDeferredValue(searchTerm);
   const deferredActiveTab = useDeferredValue(activeTab);
@@ -81,7 +82,12 @@ export default function Home() {
           const parsed = JSON.parse(saved);
           if (parsed && typeof parsed.scrollY === 'number' && parsed.scrollY > 0) {
             window.scrollTo({ top: parsed.scrollY, behavior: 'instant' });
-            return;
+            const rafId = window.requestAnimationFrame(() => {
+              if (Math.abs(window.scrollY - parsed.scrollY) > 24) {
+                window.scrollTo({ top: parsed.scrollY, behavior: 'instant' });
+              }
+            });
+            return () => window.cancelAnimationFrame(rafId);
           }
         }
       } catch (e) {
@@ -179,6 +185,13 @@ export default function Home() {
 
   const handleTabSelect = (nextTab: string) => {
     setActiveTab(nextTab);
+    if (tabBarRef.current && typeof window !== 'undefined') {
+      const headerHeight = window.innerWidth >= 640 ? 64 : 56;
+      const tabBarTop = tabBarRef.current.getBoundingClientRect().top + window.scrollY - headerHeight;
+      if (window.scrollY > tabBarTop + 4) {
+        window.scrollTo({ top: Math.max(0, tabBarTop), behavior: 'smooth' });
+      }
+    }
     const lower = (nextTab || '').toLowerCase().trim();
     const pathLower = location.pathname.toLowerCase().replace(/\/+$/, '') || '/';
     const hasTabQuery = searchParams.has('tab');
@@ -399,6 +412,7 @@ export default function Home() {
         <NewAdditions loading={false} apps={filteredApps} />
       )}
 
+      <div ref={tabBarRef} className="h-0 w-full" aria-hidden="true" />
       <PlayStoreTabs activeTab={activeTab} onTabChange={handleTabSelect} hideOnSearch={!!deferredSearchTerm} />
 
       <HomeFilterBar 
@@ -474,8 +488,17 @@ export default function Home() {
             {tabFilteredApps.length > 0 ? (
               tabFilteredApps.slice(0, visibleCount).map((app, index) => <AppListItem key={`${app.id}-${index}`} app={app} index={index + 1} />)
             ) : (
-              <div className="text-center py-20 text-slate-400">
-                <p className="text-lg">No apps found in {deferredActiveTab}</p>
+              <div className="text-center py-12 px-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800">
+                <p className="text-base font-semibold text-zinc-700 dark:text-zinc-200 mb-3">
+                  No apps found in {deferredActiveTab}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => handleTabSelect('All Apps')}
+                  className="min-h-[40px] px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors cursor-pointer"
+                >
+                  Browse All Apps
+                </button>
               </div>
             )}
           </div>

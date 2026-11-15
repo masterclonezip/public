@@ -100,12 +100,18 @@ async function doFetchStoreData() {
     mergedSettings.favicon_url = rawStaticSettings.favicon_url;
   }
   delete mergedSettings.turnstile_secret_key;
+  delete mergedSettings.admin_password;
+  delete mergedSettings.admin_totp_secret;
+  delete mergedSettings.cloudinary_api_secret;
+  delete mergedSettings.cloudinary_api_key;
+  delete mergedSettings.gemini_api_key;
+  delete mergedSettings._rest_admin_bypass;
 
   const sanitizeSiteKey = (raw: unknown): string => {
     let s = String(raw || '').replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '').trim();
     s = s.replace(/^[A-Za-z0-9_]+\s*=\s*/, '').trim();
     s = s.replace(/^["'`]+|["'`]+$/g, '').trim();
-    const match = s.match(/(0x4[A-Za-z0-9_-]{16,25})/);
+    const match = s.match(/^(0x4[A-Za-z0-9_-]{16,25})$/);
     return match ? match[1] : '';
   };
 
@@ -118,8 +124,6 @@ async function doFetchStoreData() {
     process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
     process.env.VITE_TURNSTILE_KEY,
     process.env.TURNSTILE_KEY,
-    process.env.TURNSTILE_SECRET_KEY,
-    process.env.VITE_TURNSTILE_SECRET_KEY,
   ]
     .map(sanitizeSiteKey)
     .find((k) => /^0x4[A-Za-z0-9_-]{16,25}$/.test(k));
@@ -247,7 +251,9 @@ export async function injectSeoTags(template: string, urlPath: string, hostUrl?:
   let apps = (data.apps || []).filter((a: any) => a && a.sync_to_public !== false);
   let settings = data.settings || {};
   let news = (data.news || []).filter((n: any) => n && n.sync_to_public !== false);
-  let videos = data.videos || [];
+  let videos = (data.videos || []).filter(
+    (v: any) => v && v.sync_to_public !== false && v.sync_to_public !== 'false' && v.is_published !== false && v.is_draft !== true
+  );
   const siteTitle = getField(settings, 'site_title') || (process.env.VITE_SITE_NAME || '').trim();
   const rawOrigin = (hostUrl || process.env.PUBLIC_DOMAIN || process.env.VITE_PUBLIC_DOMAIN || '').trim().replace(/^["']+|["']+$/g, '');
   const baseOrigin = rawOrigin ? normalizeNonWwwDomain(rawOrigin) : '';
@@ -272,6 +278,13 @@ export async function injectSeoTags(template: string, urlPath: string, hostUrl?:
   const cleanPathLower = cleanPath.toLowerCase();
 
   let isNotFound = false;
+  const isNoIndex =
+    cleanPathLower === '/safety' ||
+    cleanPathLower === '/safety-status' ||
+    cleanPathLower.startsWith('/admin') ||
+    cleanPathLower.startsWith('/masterworld') ||
+    cleanPathLower === '/login' ||
+    cleanPathLower.startsWith('/login/');
   let customCanonicalUrl: string | undefined = undefined;
   let pageType: 'home' | 'app' | 'news' | 'video' | 'static' | 'collection' | 'gateway' | '404' = 'static';
   let targetApp: any = null;
@@ -425,12 +438,16 @@ export async function injectSeoTags(template: string, urlPath: string, hostUrl?:
       title = `News Article Not Found`;
       description = `The requested publication could not be located.`;
     }
-  } else if (cleanPathLower.startsWith('/videos/')) {
-    const slug = cleanPath.split('/videos/')[1]?.toLowerCase().trim().replace(/\/+$/, '');
+  } else if (cleanPathLower.startsWith('/videos/') || cleanPathLower.startsWith('/video/')) {
+    const slug = cleanPath.replace(/^\/videos?\//i, '').toLowerCase().trim().replace(/\/+$/, '');
     const videoItem = videos.find((v: any) => (getField(v, 'slug') || getField(v, 'id'))?.toLowerCase().trim() === slug);
     if (videoItem) {
       title = getField(videoItem, 'seo_title') || getField(videoItem, 'meta_title') || getField(videoItem, 'title');
-      description = getField(videoItem, 'seo_description') || getField(videoItem, 'meta_description') || getField(videoItem, 'description', '').substring(0, 160);
+      description = cleanSeoDescription(
+        getField(videoItem, 'seo_description') ||
+        getField(videoItem, 'meta_description') ||
+        getField(videoItem, 'description', '').substring(0, 160)
+      );
       customCanonicalUrl = `${baseOrigin}/videos/${getField(videoItem, 'slug') || getField(videoItem, 'id')}`;
       pageType = 'video';
       targetVideo = videoItem;
@@ -530,19 +547,31 @@ export async function injectSeoTags(template: string, urlPath: string, hostUrl?:
     const videoItem = videos.find((v: any) => getField(v, 'slug')?.toLowerCase() === appSlug);
 
     if (app) {
+      const appSlugClean = String(getField(app, 'slug') || '').trim().toLowerCase();
       title = getField(app, 'seo_title') || getField(app, 'meta_title') || getField(app, 'name');
       description = cleanSeoDescription(getField(app, 'seo_description') || getField(app, 'meta_description') || stripHtml(getField(app, 'description_html')).substring(0, 160));
-      customCanonicalUrl = `${baseOrigin}/app/${getField(app, 'slug')}`;
+      customCanonicalUrl = `${baseOrigin}/app/${appSlugClean}`;
       pageType = 'app';
       targetApp = app;
     } else if (newsItem) {
       title = getField(newsItem, 'seo_title') || getField(newsItem, 'meta_title') || getField(newsItem, 'title');
-      description = getField(newsItem, 'seo_description') || getField(newsItem, 'meta_description') || getField(newsItem, 'description', '').substring(0, 160);
+      description = cleanSeoDescription(
+        getField(newsItem, 'seo_description') ||
+        getField(newsItem, 'meta_description') ||
+        getField(newsItem, 'description') ||
+        stripHtml(getField(newsItem, 'content') || getField(newsItem, 'description_html')).substring(0, 160)
+      );
+      customCanonicalUrl = `${baseOrigin}/news/${getField(newsItem, 'slug') || getField(newsItem, 'id')}`;
       pageType = 'news';
       targetNews = newsItem;
     } else if (videoItem) {
       title = getField(videoItem, 'seo_title') || getField(videoItem, 'meta_title') || getField(videoItem, 'title');
-      description = getField(videoItem, 'seo_description') || getField(videoItem, 'meta_description') || getField(videoItem, 'description', '').substring(0, 160);
+      description = cleanSeoDescription(
+        getField(videoItem, 'seo_description') ||
+        getField(videoItem, 'meta_description') ||
+        getField(videoItem, 'description', '').substring(0, 160)
+      );
+      customCanonicalUrl = `${baseOrigin}/videos/${getField(videoItem, 'slug') || getField(videoItem, 'id')}`;
       pageType = 'video';
       targetVideo = videoItem;
     } else {
@@ -579,21 +608,18 @@ export async function injectSeoTags(template: string, urlPath: string, hostUrl?:
   }
 
   let canonicalUrl = '';
-  if (pageType === 'gateway' || isNotFound) {
+  if (pageType === 'gateway' || isNotFound || isNoIndex) {
     canonicalUrl = '';
   } else if (pageType === 'app' && targetApp && getField(targetApp, 'slug')) {
-    const rawAppCanonical = getField(targetApp, 'canonical_url');
     const expectedAppSlug = String(getField(targetApp, 'slug')).trim().toLowerCase();
-    if (rawAppCanonical && typeof rawAppCanonical === 'string' && rawAppCanonical.toLowerCase().includes(`/app/${expectedAppSlug}`)) {
-      canonicalUrl = getCleanCanonicalUrl(rawAppCanonical, `/app/${expectedAppSlug}`, baseOrigin);
-    } else {
-      canonicalUrl = baseOrigin ? `${baseOrigin}/app/${expectedAppSlug}` : getCleanCanonicalUrl(undefined, `/app/${expectedAppSlug}`, baseOrigin);
-    }
+    canonicalUrl = baseOrigin ? `${baseOrigin}/app/${expectedAppSlug}` : getCleanCanonicalUrl(undefined, `/app/${expectedAppSlug}`, baseOrigin);
   } else if (pageType === 'news' && targetNews) {
     const nSlug = getField(targetNews, 'slug') || getField(targetNews, 'id');
     canonicalUrl = baseOrigin ? `${baseOrigin}/news/${nSlug}` : getCleanCanonicalUrl(undefined, `/news/${nSlug}`, baseOrigin);
-  } else {
+  } else if (customCanonicalUrl) {
     canonicalUrl = getCleanCanonicalUrl(customCanonicalUrl, canonicalPath, baseOrigin);
+  } else {
+    canonicalUrl = getCleanCanonicalUrl(undefined, canonicalPath, baseOrigin);
   }
 
   let pageOgImage = logoUrl;
@@ -603,7 +629,12 @@ export async function injectSeoTags(template: string, urlPath: string, hostUrl?:
     pageOgImage = getField(targetNews, 'og_image_url') || getField(targetNews, 'image_url') || getField(targetNews, 'logo_url') || getField(targetNews, 'image') || logoUrl;
   } else if (targetVideo) {
     const ytThumb = getYoutubeThumbnail(getField(targetVideo, 'youtube_url'));
-    if (ytThumb) pageOgImage = ytThumb;
+    pageOgImage =
+      getField(targetVideo, 'og_image_url') ||
+      getField(targetVideo, 'thumbnail_url') ||
+      getField(targetVideo, 'image_url') ||
+      ytThumb ||
+      logoUrl;
   }
 
   let domain = baseOrigin;
@@ -622,7 +653,7 @@ export async function injectSeoTags(template: string, urlPath: string, hostUrl?:
   const preRenderedBody = (!isAdminPath && pageType !== 'gateway') ? await getPagePreRender(urlPath, data) : '';
 
   // Generate Schema.org JSON-LD structured data
-  const jsonLdSchema = pageType === 'gateway' ? '' : await buildJsonLdSchema({
+  const jsonLdSchema = (pageType === 'gateway' || isNoIndex || isNotFound) ? '' : await buildJsonLdSchema({
     pageType,
     title,
     description,
@@ -646,6 +677,7 @@ export async function injectSeoTags(template: string, urlPath: string, hostUrl?:
     siteTitle,
     targetApp,
     targetNews,
+    targetVideo,
     collectionItems,
     settings,
     faviconIco,
@@ -654,6 +686,7 @@ export async function injectSeoTags(template: string, urlPath: string, hostUrl?:
     favicon180,
     jsonLdSchema,
     isNotFound,
+    isNoIndex,
     getField,
     pageType
   });

@@ -23,9 +23,12 @@ function wrapWithLayout(bodyContent: string, settings: any): string {
 }
 
 export async function getPagePreRender(urlPath: string, data: any): Promise<string> {
-  const { apps: rawApps = [], settings = {}, news: rawNews = [], videos = [], developers = [] } = data || {};
+  const { apps: rawApps = [], settings = {}, news: rawNews = [], videos: rawVideos = [], developers = [] } = data || {};
   const apps = Array.isArray(rawApps) ? rawApps.filter((a: any) => a && a.sync_to_public !== false) : [];
   const news = Array.isArray(rawNews) ? rawNews.filter((n: any) => n && n.sync_to_public !== false) : [];
+  const videos = Array.isArray(rawVideos)
+    ? rawVideos.filter((v: any) => v && v.sync_to_public !== false && v.sync_to_public !== 'false' && v.is_published !== false && v.is_draft !== true)
+    : [];
   const cleanPath = urlPath.split('?')[0].split('#')[0].replace(/\/+$/, '') || '/';
   const cleanPathLower = cleanPath.toLowerCase();
 
@@ -124,8 +127,8 @@ export async function getPagePreRender(urlPath: string, data: any): Promise<stri
     }
   } else if (cleanPathLower === '/videos') {
     bodyHtml = renderers.renderVideosList(videos, settings);
-  } else if (cleanPathLower.startsWith('/videos/')) {
-    const slug = cleanPath.split('/videos/')[1];
+  } else if (cleanPathLower.startsWith('/videos/') || cleanPathLower.startsWith('/video/')) {
+    const slug = cleanPath.replace(/^\/videos?\//i, '').trim();
     bodyHtml = renderers.renderVideoDetail(slug, videos, settings);
   } else if (cleanPathLower === '/about') {
     bodyHtml = renderers.renderAbout(settings);

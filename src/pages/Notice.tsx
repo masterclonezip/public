@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import Meta from '../components/Meta';
 import { DEFAULT_NOTICE_HTML } from '../lib/defaultLegalContent';
+import { normalizeNonWwwDomain } from '../lib/seoUtils';
 
 export default function Notice() {
   const { settings: mockSettings, fetchSettings } = useData();
@@ -34,11 +35,11 @@ export default function Notice() {
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-1 xs:px-2 sm:px-4 py-3 sm:py-6 animate-fade-in pb-16 min-h-[70vh] text-left">
+    <div className="w-full max-w-5xl mx-auto px-0 sm:px-4 py-3 sm:py-6 animate-fade-in pb-16 min-h-[70vh] text-left">
       <div className="mb-3 sm:mb-5">
         <Link 
           to="/" 
-          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+          className="inline-flex items-center gap-1.5 min-h-[40px] py-1 text-xs sm:text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Home
@@ -47,7 +48,7 @@ export default function Notice() {
       <Meta 
         title={mockSettings?.notice_meta_title || mockSettings?.important_notice_heading || 'Legal Notice'}
         description={mockSettings?.notice_meta_description || "Important legal notices and compliance information."}
-        canonical={(typeof window !== 'undefined' ? window.location.origin : '') + "/notice"}
+        canonical={(typeof window !== 'undefined' ? normalizeNonWwwDomain(window.location.origin) : '') + "/notice"}
       />
 
       <div className="animate-fade-in">
@@ -64,7 +65,7 @@ export default function Notice() {
         
         <div
           onClick={handleHtmlClick}
-          className="rich-html-boundary open-page-body prose prose-zinc dark:prose-invert max-w-none text-sm sm:text-base text-zinc-700 dark:text-zinc-300 font-medium leading-relaxed"
+          className="rich-html-boundary open-page-body prose prose-zinc dark:prose-invert max-w-none text-[15px] sm:text-base text-zinc-700 dark:text-zinc-300 font-medium leading-[1.7] sm:leading-relaxed"
           dangerouslySetInnerHTML={{ __html: safeHtml(mockSettings.important_notice || DEFAULT_NOTICE_HTML) }}
         />
       </div>

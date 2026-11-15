@@ -4,11 +4,12 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, HelpCircle, ChevronDown } from 'lucide-react';
 import Meta from '../components/Meta';
 import { safeHtml } from '../lib/safeHtmlPublic';
+import { normalizeNonWwwDomain } from '../lib/seoUtils';
 
 export default function FaqPage() {
   const { settings, fetchSettings } = useData();
   const siteTitle = settings?.site_title || '';
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const origin = typeof window !== 'undefined' ? normalizeNonWwwDomain(window.location.origin) : '';
 
   React.useEffect(() => {
     if ((!settings?.website_faqs || settings.website_faqs.length === 0) && fetchSettings) {
@@ -25,30 +26,31 @@ export default function FaqPage() {
 
   const pageTitle = settings?.faq_meta_title || "Frequently Asked Questions";
   const pageDesc = settings?.faq_meta_description || "Everything you need to know about app verification and downloads.";
+  const canonicalUrl = origin ? `${origin}/faq` : '/faq';
   const webPageSchema = useMemo(() => ({
     "@context": "https://schema.org",
     "@type": "WebPage",
-    "@id": `${origin}/faq#webpage`,
-    "url": `${origin}/faq`,
+    "@id": `${canonicalUrl}#webpage`,
+    "url": canonicalUrl,
     "name": pageTitle,
     "headline": pageTitle,
     "description": pageDesc,
     "inLanguage": "en"
-  }), [origin, pageTitle, pageDesc]);
+  }), [canonicalUrl, pageTitle, pageDesc]);
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-1 xs:px-2 sm:px-4 py-3 sm:py-6 animate-fade-in pb-16 min-h-[70vh] text-left">
+    <div className="w-full max-w-5xl mx-auto px-0 sm:px-4 py-3 sm:py-6 animate-fade-in pb-16 min-h-[70vh] text-left">
       <Meta 
         title={pageTitle}
         description={pageDesc}
-        canonical={`${origin}/faq`}
+        canonical={canonicalUrl}
         schema={webPageSchema}
       />
       
       <div className="mb-3 sm:mb-5">
         <Link 
           to="/" 
-          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+          className="inline-flex items-center gap-1.5 min-h-[40px] py-1 text-xs sm:text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Home
@@ -77,8 +79,8 @@ export default function FaqPage() {
               className="group rounded-xl sm:rounded-2xl border transition-colors duration-200 overflow-hidden bg-transparent border-zinc-200/80 dark:border-zinc-800/80 open:border-blue-500/30 dark:open:border-blue-500/30"
               open
             >
-              <summary className="list-none [&::-webkit-details-marker]:hidden w-full text-left p-3.5 sm:p-5 flex items-center justify-between gap-3 cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 select-none">
-                <h2 className="text-sm sm:text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-start gap-2.5">
+              <summary className="list-none [&::-webkit-details-marker]:hidden w-full min-h-[52px] text-left p-4 sm:p-5 flex items-center justify-between gap-3 cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 select-none">
+                <h2 className="text-[15px] sm:text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-start gap-2.5">
                   <span className="text-blue-600 dark:text-blue-400 font-extrabold shrink-0 select-none">Q.</span>
                   <span className="leading-snug">{faq.question}</span>
                 </h2>
@@ -87,9 +89,9 @@ export default function FaqPage() {
                 </div>
               </summary>
 
-              <div className="px-3.5 sm:px-5 pb-4 sm:pb-5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 text-sm sm:text-base text-zinc-700 dark:text-zinc-300 leading-relaxed">
+              <div className="px-4 sm:px-5 pb-4 sm:pb-5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 text-[15px] sm:text-base text-zinc-700 dark:text-zinc-300 leading-[1.7]">
                 <div
-                  className="rich-html-boundary open-page-body prose prose-zinc dark:prose-invert prose-sm sm:prose-base max-w-none w-full break-words whitespace-normal"
+                  className="rich-html-boundary open-page-body prose prose-zinc dark:prose-invert prose-sm sm:prose-base max-w-none w-full break-words whitespace-normal text-[15px] sm:text-base"
                   dangerouslySetInnerHTML={{ __html: safeHtml(faq.answer) }}
                 />
               </div>

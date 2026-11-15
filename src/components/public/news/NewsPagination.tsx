@@ -21,7 +21,7 @@ export default function NewsPagination({
   };
 
   return (
-    <nav aria-label="News pagination" className="mt-10 flex items-center justify-center gap-1.5 sm:gap-2">
+    <nav aria-label="News pagination" className="mt-10 flex items-center justify-center gap-1.5 sm:gap-2 flex-wrap">
       {currentPage > 1 ? (
         <Link
           to={getPageUrl(currentPage - 1)}
@@ -29,7 +29,7 @@ export default function NewsPagination({
             e.preventDefault();
             onPageChange(currentPage - 1);
           }}
-          className="p-2 sm:px-3 sm:py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer no-underline"
+          className="min-h-[40px] min-w-[40px] px-2.5 sm:px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-center justify-center gap-1 text-xs font-semibold cursor-pointer no-underline"
           aria-label="Previous page"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -37,7 +37,7 @@ export default function NewsPagination({
         </Link>
       ) : (
         <span
-          className="p-2 sm:px-3 sm:py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 opacity-40 cursor-not-allowed flex items-center gap-1 text-xs font-semibold select-none"
+          className="min-h-[40px] min-w-[40px] px-2.5 sm:px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 opacity-40 cursor-not-allowed flex items-center justify-center gap-1 text-xs font-semibold select-none"
           aria-disabled="true"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -65,7 +65,7 @@ export default function NewsPagination({
               onPageChange(pageNum);
             }}
             aria-current={isCurrent ? 'page' : undefined}
-            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl text-xs font-bold transition-all flex items-center justify-center cursor-pointer no-underline ${
+            className={`w-10 h-10 rounded-xl text-xs font-bold transition-all flex items-center justify-center cursor-pointer no-underline ${
               isCurrent
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20 pointer-events-none'
                 : 'border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800'
@@ -83,7 +83,7 @@ export default function NewsPagination({
             e.preventDefault();
             onPageChange(currentPage + 1);
           }}
-          className="p-2 sm:px-3 sm:py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer no-underline"
+          className="min-h-[40px] min-w-[40px] px-2.5 sm:px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-center justify-center gap-1 text-xs font-semibold cursor-pointer no-underline"
           aria-label="Next page"
         >
           <span className="hidden sm:inline">Next</span>
@@ -91,7 +91,7 @@ export default function NewsPagination({
         </Link>
       ) : (
         <span
-          className="p-2 sm:px-3 sm:py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 opacity-40 cursor-not-allowed flex items-center gap-1 text-xs font-semibold select-none"
+          className="min-h-[40px] min-w-[40px] px-2.5 sm:px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 opacity-40 cursor-not-allowed flex items-center justify-center gap-1 text-xs font-semibold select-none"
           aria-disabled="true"
         >
           <span className="hidden sm:inline">Next</span>

@@ -18,16 +18,17 @@ export default function HomeSearchResults({
 
   return (
     <div className="px-0 sm:px-1 mb-4">
-      <div className="flex items-center justify-between bg-blue-50/60 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 rounded-xl px-3 py-2 text-xs font-medium text-blue-900 dark:text-blue-200 mb-3">
-        <span className="flex items-center gap-1.5">
-          <Search className="w-3.5 h-3.5 text-blue-500" />
-          <span>Showing results for <strong>"{searchTerm}"</strong> ({filteredApps.length} found)</span>
+      <div className="flex items-center justify-between gap-2 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 rounded-xl px-3 py-2 text-xs font-medium text-blue-900 dark:text-blue-200 mb-3">
+        <span className="flex items-center gap-1.5 min-w-0 truncate">
+          <Search className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+          <span className="truncate">Results for <strong>"{searchTerm}"</strong> ({filteredApps.length})</span>
         </span>
         <button
+          type="button"
           onClick={onClearSearch}
-          className="text-blue-600 dark:text-blue-400 hover:underline font-bold text-xs cursor-pointer ml-2"
+          className="min-h-[36px] px-3 py-1 rounded-lg bg-white/80 dark:bg-zinc-900/60 text-blue-600 dark:text-blue-400 hover:underline font-bold text-xs cursor-pointer shrink-0"
         >
-          Clear Search
+          Clear
         </button>
       </div>
       <div className="space-y-2">

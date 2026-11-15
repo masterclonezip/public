@@ -114,6 +114,8 @@ export interface NewsItem {
   is_new?: boolean;
   is_pinned?: boolean;
   sync_to_public?: boolean;
+  is_published?: boolean;
+  is_draft?: boolean;
 }
 
 export interface AppConfig {
@@ -194,13 +196,18 @@ export interface VideoItem {
   video_url?: string;
   thumbnail?: string;
   thumbnail_url?: string;
+  image_url?: string;
   duration?: string;
   category?: string;
   seo_title?: string;
+  meta_title?: string;
   seo_description?: string;
   meta_description?: string;
   seo_keywords?: string;
   canonical_url?: string;
   og_image_url?: string;
   created_at?: string;
+  sync_to_public?: boolean;
+  is_published?: boolean;
+  is_draft?: boolean;
 }

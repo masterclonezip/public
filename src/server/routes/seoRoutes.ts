@@ -270,7 +270,9 @@ Disallow: /admin/
 Disallow: /login/
 Disallow: /masterworld/
 Disallow: /moreinfo/
-Disallow: /moreinfo/*`;
+Disallow: /moreinfo/*
+Disallow: /safety
+Disallow: /safety-status`;
 
   const agentBlocks = namedAgents
     .map((ua) => `User-agent: ${ua}\n${blockRules}`)
@@ -297,7 +299,6 @@ Sitemap: ${host}/sitemap-apps.xml
 Sitemap: ${host}/sitemap-static.xml
 Sitemap: ${host}/sitemap-videos.xml
 Sitemap: ${host}/sitemap-developers.xml
-Sitemap: ${host}/sitemap-categories.xml
 `);
 });
 

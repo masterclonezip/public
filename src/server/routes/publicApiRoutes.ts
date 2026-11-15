@@ -152,9 +152,20 @@ publicApiRouter.get('/api/v1/public/news/:slug', async (req, res) => {
   res.status(404).json({ status: 'NOT_FOUND', error: 'News item not found' });
 });
 
+function isPublicReadyVideo(v: any): boolean {
+  return Boolean(
+    v &&
+    v.sync_to_public !== false &&
+    v.sync_to_public !== 'false' &&
+    v.is_published !== false &&
+    v.is_draft !== true
+  );
+}
+
 publicApiRouter.get('/api/v1/public/videos', async (req, res) => {
   const data = await fetchStoreData();
-  const videos = data?.videos || (staticData as any)?.videos || [];
+  const rawVideos = data?.videos || (staticData as any)?.videos || [];
+  const videos = Array.isArray(rawVideos) ? rawVideos.filter(isPublicReadyVideo) : [];
   res.setHeader('Cache-Control', 'public, max-age=600, s-maxage=1200, stale-while-revalidate=86400');
   res.json({ status: 'OK', videos });
 });
@@ -240,17 +251,27 @@ publicApiRouter.get('/api/v1/public/backup-data', async (req, res) => {
     const sourceApps = (Array.isArray(data?.apps) && data.apps.length > 0) ? data.apps : staticApps;
     const rawApps = sourceApps.filter((a: any) => a && a.sync_to_public !== false);
     const rawNews = (data?.news || (staticData as any)?.news || (staticData as any)?.mockNews || []).filter((n: any) => n && n.sync_to_public !== false);
+    const rawVideos = (data?.videos || (staticData as any)?.videos || (staticData as any)?.mockVideos || []).filter(isPublicReadyVideo);
     res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
     return res.json({
       apps: Array.isArray(rawApps) ? rawApps.map((a: any) => sanitizeAppForPublicClient(a, false)) : [],
       settings: sanitizeSettingsForPublicClient(data?.settings || (staticData as any)?.settings || (staticData as any)?.mockSettings || {}),
       news: Array.isArray(rawNews) ? rawNews.map(sanitizeNewsCardForPublicList) : [],
-      videos: data?.videos || (staticData as any)?.videos || (staticData as any)?.mockVideos || [],
+      videos: rawVideos,
       reviews: []
     });
   } catch (err) {
+    const fallbackApps = ((staticData as any)?.apps || (staticData as any)?.mockApps || []).filter((a: any) => a && a.sync_to_public !== false);
+    const fallbackNews = ((staticData as any)?.news || (staticData as any)?.mockNews || []).filter((n: any) => n && n.sync_to_public !== false);
+    const fallbackVideos = ((staticData as any)?.videos || (staticData as any)?.mockVideos || []).filter(isPublicReadyVideo);
     res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300');
-    return res.json(staticData);
+    return res.json({
+      apps: fallbackApps.map((a: any) => sanitizeAppForPublicClient(a, false)),
+      settings: sanitizeSettingsForPublicClient((staticData as any)?.settings || (staticData as any)?.mockSettings || {}),
+      news: fallbackNews.map(sanitizeNewsCardForPublicList),
+      videos: fallbackVideos,
+      reviews: []
+    });
   }
 });
 
@@ -261,16 +282,26 @@ publicApiRouter.get('/api/v1/public/backup-data-full', async (req, res) => {
     const sourceApps = (Array.isArray(data?.apps) && data.apps.length > 0) ? data.apps : staticApps;
     const rawApps = sourceApps.filter((a: any) => a && a.sync_to_public !== false);
     const rawNews = (data?.news || (staticData as any)?.news || (staticData as any)?.mockNews || []).filter((n: any) => n && n.sync_to_public !== false);
+    const rawVideos = (data?.videos || (staticData as any)?.videos || (staticData as any)?.mockVideos || []).filter(isPublicReadyVideo);
     res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
     return res.json({
       apps: Array.isArray(rawApps) ? rawApps.map((a: any) => sanitizeAppForPublicClient(a, true)) : [],
       settings: sanitizeSettingsForPublicClient(data?.settings || (staticData as any)?.settings || (staticData as any)?.mockSettings || {}),
       news: rawNews,
-      videos: data?.videos || (staticData as any)?.videos || (staticData as any)?.mockVideos || [],
+      videos: rawVideos,
       reviews: data?.reviews || []
     });
   } catch (err) {
+    const fallbackApps = ((staticData as any)?.apps || (staticData as any)?.mockApps || []).filter((a: any) => a && a.sync_to_public !== false);
+    const fallbackNews = ((staticData as any)?.news || (staticData as any)?.mockNews || []).filter((n: any) => n && n.sync_to_public !== false);
+    const fallbackVideos = ((staticData as any)?.videos || (staticData as any)?.mockVideos || []).filter(isPublicReadyVideo);
     res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300');
-    return res.json(staticData);
+    return res.json({
+      apps: fallbackApps.map((a: any) => sanitizeAppForPublicClient(a, true)),
+      settings: sanitizeSettingsForPublicClient((staticData as any)?.settings || (staticData as any)?.mockSettings || {}),
+      news: fallbackNews,
+      videos: fallbackVideos,
+      reviews: (staticData as any)?.reviews || []
+    });
   }
 });

@@ -22,9 +22,16 @@ export default function VideoDetailPage() {
   const { videos: mockVideos, settings: mockSettings, loading, videosSyncedWithServer, serverVideosFetched, refreshAll } = useData();
   const { slug } = useParams();
   const [fetchedVideo, setFetchedVideo] = useState<any | null>(null);
-  const videoItem = mockVideos.find(v => v.slug?.toLowerCase() === slug?.toLowerCase() || v.id?.toLowerCase() === slug?.toLowerCase()) ||
-                    staticMockVideos.find(v => v.slug?.toLowerCase() === slug?.toLowerCase() || v.id?.toLowerCase() === slug?.toLowerCase()) ||
-                    (fetchedVideo && (fetchedVideo.slug?.toLowerCase() === slug?.toLowerCase() || fetchedVideo.id?.toLowerCase() === slug?.toLowerCase()) ? fetchedVideo : undefined);
+  const isPublicVideo = (v: any) =>
+    v &&
+    v.sync_to_public !== false &&
+    v.sync_to_public !== 'false' &&
+    v.is_published !== false &&
+    v.is_draft !== true;
+
+  const videoItem = mockVideos.find(v => isPublicVideo(v) && (v.slug?.toLowerCase() === slug?.toLowerCase() || v.id?.toLowerCase() === slug?.toLowerCase())) ||
+                    staticMockVideos.find(v => isPublicVideo(v) && (v.slug?.toLowerCase() === slug?.toLowerCase() || v.id?.toLowerCase() === slug?.toLowerCase())) ||
+                    (fetchedVideo && isPublicVideo(fetchedVideo) && (fetchedVideo.slug?.toLowerCase() === slug?.toLowerCase() || fetchedVideo.id?.toLowerCase() === slug?.toLowerCase()) ? fetchedVideo : undefined);
   const [commentText, setCommentText] = useState('');
   
   const [triedRefresh, setTriedRefresh] = useState(false);
@@ -42,7 +49,7 @@ export default function VideoDetailPage() {
     const slugKey = slug?.toLowerCase() || '';
     if (!slugKey) return;
 
-    const found = mockVideos.some(v => v.slug?.toLowerCase() === slugKey || v.id?.toLowerCase() === slugKey);
+    const found = mockVideos.some(v => isPublicVideo(v) && (v.slug?.toLowerCase() === slugKey || v.id?.toLowerCase() === slugKey));
     if (found) {
       setTriedRefresh(true);
       setIsRefreshing(false);
@@ -51,7 +58,7 @@ export default function VideoDetailPage() {
 
     loadFullStaticDataset().then(dataset => {
       const match = (dataset?.videos || []).find((v: any) =>
-        (v.slug || '').toLowerCase() === slugKey || (v.id || '').toLowerCase() === slugKey
+        isPublicVideo(v) && ((v.slug || '').toLowerCase() === slugKey || (v.id || '').toLowerCase() === slugKey)
       );
       if (match) {
         setFetchedVideo(match);
@@ -77,15 +84,25 @@ export default function VideoDetailPage() {
     }
   }, [slug, mockVideos, triedRefresh, isRefreshing, refreshAll]);
 
-  const getInitialComments = () => {
-    const saved = localStorage.getItem(`video_comments_${slug}`);
-    if (saved) {
-      return JSON.parse(saved);
+  const readCommentsForSlug = (targetSlug?: string): Comment[] => {
+    if (typeof window === 'undefined' || !targetSlug) return [];
+    try {
+      const saved = localStorage.getItem(`video_comments_${targetSlug}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return Array.isArray(parsed) ? parsed : [];
+      }
+    } catch (_) {
+      // Ignore malformed localStorage data or restricted storage
     }
     return [];
   };
 
-  const [comments, setComments] = useState<Comment[]>(getInitialComments);
+  const [comments, setComments] = useState<Comment[]>(() => readCommentsForSlug(slug));
+
+  useEffect(() => {
+    setComments(readCommentsForSlug(slug));
+  }, [slug]);
 
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,13 +111,17 @@ export default function VideoDetailPage() {
     const newComment: Comment = {
       id: Math.random().toString(36).substr(2, 9),
       author: 'Guest User',
-      content: commentText,
+      content: commentText.trim(),
       date: new Date().toLocaleDateString()
     };
 
     const newCommentsList = [newComment, ...comments];
     setComments(newCommentsList);
-    localStorage.setItem(`video_comments_${slug}`, JSON.stringify(newCommentsList));
+    try {
+      localStorage.setItem(`video_comments_${slug}`, JSON.stringify(newCommentsList));
+    } catch (_) {
+      // Tolerate blocked storage in private mode
+    }
     setCommentText('');
   };
 
@@ -177,15 +198,42 @@ export default function VideoDetailPage() {
   const rawUploadDate = (videoItem as any).updated_at || videoItem.created_at || (videoItem as any).published_at || (videoItem as any).date || '2026-09-01T00:00:00.000Z';
   const parsedUploadDate = Date.parse(String(rawUploadDate));
   const uploadDateIso = !isNaN(parsedUploadDate) && parsedUploadDate > 0 ? new Date(parsedUploadDate).toISOString() : '2026-09-01T00:00:00.000Z';
+  const videoTitle = videoItem.seo_title || videoItem.meta_title || videoItem.title;
+  const videoDesc = videoItem.seo_description || videoItem.meta_description || videoItem.description || videoItem.title;
+  const videoThumb = (videoItem as any).og_image_url || (videoItem as any).thumbnail_url || (videoItem as any).image_url || (videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : '');
 
-  const videoSchema = {
+  const videoSchema: Record<string, any> = {
     "@context": "https://schema.org",
     "@type": "VideoObject",
-    "name": videoItem.title,
-    "description": videoItem.seo_description || videoItem.description || videoItem.title,
-    "thumbnailUrl": videoId ? `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` : `${origin}/logo.png`,
+    "@id": `${canonicalVideoUrl}#video`,
+    "url": canonicalVideoUrl,
+    "name": videoTitle,
+    "description": videoDesc,
+    "thumbnailUrl": videoThumb || `${origin}/logo.png`,
     "uploadDate": uploadDateIso,
-    "contentUrl": videoItem.youtube_url
+    "contentUrl": videoItem.youtube_url,
+    ...(videoId ? { "embedUrl": `https://www.youtube.com/embed/${videoId}` } : {}),
+    "publisher": {
+      "@type": "Organization",
+      "name": mockSettings?.site_title || "",
+      ...(origin ? {
+        "url": origin,
+        "logo": {
+          "@type": "ImageObject",
+          "url": mockSettings?.logo_url || `${origin}/logo.png`
+        }
+      } : {})
+    }
+  };
+
+  const videoWebPageSchema = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "@id": `${canonicalVideoUrl}#webpage`,
+    "url": canonicalVideoUrl,
+    "name": videoTitle,
+    "description": videoDesc,
+    "inLanguage": "en"
   };
 
   const videoBreadcrumbSchema = {
@@ -214,23 +262,23 @@ export default function VideoDetailPage() {
   };
 
   return (
-    <div className="animate-fade-in max-w-[1550px] mx-auto px-3 sm:px-6 md:px-10 pb-12">
+    <div className="animate-fade-in max-w-[1550px] mx-auto px-0 sm:px-2 md:px-4 pb-12">
       <Meta 
-        title={videoItem.seo_title || videoItem.title}
-        description={videoItem.seo_description || videoItem.description}
+        title={videoTitle}
+        description={videoDesc}
         keywords={videoItem.seo_keywords}
-        image={`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`}
+        image={videoThumb}
         url={canonicalVideoUrl}
         type="website"
         canonical={canonicalVideoUrl}
-        schema={videoSchema}
+        schema={[videoSchema, videoWebPageSchema]}
         breadcrumbSchema={videoBreadcrumbSchema}
       />
       
       <div className="mb-3 sm:mb-5 pt-1 sm:pt-3">
         <Link 
           to="/videos" 
-          className="inline-flex items-center gap-2 text-sm font-medium text-blue-500 hover:text-blue-600 transition-colors group"
+          className="inline-flex items-center gap-2 min-h-[40px] py-1 text-sm font-medium text-blue-500 hover:text-blue-600 transition-colors group"
         >
           <div className="p-1.5 rounded-full bg-blue-50 dark:bg-blue-900/20 group-hover:-translate-x-1 transition-transform">
             <ArrowLeft className="w-4 h-4" />
@@ -288,12 +336,12 @@ export default function VideoDetailPage() {
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     placeholder="Add a comment..."
-                    className="w-full bg-white dark:bg-zinc-900 border border-black/10 dark:border-white/10 rounded-2xl p-4 pr-14 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/30 transition-all min-h-[120px] resize-y outline-none font-normal text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
+                    className="w-full bg-white dark:bg-zinc-900 border border-black/10 dark:border-white/10 rounded-2xl p-4 pr-16 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/30 transition-all min-h-[120px] resize-y outline-none text-base sm:text-sm font-normal text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
                   />
                   <button
                     type="submit"
                     disabled={!commentText.trim()}
-                    className="absolute bottom-4 right-4 w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center hover:bg-blue-700 transition-all disabled:opacity-50 active:scale-[0.95]"
+                    className="absolute bottom-3.5 right-3.5 w-11 h-11 bg-blue-600 text-white rounded-xl flex items-center justify-center hover:bg-blue-700 transition-all disabled:opacity-50 active:scale-[0.95] cursor-pointer"
                     aria-label="Submit comment"
                   >
                     <Send className="w-4 h-4 mr-0.5" />

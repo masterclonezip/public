@@ -65,11 +65,11 @@ export const WebsiteTitleHero = React.memo(({ settings }: WebsiteTitleHeroProps)
   }
 
   return (
-    <div className="w-full relative py-1 sm:py-1.5 px-4 overflow-hidden flex flex-col items-center justify-center text-center my-0">
-      {/* Background Soft Ambient Light */}
-      <div className="absolute inset-0 pointer-events-none flex items-center justify-center -z-10 overflow-hidden">
+    <div className="w-full relative py-1 sm:py-1.5 px-3 sm:px-4 overflow-hidden flex flex-col items-center justify-center text-center my-0">
+      {/* Background Soft Ambient Light (desktop only to avoid mobile blend-mode GPU overhead) */}
+      <div className="hidden sm:flex absolute inset-0 pointer-events-none items-center justify-center -z-10 overflow-hidden">
         <div 
-          className={`w-[200px] sm:w-[300px] h-[100px] sm:h-[150px] rounded-full blur-[40px] sm:blur-[60px] mix-blend-multiply dark:mix-blend-screen opacity-8 transition-colors duration-500 ${
+          className={`w-[300px] h-[150px] rounded-full blur-[60px] mix-blend-multiply dark:mix-blend-screen opacity-8 transition-colors duration-500 ${
             animation === 'glow-pulse' && isAnimated ? 'animate-pulse' : ''
           } ${
             color === 'emerald-indigo' ? 'bg-emerald-500/30 dark:bg-indigo-500/15' :

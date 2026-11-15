@@ -60,6 +60,8 @@ const Meta: React.FC<MetaProps> = ({
 
   const cleanPathLower = currentPath.toLowerCase().replace(/\/+$/, '') || '/';
   const isDisallowedPrefix = 
+    cleanPathLower === '/safety' ||
+    cleanPathLower === '/safety-status' ||
     cleanPathLower.startsWith('/s/') ||
     cleanPathLower.startsWith('/dl/') ||
     cleanPathLower.startsWith('/out/') ||

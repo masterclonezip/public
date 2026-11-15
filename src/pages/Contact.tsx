@@ -9,6 +9,7 @@ import { useData } from '../contexts/DataContextPublic';
 import { Link } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
 import Meta from '../components/Meta';
+import { normalizeNonWwwDomain } from '../lib/seoUtils';
 
 export default function Contact() {
   const { settings: mockSettings } = useData();
@@ -18,17 +19,18 @@ export default function Contact() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errorText, setErrorText] = useState('');
+  const origin = typeof window !== 'undefined' ? normalizeNonWwwDomain(window.location.origin) : '';
   return (
-    <div className="w-full max-w-5xl mx-auto px-1 xs:px-2 sm:px-4 py-3 sm:py-6 animate-fade-in pb-16 min-h-[70vh] text-left">
+    <div className="w-full max-w-5xl mx-auto px-0 sm:px-4 py-3 sm:py-6 animate-fade-in pb-16 min-h-[70vh] text-left">
       <Meta 
         title={mockSettings?.contact_meta_title || "Contact Support"}
         description={mockSettings?.contact_meta_description || "Get in touch with support for any queries or assistance."}
-        canonical={window.location.origin + "/contact"}
+        canonical={origin ? `${origin}/contact` : "/contact"}
       />
       <div className="mb-3 sm:mb-5">
         <Link 
           to="/" 
-          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+          className="inline-flex items-center gap-1.5 min-h-[40px] py-1 text-xs sm:text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Home
@@ -39,7 +41,7 @@ export default function Contact() {
           <div>
             <h1 className="text-xl xs:text-2xl sm:text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100 pb-3 mb-4 border-b border-zinc-200/80 dark:border-zinc-800/80">Contact Us</h1>
             <div 
-              className="rich-html-boundary open-page-body markdown-body text-sm sm:text-base text-zinc-700 dark:text-zinc-300 leading-relaxed font-medium"
+              className="rich-html-boundary open-page-body markdown-body text-[15px] sm:text-base text-zinc-700 dark:text-zinc-300 leading-[1.7] font-medium"
               dangerouslySetInnerHTML={{ __html: safeHtml(mockSettings.contact_content || '' ) }}
             />
           </div>
@@ -122,15 +124,15 @@ export default function Contact() {
 
           <div>
             <label htmlFor="contact-name" className="block text-xs sm:text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Name</label>
-            <input id="contact-name" required type="text" placeholder="Your Name" value={username} onChange={e => setUsername(e.target.value)} className="w-full p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+            <input id="contact-name" required type="text" placeholder="Your Name" value={username} onChange={e => setUsername(e.target.value)} className="w-full min-h-[46px] p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-base sm:text-sm text-zinc-900 dark:text-zinc-100 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
           </div>
           <div>
             <label htmlFor="contact-email" className="block text-xs sm:text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Email</label>
-            <input id="contact-email" required type="email" placeholder="Your Email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+            <input id="contact-email" required type="email" placeholder="Your Email" value={email} onChange={e => setEmail(e.target.value)} className="w-full min-h-[46px] p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-base sm:text-sm text-zinc-900 dark:text-zinc-100 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
           </div>
           <div>
             <label htmlFor="contact-message" className="block text-xs sm:text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Message</label>
-            <textarea id="contact-message" required value={msgText} onChange={(e) => setMsgText(e.target.value)} className="w-full p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 h-36 sm:h-44 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-zinc-900 dark:text-zinc-100 font-medium resize-none" placeholder="How can we help?"></textarea>
+            <textarea id="contact-message" required value={msgText} onChange={(e) => setMsgText(e.target.value)} className="w-full p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 h-36 sm:h-44 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-base sm:text-sm text-zinc-900 dark:text-zinc-100 font-medium resize-none" placeholder="How can we help?"></textarea>
           </div>
 
           {errorText && (
@@ -147,7 +149,7 @@ export default function Contact() {
             </div>
           )}
 
-          <button type="submit" disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-3.5 rounded-xl shadow-md hover:shadow-lg transition-all active:scale-[0.99] text-sm flex items-center justify-center gap-2">
+          <button type="submit" disabled={submitting} className="w-full min-h-[48px] bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-3.5 rounded-xl shadow-md hover:shadow-lg transition-all active:scale-[0.99] text-sm flex items-center justify-center gap-2 cursor-pointer">
             {submitting ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />

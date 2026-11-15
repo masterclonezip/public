@@ -14,6 +14,7 @@ export default function LightSearch({ isOpen, onClose }: LightSearchProps) {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [history, setHistory] = useState<string[]>([]);
+  const [failedIcons, setFailedIcons] = useState<Record<string, boolean>>({});
   const { apps, settings, fetchApps } = useData();
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -173,14 +174,14 @@ export default function LightSearch({ isOpen, onClose }: LightSearchProps) {
 
   return (
     <div 
-      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex flex-col items-center pt-3 sm:pt-12 px-3 sm:px-4 animate-in fade-in duration-150"
+      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex flex-col items-center pt-[max(0.75rem,env(safe-area-inset-top))] pb-[env(safe-area-inset-bottom)] sm:pt-12 px-3 sm:px-4 animate-in fade-in duration-150"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label="Search"
     >
       <div 
-        className="w-full max-w-xl bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-3xl shadow-2xl border border-black/10 dark:border-white/10 overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-98 slide-in-from-top-3 duration-150"
+        className="w-full max-w-xl bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-3xl shadow-2xl border border-black/10 dark:border-white/10 overflow-hidden flex flex-col max-h-[82dvh] animate-in zoom-in-98 slide-in-from-top-3 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search Header Input Bar */}
@@ -195,7 +196,7 @@ export default function LightSearch({ isOpen, onClose }: LightSearchProps) {
               handleSelectTerm(query.trim());
             }
           }}
-          className="flex items-center gap-3 px-4 py-3.5 border-b border-black/5 dark:border-white/5 shrink-0"
+          className="flex items-center gap-2.5 px-3.5 sm:px-4 py-3 border-b border-black/5 dark:border-white/5 shrink-0"
         >
           <Search className="w-5 h-5 text-blue-500 shrink-0" />
           <input
@@ -209,7 +210,7 @@ export default function LightSearch({ isOpen, onClose }: LightSearchProps) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search games, apps, developers..."
-            className="flex-1 bg-transparent text-sm sm:text-base font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 outline-none border-none p-0 focus:ring-0"
+            className="flex-1 bg-transparent text-base font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 outline-none border-none p-0 focus:ring-0"
           />
           {query.length > 0 && (
             <button
@@ -218,7 +219,7 @@ export default function LightSearch({ isOpen, onClose }: LightSearchProps) {
                 setQuery('');
                 inputRef.current?.focus();
               }}
-              className="p-1.5 rounded-full text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+              className="w-9 h-9 flex items-center justify-center rounded-full text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
               aria-label="Clear input"
             >
               <X className="w-4 h-4" />
@@ -227,10 +228,11 @@ export default function LightSearch({ isOpen, onClose }: LightSearchProps) {
           <button 
             type="button"
             onClick={onClose}
-            className="px-2.5 py-1 text-xs font-semibold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
+            className="min-h-[38px] px-3 flex items-center justify-center text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white bg-zinc-100 dark:bg-zinc-800 rounded-xl transition-colors cursor-pointer shrink-0"
             aria-label="Close search"
           >
-            Esc
+            <span className="hidden sm:inline">Esc</span>
+            <span className="sm:hidden">Cancel</span>
           </button>
         </form>
 
@@ -252,30 +254,38 @@ export default function LightSearch({ isOpen, onClose }: LightSearchProps) {
                         setSelectedIndex(idx);
                         preloadAppDetails(app);
                       }}
-                      onTouchStart={() => preloadAppDetails(app)}
                       onClick={() => handleSelectApp(app)}
-                      className={`flex items-center justify-between gap-3 p-2 sm:p-2.5 rounded-xl transition-colors cursor-pointer group ${
+                      className={`flex items-center justify-between gap-3 p-2.5 min-h-[54px] rounded-xl transition-colors cursor-pointer group ${
                         isActive
                           ? 'bg-blue-50/90 dark:bg-blue-950/40 ring-1 ring-blue-500/30'
                           : 'hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80'
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <img
-                          src={getOptimizedImageUrl(app.icon_url, 96) || "/logo.png"}
-                          alt={app.name}
-                          width={40}
-                          height={40}
-                          loading="lazy"
-                          decoding="async"
-                          className="w-10 h-10 rounded-xl object-cover shrink-0 border border-black/5 dark:border-white/5 bg-zinc-100 dark:bg-zinc-800"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            if (app.icon_url && target.src !== app.icon_url) {
-                              target.src = app.icon_url;
-                            }
-                          }}
-                        />
+                        {!failedIcons[app.id] && app.icon_url ? (
+                          <img
+                            src={getOptimizedImageUrl(app.icon_url, 96)}
+                            alt={app.name}
+                            width={40}
+                            height={40}
+                            loading="lazy"
+                            decoding="async"
+                            className="w-10 h-10 rounded-xl object-cover shrink-0 border border-black/5 dark:border-white/5 bg-zinc-100 dark:bg-zinc-800"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              if (app.icon_url && target.src !== app.icon_url && !target.dataset.retried) {
+                                target.dataset.retried = '1';
+                                target.src = app.icon_url;
+                              } else {
+                                setFailedIcons(prev => ({ ...prev, [app.id]: true }));
+                              }
+                            }}
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-xl shrink-0 bg-blue-50 dark:bg-blue-900/30 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-sm">
+                            {(app.name || 'A').substring(0, 1).toUpperCase()}
+                          </div>
+                        )}
                         <div className="min-w-0">
                           <h4 className={`text-sm font-semibold truncate transition-colors ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-900 dark:text-zinc-100 group-hover:text-blue-500'}`}>
                             {app.name}
@@ -285,7 +295,7 @@ export default function LightSearch({ isOpen, onClose }: LightSearchProps) {
                           </p>
                         </div>
                       </div>
-                      <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 px-2.5 py-1 bg-blue-50 dark:bg-blue-950/40 rounded-lg shrink-0">
+                      <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/40 rounded-lg shrink-0">
                         View
                       </span>
                     </div>
@@ -296,7 +306,7 @@ export default function LightSearch({ isOpen, onClose }: LightSearchProps) {
                 <button
                   type="button"
                   onClick={() => handleSelectTerm(query.trim())}
-                  className="w-full mt-2 p-2.5 text-center text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-xl transition-colors cursor-pointer"
+                  className="w-full mt-2 min-h-[44px] px-3 text-center text-sm sm:text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-xl transition-colors cursor-pointer"
                 >
                   View all results for "{query.trim()}" →
                 </button>
@@ -328,11 +338,11 @@ export default function LightSearch({ isOpen, onClose }: LightSearchProps) {
                       <div
                         key={`hist-${idx}`}
                         onClick={() => handleSelectTerm(term)}
-                        className="flex items-center justify-between px-3 py-2 rounded-xl hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80 transition-colors cursor-pointer group"
+                        className="flex items-center justify-between pl-3 pr-1.5 py-1.5 min-h-[44px] rounded-xl hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80 transition-colors cursor-pointer group"
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <Search className="w-3.5 h-3.5 text-zinc-400 group-hover:text-blue-500 transition-colors shrink-0" />
-                          <span className="text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300 truncate">
+                          <Search className="w-4 h-4 text-zinc-400 group-hover:text-blue-500 transition-colors shrink-0" />
+                          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 truncate">
                             {term}
                           </span>
                         </div>
@@ -340,9 +350,9 @@ export default function LightSearch({ isOpen, onClose }: LightSearchProps) {
                           type="button"
                           onClick={(e) => removeFromHistory(term, e)}
                           aria-label={`Remove ${term}`}
-                          className="p-1 text-zinc-400 hover:text-red-500 transition-colors rounded-md"
+                          className="w-9 h-9 flex items-center justify-center text-zinc-400 hover:text-red-500 transition-colors rounded-lg shrink-0 cursor-pointer"
                         >
-                          <X className="w-3.5 h-3.5" />
+                          <X className="w-4 h-4" />
                         </button>
                       </div>
                     ))}
@@ -352,18 +362,18 @@ export default function LightSearch({ isOpen, onClose }: LightSearchProps) {
 
               {/* Trending Searches */}
               {trendingSearches.length > 0 && (
-                <div className="px-3 pt-2">
-                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-2">
+                <div className="px-3 pt-2 pb-1">
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-2.5">
                     <TrendingUp className="w-3.5 h-3.5 text-blue-500" />
                     <span>Popular & Trending</span>
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-2">
                     {trendingSearches.map((tag, idx) => (
                       <button
                         key={`trend-${idx}`}
                         type="button"
                         onClick={() => handleSelectTerm(tag)}
-                        className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800/60 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-blue-600 dark:hover:text-blue-400 rounded-full text-xs font-medium text-zinc-700 dark:text-zinc-300 transition-all border border-black/5 dark:border-white/5 active:scale-95"
+                        className="min-h-[36px] px-3.5 py-1.5 bg-zinc-100 dark:bg-zinc-800/60 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-blue-600 dark:hover:text-blue-400 rounded-full text-xs font-medium text-zinc-700 dark:text-zinc-300 transition-all border border-black/5 dark:border-white/5 active:scale-95 cursor-pointer"
                       >
                         {tag}
                       </button>

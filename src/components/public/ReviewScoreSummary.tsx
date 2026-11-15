@@ -70,7 +70,7 @@ export function ReviewScoreSummary({
               />
             ))}
           </div>
-          <div className="text-[9px] xs:text-[10px] font-semibold text-zinc-400 dark:text-zinc-500">
+          <div className="text-[10px] xs:text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">
             {typeof totalCount === 'number' ? totalCount.toLocaleString() : totalCount} ratings
           </div>
         </div>
@@ -92,7 +92,7 @@ export function ReviewScoreSummary({
       {/* Moderation & Transparency Badge */}
       <div className="mt-4 p-3 bg-green-500/5 border border-green-500/10 rounded-xl flex items-start gap-2.5">
         <ShieldCheck className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
-        <span className="text-[11px] font-semibold text-green-700 dark:text-green-400 leading-relaxed">
+        <span className="text-xs font-semibold text-green-700 dark:text-green-400 leading-relaxed">
           Ratings and reviews are contributed by players and moderated for safety and constructive gameplay feedback.
         </span>
       </div>

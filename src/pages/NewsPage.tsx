@@ -38,7 +38,7 @@ export default function NewsPage() {
 
   const publicNewsList = useMemo(() => {
     return (mockNews || [])
-      .filter(item => item && item.sync_to_public !== false)
+      .filter(item => item && item.sync_to_public !== false && String(item.sync_to_public) !== 'false' && item.is_published !== false && item.is_draft !== true)
       .sort((a, b) => {
         if (a.is_pinned && !b.is_pinned) return -1;
         if (!a.is_pinned && b.is_pinned) return 1;
@@ -165,7 +165,7 @@ export default function NewsPage() {
   const baseTitle = mockSettings?.news_meta_title || "News & Updates";
   const seoTitle = safeCurrentPage > 1 ? `${baseTitle} - Page ${safeCurrentPage}` : baseTitle;
   const seoDescription = mockSettings?.news_meta_description || "The latest news, reports, and platform updates.";
-  const canonicalUrl = `${origin}/news${safeCurrentPage > 1 ? `?page=${safeCurrentPage}` : ''}`;
+  const canonicalUrl = origin ? `${origin}/news` : '/news';
 
   const newsCollectionSchema = useMemo(() => ({
     "@context": "https://schema.org",
@@ -219,26 +219,26 @@ export default function NewsPage() {
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-4 py-2 rounded-full shadow-xl flex items-center gap-2 border border-white/10 dark:border-black/5 animate-fade-in text-xs font-semibold"
+          className="fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-50 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-4 py-2.5 rounded-full shadow-xl flex items-center gap-2 border border-white/10 dark:border-black/5 animate-fade-in text-xs font-semibold"
         >
           <Check className="w-3.5 h-3.5 text-green-500" />
           <span>Link copied to clipboard</span>
         </div>
       )}
 
-      <div ref={contentTopRef} className="pt-0.5 pb-0.5 px-3 sm:px-0">
+      <div ref={contentTopRef} className="pt-0.5 pb-1 px-0">
         <Link 
           to="/" 
-          className="inline-flex items-center gap-2 text-sm sm:text-base font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors group shrink-0 no-underline"
+          className="inline-flex items-center gap-1.5 min-h-[36px] py-1 text-xs sm:text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors group shrink-0 no-underline"
         >
-          <div className="p-1.5 sm:p-2 rounded-full bg-blue-50 dark:bg-blue-900/30 group-hover:-translate-x-1 transition-transform shadow-xs">
-            <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+          <div className="p-1 rounded-full bg-blue-50 dark:bg-blue-900/30 group-hover:-translate-x-1 transition-transform">
+            <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </div>
           <span>Back to storefront</span>
         </Link>
       </div>
 
-      <div className="px-3 sm:px-0 mt-0.5 mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+      <div className="px-0 mt-0.5 mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         <h1 className="text-2xl sm:text-3xl font-extrabold text-zinc-900 dark:text-white tracking-tight">
           News &amp; Updates
         </h1>
@@ -246,28 +246,28 @@ export default function NewsPage() {
         <div className="relative w-full sm:w-80 shrink-0">
           <input
             type="text"
-            className="w-full py-2.5 pl-10 pr-9 text-sm text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800/90 border border-zinc-200 dark:border-zinc-700/80 rounded-xl placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium"
+            className="w-full py-2.5 pl-10 pr-11 min-h-[44px] text-base sm:text-sm text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800/90 border border-zinc-200 dark:border-zinc-700/80 rounded-xl placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium"
             placeholder="Search news or topics..."
             value={searchTerm}
             onChange={(e) => handleSearchChange(e.target.value)}
             aria-label="Search news articles"
           />
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 pointer-events-none" />
           {searchTerm && (
             <button 
               type="button"
               onClick={() => handleSearchChange('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+              className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
               aria-label="Clear search"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-4 h-4" />
             </button>
           )}
         </div>
       </div>
 
       {categories.length > 1 && (
-        <div className="px-3 sm:px-0 mb-6 flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+        <div className="-mx-2.5 px-2.5 sm:mx-0 sm:px-0 mb-6 flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
           {categories.map(cat => {
             const isSelected = activeCategory.toLowerCase() === cat.toLowerCase();
             const catHref = cat === 'All' ? '/news' : `/news?category=${encodeURIComponent(cat)}`;
@@ -279,7 +279,7 @@ export default function NewsPage() {
                   e.preventDefault();
                   handleCategoryChange(cat);
                 }}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer no-underline ${
+                className={`min-h-[38px] inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer no-underline ${
                   isSelected
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
                     : 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
@@ -293,21 +293,21 @@ export default function NewsPage() {
       )}
 
       {currentNewsSlice.length === 0 ? (
-        <div className="py-16 text-center bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50 mx-3 sm:mx-0">
+        <div className="py-16 px-4 text-center bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50">
           <p className="text-base font-bold text-zinc-800 dark:text-zinc-200">No news articles found</p>
           <p className="text-xs text-zinc-400 mt-1 mb-4">Try adjusting your category or search keywords</p>
           {(activeCategory !== 'All' || searchTerm) && (
             <button
               type="button"
               onClick={handleClearFilters}
-              className="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-xl hover:bg-blue-700 transition-colors cursor-pointer"
+              className="min-h-[40px] px-5 py-2 bg-blue-600 text-white text-xs font-semibold rounded-xl hover:bg-blue-700 transition-colors cursor-pointer"
             >
               Reset Filters
             </button>
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 px-3 sm:px-0">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
           {currentNewsSlice.map((item, idx) => (
             <NewsCard key={item.id || item.slug} item={item} index={idx} onShare={handleShare} />
           ))}
@@ -322,7 +322,7 @@ export default function NewsPage() {
       />
 
       {activeCategory === 'All' && !searchTerm && safeCurrentPage === 1 && remainingNews.length > 0 && (
-        <nav aria-label="Complete News Archive" data-nosnippet className="mt-10 pt-6 border-t border-zinc-200/80 dark:border-zinc-800/80 px-3 sm:px-0">
+        <nav aria-label="Complete News Archive" data-nosnippet className="mt-10 pt-6 border-t border-zinc-200/80 dark:border-zinc-800/80">
           <h2 className="text-xs sm:text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-3 uppercase tracking-wider">
             More News &amp; Updates ({remainingNews.length})
           </h2>
@@ -334,9 +334,9 @@ export default function NewsPage() {
                 <Link
                   key={n.id || nSlug}
                   to={`/news/${encodeURIComponent(nSlug)}`}
-                  className="px-3 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 hover:bg-blue-50 dark:hover:bg-blue-950/30 border border-zinc-200/60 dark:border-zinc-800/60 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 truncate no-underline transition-colors"
+                  className="min-h-[42px] flex items-center px-3.5 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 hover:bg-blue-50 dark:hover:bg-blue-950/30 border border-zinc-200/60 dark:border-zinc-800/60 text-[13px] sm:text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 truncate no-underline transition-colors"
                 >
-                  {nTitle}
+                  <span className="truncate">{nTitle}</span>
                 </Link>
               );
             })}

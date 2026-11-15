@@ -240,7 +240,7 @@ function AppContent() {
       <ScrollToTop />
       {memoizedHeader}
 
-      <main id="main-content" tabIndex={-1} suppressHydrationWarning={true} className="flex-1 w-full max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-0 sm:py-3 pb-16 sm:pb-24 overflow-x-hidden relative focus:outline-none">
+      <main id="main-content" tabIndex={-1} suppressHydrationWarning={true} className="flex-1 w-full max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-8 py-0 sm:py-3 pb-16 sm:pb-24 [overflow-x:clip] relative focus:outline-none">
         <div className="w-full h-full" suppressHydrationWarning={true}>
           <ErrorBoundary>
             <Routes location={location}>
