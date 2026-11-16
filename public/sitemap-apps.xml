@@ -1,6 +1,86 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
+    <loc>https://example.com/app/top-rummy</loc>
+    <lastmod>2026-11-16T17:50:47+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794851446/l1g6xt0c6f8ddun3cwbp.png</image:loc>
+      <image:title>TOP RUMMY</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://example.com/app/1-2-3-rummy</loc>
+    <lastmod>2026-11-16T17:49:31+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794851369/ultmvahm81mtaqoayekg.png</image:loc>
+      <image:title>1 2 3 RUMMY</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://example.com/app/jaiho-spin</loc>
+    <lastmod>2026-11-16T17:48:00+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794851258/etmeztsiwnibt4vg2eam.png</image:loc>
+      <image:title>JAIHO SPIN</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://example.com/app/saga-slots</loc>
+    <lastmod>2026-11-16T17:46:28+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794851169/kv3r8lev0axvlgzyhtti.png</image:loc>
+      <image:title>SAGA SLOTS</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://example.com/app/spin-rummy</loc>
+    <lastmod>2026-11-16T17:45:31+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794851125/enhkduij8r86cs7fmgc6.png</image:loc>
+      <image:title>SPIN RUMMY</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://example.com/app/mbm-bet</loc>
+    <lastmod>2026-11-16T17:42:16+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794324821/lspfzyxjpapssnrt4cqw.png</image:loc>
+      <image:title>MBM BET</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://example.com/app/abc-rummy</loc>
+    <lastmod>2026-11-16T17:39:22+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794325341/vqkrxtnokavfpz33ao7c.webp</image:loc>
+      <image:title>ABC RUMMY</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://example.com/app/jaiho-777</loc>
+    <lastmod>2026-11-16T17:29:13+00:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794418577/ivixwkpzyiyh65ynjht5.png</image:loc>
+      <image:title>JAIHO 777</image:title>
+    </image:image>
+  </url>
+  <url>
     <loc>https://example.com/app/diwa-777</loc>
     <lastmod>2026-11-15T11:37:43+00:00</lastmod>
     <changefreq>weekly</changefreq>
@@ -51,16 +131,6 @@
     </image:image>
   </url>
   <url>
-    <loc>https://example.com/app/abc-rummy</loc>
-    <lastmod>2026-11-12T13:47:54+00:00</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794325341/vqkrxtnokavfpz33ao7c.webp</image:loc>
-      <image:title>ABC RUMMY</image:title>
-    </image:image>
-  </url>
-  <url>
     <loc>https://example.com/app/jaiho-arcade</loc>
     <lastmod>2026-11-12T13:43:25+00:00</lastmod>
     <changefreq>weekly</changefreq>
@@ -68,16 +138,6 @@
     <image:image>
       <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794324253/ebegrrpzrvc8juzsxb57.png</image:loc>
       <image:title>JAIHO ARCADE</image:title>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://example.com/app/jaiho-777</loc>
-    <lastmod>2026-11-11T17:56:12+00:00</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794418577/ivixwkpzyiyh65ynjht5.png</image:loc>
-      <image:title>JAIHO 777</image:title>
     </image:image>
   </url>
   <url>
@@ -168,16 +228,6 @@
     <image:image>
       <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794331916/o5wppqb1h59ddc2vxnfd.webp</image:loc>
       <image:title>RUMMY ZIP</image:title>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://example.com/app/mbm-bet</loc>
-    <lastmod>2026-11-10T15:40:25+00:00</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794324821/lspfzyxjpapssnrt4cqw.png</image:loc>
-      <image:title>MBM BET</image:title>
     </image:image>
   </url>
   <url>
