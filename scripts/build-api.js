@@ -1,7 +1,12 @@
 const fs = require('fs');
 const { execSync } = require('child_process');
 
-if (fs.existsSync('scripts/prerender.ts')) {
+if (!fs.existsSync('server.ts')) {
+    console.log("server.ts not found. Skipping api/index.js generation.");
+    process.exit(0);
+}
+
+if (fs.existsSync('scripts/prerender.ts') && fs.existsSync('src/pages/Home.tsx')) {
     try {
         console.log("Syncing staticData.json & sitemaps from live Firestore before API build...");
         execSync('npx tsx scripts/prerender.ts --sync-only', { stdio: 'inherit' });
@@ -11,11 +16,6 @@ if (fs.existsSync('scripts/prerender.ts')) {
 }
 
 // Generate api/index.js for Vercel serverless functions
-
-if (!fs.existsSync('server.ts')) {
-    console.log("server.ts not found. Skipping api/index.js generation.");
-    process.exit(0);
-}
 console.log("Generating api/index.js from server.ts for Vercel...");
 let content = fs.readFileSync('server.ts', 'utf8');
 // 1. Rewrite imports and requires for api/ location

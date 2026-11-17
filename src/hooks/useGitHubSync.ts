@@ -15,7 +15,33 @@ import communityStaticReviews from '../lib/communityStaticReviews.json';
 import rawIndexHtml from '../../index.html?raw';
 import rawMiddlewareJs from '../../functions/_middleware.js?raw';
 import rawHeadersFile from '../../public/_headers?raw';
-import rawRedirectsFile from '../../public/_redirects?raw';
+
+const FALLBACK_PUBLIC_REDIRECTS = [
+  '# Cloudflare Pages Redirects & Canonical Routing',
+  '/developer        /developers   301',
+  '/developer/*      /developers/:splat 301',
+  '/faqs             /faq          301',
+  '/video            /videos       301',
+  '/video/*          /videos/:splat 301',
+  '/blogs/*          /             301',
+  '/blog/*           /             301',
+  '/blogs            /             301',
+  '/blog             /             301',
+  '/moreinfo/*       /template.html 200',
+  '/moreinfo         /template.html 200',
+  '/admin/*          /template.html 200',
+  '/admin            /template.html 200',
+  '/login/*          /template.html 200',
+  '/login            /template.html 200',
+  '/masterworld/*    /template.html 200',
+  '/masterworld      /template.html 200',
+  ''
+].join('\n');
+
+const rawRedirectsFile =
+  typeof __BUNDLED_PUBLIC_REDIRECTS__ === 'string' && __BUNDLED_PUBLIC_REDIRECTS__.trim()
+    ? __BUNDLED_PUBLIC_REDIRECTS__
+    : FALLBACK_PUBLIC_REDIRECTS;
 import rawPrerenderTs from '../../scripts/prerender.ts?raw';
 import rawCompressDistTs from '../../scripts/compress-dist.ts?raw';
 import rawBuildApiJs from '../../scripts/build-api.js?raw';

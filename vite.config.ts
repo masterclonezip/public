@@ -670,11 +670,18 @@ export default defineConfig(({mode}) => {
       : {}),
   };
 
+  const publicRedirectsPath = path.resolve(__dirname, 'public/_redirects');
+  const bundledPublicRedirects =
+    isAdminBuild && fs.existsSync(publicRedirectsPath)
+      ? fs.readFileSync(publicRedirectsPath, 'utf8')
+      : '';
+
   return {
     plugins: [react(), tailwindcss(), adminAuthDevPlugin(env)],
     envPrefix: ['VITE_'],
     define: {
       __ADMIN_ENABLED__: isAdminBuild,
+      __BUNDLED_PUBLIC_REDIRECTS__: JSON.stringify(bundledPublicRedirects),
       __APP_BUILD_ENV__: JSON.stringify(resolvedBuildEnv),
       'process.env.NODE_ENV': JSON.stringify(mode === 'production' ? 'production' : (process.env.NODE_ENV || 'development')),
       'process.env.ADMIN_PATH': JSON.stringify(resolvedBuildEnv.ADMIN_PATH || ''),

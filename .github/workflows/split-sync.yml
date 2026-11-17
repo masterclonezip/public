@@ -74,6 +74,8 @@ jobs:
             "src/server/routes/adminVaultRoutes.ts"
             "src/server/routes/githubSyncRoutes.ts"
             "src/server/routes/uploadRoutes.ts"
+            "src/server/routes/communityRoutes.ts"
+            "src/server/routes/reportRoutes.ts"
             "src/server/services/geminiServerService.ts"
             "src/lib/githubSync.ts"
             "src/lib/appPdfExport.ts"
@@ -161,6 +163,7 @@ jobs:
             "src/components/WebsiteTitleHero.tsx"
             "src/lib/routePreloader.ts"
             "src/lib/pageComponents.ts"
+            "src/hooks/useReviews.ts"
           )
 
           SOURCE_DIR=$(pwd)
