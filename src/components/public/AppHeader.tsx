@@ -27,8 +27,8 @@ export default function AppHeader({ app }: AppHeaderProps) {
   return (
     <div className="flex w-full items-center gap-3 xs:gap-4 sm:gap-6 mb-4 sm:mb-6 px-0 sm:px-4 md:px-6 mt-1 sm:mt-2">
       {/* App Icon Container */}
-      <div className="relative w-[64px] h-[64px] xs:w-[72px] xs:h-[72px] sm:w-[96px] sm:h-[96px] md:w-[112px] md:h-[112px] shrink-0">
-        <div className="w-full h-full rounded-[16px] xs:rounded-[18px] sm:rounded-[24px] overflow-hidden shadow-sm bg-zinc-100 dark:bg-zinc-800 border border-black/5 dark:border-white/10 relative">
+      <div className="relative w-[72px] h-[72px] xs:w-[80px] xs:h-[80px] sm:w-[104px] sm:h-[104px] md:w-[116px] md:h-[116px] shrink-0">
+        <div className="w-full h-full rounded-[18px] xs:rounded-[20px] sm:rounded-[24px] overflow-hidden shadow-sm bg-zinc-100 dark:bg-zinc-800 border border-black/5 dark:border-white/10 relative">
           {rawUrl && !isFailed ? (
             <img 
               src={currentSrc} 
@@ -37,8 +37,8 @@ export default function AppHeader({ app }: AppHeaderProps) {
               loading="eager" 
               fetchPriority="high" 
               decoding="async"
-              width={112} 
-              height={112} 
+              width={116} 
+              height={116} 
               className="w-full h-full object-cover block relative z-10" 
               onError={handleImageError}
             />

@@ -28,7 +28,7 @@ export function renderCategoriesList(categoriesList: Array<{ name: string; slug:
   });
 
   return `
-    <div class="w-full max-w-5xl mx-auto py-3 sm:py-6 px-1 xs:px-2 sm:px-4 text-left">
+    <div class="w-full max-w-5xl mx-auto py-3 sm:py-6 px-0 sm:px-4 text-left">
       <nav aria-label="Breadcrumb" class="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 mb-3 sm:mb-5 text-left">
         <a href="/" class="hover:text-blue-600">Home</a>
         <span>/</span>
@@ -45,19 +45,18 @@ export function renderCategoriesList(categoriesList: Array<{ name: string; slug:
   `;
 }
 
-export function renderDevelopersList(developers: any[], settings: any): string {
-  const siteTitle = getField(settings, 'site_title') || '';
+export function renderDevelopersList(developers: any[], _settings: any): string {
   const devList = (Array.isArray(developers) && developers.length > 0)
     ? developers
-    : (Array.isArray(settings?.developers) ? settings.developers : []);
+    : (Array.isArray(_settings?.developers) ? _settings.developers : []);
 
   if (devList.length === 0) {
     return `
       <div class="animate-fade-in">
-        <div class="w-full max-w-5xl mx-auto px-1 xs:px-2 sm:px-4 py-8 sm:py-12 pb-16 min-h-[60vh] flex flex-col items-center justify-center text-center">
+        <div class="w-full max-w-5xl mx-auto px-0 sm:px-4 py-8 sm:py-12 pb-16 min-h-[60vh] flex flex-col items-center justify-center text-center">
           <div class="max-w-lg mx-auto py-8">
             <h1 class="text-2xl sm:text-3xl font-black mb-3 text-zinc-900 dark:text-white uppercase tracking-tight">Our Developers</h1>
-            <p class="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 font-medium">Information about our developers is not available at this moment. Please check back later.</p>
+            <p class="text-[15px] sm:text-base text-zinc-600 dark:text-zinc-400 font-medium">Information about our developers is not available at this moment. Please check back later.</p>
           </div>
         </div>
       </div>
@@ -68,23 +67,28 @@ export function renderDevelopersList(developers: any[], settings: any): string {
   devList.forEach(d => {
     const name = getField(d, 'name') || getField(d, 'title') || 'Developer';
     const logo = getField(d, 'image_url') || getField(d, 'logo_url') || getField(d, 'icon_url');
-    const optimizedLogo = logo ? optimizeImageUrl(logo, 256) : `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
+    const optimizedLogo = logo ? optimizeImageUrl(logo, 256) : '';
     const bio = getField(d, 'bio') || getField(d, 'description') || '';
     const role = getField(d, 'role') || 'Verified Developer';
     const github = getField(d, 'github') || '';
     const twitter = getField(d, 'twitter') || '';
+    const initial = (name || 'D').trim().charAt(0).toUpperCase();
 
     cards += `
       <div class="border border-zinc-200/80 dark:border-zinc-800/80 rounded-2xl p-5 sm:p-6 transition-all flex flex-col items-center text-center group animate-fade-in">
-        <div class="w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden mb-4 sm:mb-6 border-4 border-white dark:border-zinc-800 shadow-md">
-          <img src="${escapeHtml(optimizedLogo)}" alt="${escapeHtml(name)}" loading="lazy" decoding="async" width="128" height="128" class="w-full h-full object-cover" referrerpolicy="no-referrer"/>
+        <div class="w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden mb-5 sm:mb-6 border-4 border-white dark:border-zinc-800 shadow-xl group-hover:scale-105 transition-transform duration-500 bg-gradient-to-br from-blue-600/15 to-indigo-600/15 flex items-center justify-center">
+          ${optimizedLogo ? `
+            <img src="${escapeHtml(optimizedLogo)}" alt="${escapeHtml(name)}" loading="lazy" decoding="async" width="128" height="128" class="w-full h-full object-cover" />
+          ` : `
+            <span class="text-3xl font-black text-blue-600 dark:text-blue-400 select-none">${escapeHtml(initial)}</span>
+          `}
         </div>
         <h3 class="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white mb-2 tracking-tight">${escapeHtml(name)}</h3>
-        <div class="bg-pink-500/10 text-pink-600 dark:text-pink-400 px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-widest mb-3">${escapeHtml(role)}</div>
-        ${bio ? `<p class="text-zinc-600 dark:text-zinc-400 mb-6 flex-grow font-medium text-sm leading-relaxed">${escapeHtml(bio)}</p>` : ''}
-        <div class="flex gap-4 mt-auto pt-4 border-t border-zinc-200/80 dark:border-zinc-800/80 w-full justify-center">
-          ${github ? `<a href="${escapeHtml(github)}" target="_blank" rel="noopener noreferrer" class="p-2.5 bg-black/5 dark:bg-white/5 rounded-xl text-zinc-700 dark:text-zinc-300" aria-label="${escapeHtml(name)} GitHub Profile">GitHub</a>` : ''}
-          ${twitter ? `<a href="${escapeHtml(twitter)}" target="_blank" rel="noopener noreferrer" class="p-2.5 bg-black/5 dark:bg-white/5 rounded-xl text-zinc-700 dark:text-zinc-300" aria-label="${escapeHtml(name)} Twitter Profile">Twitter</a>` : ''}
+        <div class="bg-pink-500/10 text-pink-600 dark:text-pink-400 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest mb-4">${escapeHtml(role)}</div>
+        ${bio ? `<p class="text-slate-600 dark:text-slate-400 mb-8 flex-grow font-medium text-[15px] sm:text-sm leading-relaxed">${escapeHtml(bio)}</p>` : ''}
+        <div class="flex gap-4 mt-auto pt-6 border-t border-black/5 dark:border-white/5 w-full justify-center">
+          ${github ? `<a href="${escapeHtml(github)}" target="_blank" rel="noopener noreferrer" class="w-11 h-11 flex items-center justify-center bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 rounded-xl transition-colors text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white" title="GitHub" aria-label="${escapeHtml(name)} GitHub Profile"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"></path><path d="M9 18c-4.51 2-5-2-7-2"></path></svg></a>` : ''}
+          ${twitter ? `<a href="${escapeHtml(twitter)}" target="_blank" rel="noopener noreferrer" class="w-11 h-11 flex items-center justify-center bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 rounded-xl transition-colors text-zinc-700 dark:text-zinc-300 hover:text-blue-500 dark:hover:text-blue-400" title="Twitter" aria-label="${escapeHtml(name)} Twitter Profile"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path></svg></a>` : ''}
         </div>
       </div>
     `;
@@ -92,11 +96,11 @@ export function renderDevelopersList(developers: any[], settings: any): string {
 
   return `
     <div class="animate-fade-in">
-      <div class="w-full max-w-5xl mx-auto px-1 xs:px-2 sm:px-4 py-4 sm:py-8 pb-16 min-h-[70vh]">
+      <div class="w-full max-w-5xl mx-auto px-0 sm:px-4 py-4 sm:py-8 pb-16 min-h-[70vh]">
         <div class="w-full">
           <div class="text-left sm:text-center pb-4 sm:pb-6 mb-6 sm:mb-10 border-b border-zinc-200/80 dark:border-zinc-800/80 animate-fade-in">
             <h1 class="text-2xl xs:text-3xl sm:text-5xl font-extrabold mb-2 text-zinc-900 dark:text-zinc-100 tracking-tight">Meet Our Team</h1>
-            <p class="text-sm sm:text-lg text-zinc-600 dark:text-zinc-400 font-medium max-w-2xl sm:mx-auto">The creative minds and technical experts building our platform.</p>
+            <p class="text-sm sm:text-lg text-zinc-600 dark:text-zinc-400 font-medium max-w-2xl sm:mx-auto">The creative minds and technical experts building the future.</p>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">${cards}</div>
         </div>
@@ -107,9 +111,9 @@ export function renderDevelopersList(developers: any[], settings: any): string {
 
 function renderStandardLegalLayout(heading: string, statusLabel: string, statusValue: string, emailLabel: string, supportEmail: string, contentHtml: string): string {
   return `
-    <div class="w-full max-w-5xl mx-auto px-1 xs:px-2 sm:px-4 py-3 sm:py-6 animate-fade-in pb-16 min-h-[70vh] text-left">
+    <div class="w-full max-w-5xl mx-auto px-0 sm:px-4 py-3 sm:py-6 animate-fade-in pb-16 min-h-[70vh] text-left">
       <div class="mb-3 sm:mb-5">
-        <a href="/" class="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+        <a href="/" class="inline-flex items-center gap-1.5 min-h-[40px] py-1 text-xs sm:text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 12H5M12 19l-7-7 7-7"></path></svg>
           Home
         </a>
@@ -120,7 +124,7 @@ function renderStandardLegalLayout(heading: string, statusLabel: string, statusV
           <div><span class="font-semibold text-zinc-700 dark:text-zinc-300">${escapeHtml(statusLabel)}:</span> ${escapeHtml(statusValue)}</div>
           ${supportEmail ? `<div><span class="font-semibold text-zinc-700 dark:text-zinc-300">${escapeHtml(emailLabel)}:</span> ${escapeHtml(supportEmail)}</div>` : ''}
         </div>
-        <div class="rich-html-boundary open-page-body prose prose-zinc dark:prose-invert max-w-none text-sm sm:text-base text-zinc-700 dark:text-zinc-300 font-medium leading-relaxed">${contentHtml}</div>
+        <div class="rich-html-boundary open-page-body prose prose-zinc dark:prose-invert max-w-none text-[15px] sm:text-base text-zinc-700 dark:text-zinc-300 font-medium leading-[1.7]">${contentHtml}</div>
       </div>
     </div>
   `;
@@ -136,9 +140,9 @@ export function renderContact(settings: any): string {
   const content = sanitizeHtml(getField(settings, 'contact_content') || '');
   const email = getField(settings, 'support_email', '');
   return `
-    <div class="w-full max-w-5xl mx-auto px-1 xs:px-2 sm:px-4 py-3 sm:py-6 animate-fade-in pb-16 min-h-[70vh] text-left">
+    <div class="w-full max-w-5xl mx-auto px-0 sm:px-4 py-3 sm:py-6 animate-fade-in pb-16 min-h-[70vh] text-left">
       <div class="mb-3 sm:mb-5">
-        <a href="/" class="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+        <a href="/" class="inline-flex items-center gap-1.5 min-h-[40px] py-1 text-xs sm:text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 12H5M12 19l-7-7 7-7"></path></svg>
           Home
         </a>
@@ -147,7 +151,7 @@ export function renderContact(settings: any): string {
         <div class="lg:col-span-12 xl:col-span-5 space-y-5">
           <div>
             <h1 class="text-xl xs:text-2xl sm:text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100 pb-3 mb-4 border-b border-zinc-200/80 dark:border-zinc-800/80">Contact Us</h1>
-            <div class="rich-html-boundary open-page-body markdown-body text-sm sm:text-base text-zinc-700 dark:text-zinc-300 leading-relaxed font-medium">${content}</div>
+            <div class="rich-html-boundary open-page-body markdown-body text-[15px] sm:text-base text-zinc-700 dark:text-zinc-300 leading-[1.7] font-medium">${content}</div>
           </div>
           <div class="space-y-3 sm:space-y-4">
             <div class="flex items-start gap-3.5 p-3.5 sm:p-4 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80">
@@ -185,17 +189,17 @@ export function renderContact(settings: any): string {
           </div>
           <div>
             <label class="block text-xs sm:text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Name</label>
-            <div class="w-full h-12 px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl"></div>
+            <div class="w-full min-h-[46px] p-3.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl"></div>
           </div>
           <div>
             <label class="block text-xs sm:text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Email</label>
-            <div class="w-full h-12 px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl"></div>
+            <div class="w-full min-h-[46px] p-3.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl"></div>
           </div>
           <div>
             <label class="block text-xs sm:text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Message</label>
-            <div class="w-full h-36 px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl"></div>
+            <div class="w-full h-36 sm:h-44 p-3.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl"></div>
           </div>
-          <div class="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl flex items-center justify-center text-sm">Send Message</div>
+          <div class="w-full min-h-[48px] bg-blue-600 text-white font-bold py-3.5 rounded-xl flex items-center justify-center text-sm shadow-md">Send Message</div>
         </div>
       </div>
     </div>
@@ -266,36 +270,47 @@ export function render404(urlPath: string, settings: any): string {
 }
 
 export function renderFaqPage(settings: any): string {
-  const siteTitle = getField(settings, 'site_title') || '';
   const siteFaqs = Array.isArray(settings?.website_faqs) ? settings.website_faqs.filter((f: any) => f && f.question && f.answer) : [];
   return `
-    <div class="w-full max-w-5xl mx-auto px-1 xs:px-2 sm:px-4 py-3 sm:py-6 animate-fade-in pb-16 min-h-[70vh] text-left">
+    <div class="w-full max-w-5xl mx-auto px-0 sm:px-4 py-3 sm:py-6 animate-fade-in pb-16 min-h-[70vh] text-left">
       <div class="mb-3 sm:mb-5">
-        <a href="/" class="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">← Home</a>
+        <a href="/" class="inline-flex items-center gap-1.5 min-h-[40px] py-1 text-xs sm:text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 12H5M12 19l-7-7 7-7"></path></svg>
+          Home
+        </a>
       </div>
-      <div class="pb-3 sm:pb-4 mb-4 sm:mb-6 border-b border-zinc-200/80 dark:border-zinc-800/80">
-        <h1 class="text-xl xs:text-2xl sm:text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100">
-          Frequently Asked Questions
-        </h1>
-        <p class="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
-          Everything you need to know about app downloads and verification.
-        </p>
-      </div>
-      <div class="space-y-3 sm:space-y-4">
-        ${siteFaqs.map((faq: any) => `
-          <details class="group rounded-xl sm:rounded-2xl border transition-colors duration-200 overflow-hidden bg-transparent border-zinc-200/80 dark:border-zinc-800/80 open:border-blue-500/30 dark:open:border-blue-500/30" open>
-            <summary class="list-none [&::-webkit-details-marker]:hidden w-full text-left p-3.5 sm:p-5 flex items-center justify-between gap-3 cursor-pointer select-none">
-              <h2 class="text-sm sm:text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-start gap-2.5">
-                <span class="text-blue-600 dark:text-blue-400 font-extrabold shrink-0 select-none">Q.</span>
-                <span class="leading-snug">${escapeHtml(faq.question)}</span>
-              </h2>
-              <span class="text-zinc-400 dark:text-zinc-500 font-bold select-none">+</span>
-            </summary>
-            <div class="px-3.5 sm:px-5 pb-4 sm:pb-5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 text-sm sm:text-base text-zinc-700 dark:text-zinc-300 leading-relaxed">
-              <div class="rich-html-boundary open-page-body prose prose-zinc dark:prose-invert prose-sm sm:prose-base max-w-none w-full break-words whitespace-normal">${sanitizeHtml(faq.answer)}</div>
-            </div>
-          </details>
-        `).join('')}
+      <div class="animate-fade-in">
+        <div class="flex items-center gap-3 pb-3 sm:pb-4 mb-4 sm:mb-6 border-b border-zinc-200/80 dark:border-zinc-800/80">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><path d="M12 17h.01"></path></svg>
+          </div>
+          <div>
+            <h1 class="text-xl xs:text-2xl sm:text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100">
+              Frequently Asked Questions
+            </h1>
+            <p class="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
+              Everything you need to know about app downloads and verification.
+            </p>
+          </div>
+        </div>
+        <div class="space-y-3 sm:space-y-4">
+          ${siteFaqs.map((faq: any) => `
+            <details class="group rounded-xl sm:rounded-2xl border transition-colors duration-200 overflow-hidden bg-transparent border-zinc-200/80 dark:border-zinc-800/80 open:border-blue-500/30 dark:open:border-blue-500/30" open>
+              <summary class="list-none [&::-webkit-details-marker]:hidden w-full min-h-[52px] text-left p-4 sm:p-5 flex items-center justify-between gap-3 cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 select-none">
+                <h2 class="text-[15px] sm:text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-start gap-2.5">
+                  <span class="text-blue-600 dark:text-blue-400 font-extrabold shrink-0 select-none">Q.</span>
+                  <span class="leading-snug">${escapeHtml(faq.question)}</span>
+                </h2>
+                <div class="p-1 rounded-lg transition-transform duration-200 shrink-0 text-zinc-400 dark:text-zinc-500 group-open:rotate-180 group-open:text-blue-600 group-open:dark:text-blue-400">
+                  <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+                </div>
+              </summary>
+              <div class="px-4 sm:px-5 pb-4 sm:pb-5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 text-[15px] sm:text-base text-zinc-700 dark:text-zinc-300 leading-[1.7]">
+                <div class="rich-html-boundary open-page-body prose prose-zinc dark:prose-invert prose-sm sm:prose-base max-w-none w-full break-words whitespace-normal text-[15px] sm:text-base">${sanitizeHtml(faq.answer)}</div>
+              </div>
+            </details>
+          `).join('')}
+        </div>
       </div>
     </div>
   `;

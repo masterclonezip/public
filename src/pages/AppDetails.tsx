@@ -15,7 +15,7 @@ import { getCachedLiveAppStats } from '../lib/communityFirebase';
 import { mockApps as staticMockApps, loadFullStaticDataset } from '../lib/lightFallback';
 import { resolveAppSlug, computeSimilarApps, extractPrimaryCategory, checkAppIsNew, checkAppIsHot } from '../lib/slugResolver';
 import { getRelatedNewsForApp } from '../lib/newsUtils';
-import { getPrefetchedApp } from '../lib/preloadHelper';
+import { getPrefetchedApp, getInFlightAppFetch } from '../lib/preloadHelper';
 import AppDetailsSkeleton from '../components/public/AppDetailsSkeleton';
 import AppHeader from '../components/public/AppHeader';
 import AppActionButtons from '../components/public/AppActionButtons';
@@ -330,6 +330,27 @@ export default function AppDetails() {
       syncAttemptedRef.current[slugKey] = true;
       setIsFetchingDetails(true);
 
+      const inFlight = getInFlightAppFetch(slugKey);
+      if (inFlight) {
+        inFlight
+          .then(prefetchedApp => {
+            if (prefetchedApp) {
+              if (updateAppDetail) updateAppDetail(prefetchedApp);
+              if (activeSlugRef.current === slugKey) {
+                setFetchedApp(prefetchedApp);
+              }
+            }
+          })
+          .catch(() => {})
+          .finally(() => {
+            if (activeSlugRef.current === slugKey) {
+              setIsFetchingDetails(false);
+              setRemoteCheckDoneSlug(slugKey);
+            }
+          });
+        return;
+      }
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3500);
 
@@ -358,6 +379,11 @@ export default function AppDetails() {
             setRemoteCheckDoneSlug(slugKey);
           }
         });
+
+      return () => {
+        clearTimeout(timeoutId);
+        controller.abort();
+      };
     }
   }, [slug, fetchedApp, app, mockApps, updateAppDetail, mergeCatalogApps]);
 

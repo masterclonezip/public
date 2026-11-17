@@ -7,7 +7,7 @@ import { useData } from '../contexts/DataContextPublic';
 
 export default function Ticker() {
   const { settings } = useData();
-  if (!settings.ticker_text) return null;
+  if (settings?.ticker_enabled === false || !settings?.ticker_text) return null;
 
   return (
     <div className="bg-transparent py-2.5 sm:py-3 overflow-hidden border-t border-black/5 dark:border-white/5 flex items-center relative z-[70] select-none pointer-events-none cv-auto" style={{ contain: 'paint' }}>

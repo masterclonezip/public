@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import zlib from 'zlib';
 import staticData from '../../lib/staticData.json';
 import { fetchStoreData } from '../../seoHelper';
-import { getAllSiteIconUrls, resolveSiteLogoUrl, wrapPngsInIco } from '../../seo/utils';
+import { getAllSiteIconUrls, isPngBytes, resolveSiteLogoUrl, wrapPngsInIco } from '../../seo/utils';
 import {
   generateMasterSitemapXml,
   generateAppsSitemapXml,
@@ -132,8 +132,12 @@ seoRouter.get(
               if (rawPng.byteLength > 64) {
                 let outBuf: Buffer;
                 let ct: string;
-                if (p === '/favicon.ico') {
+                const isIco = rawPng[0] === 0 && rawPng[1] === 0 && rawPng[2] === 1 && rawPng[3] === 0;
+                if (p === '/favicon.ico' && isPngBytes(rawPng)) {
                   outBuf = Buffer.from(wrapPngsInIco([{ size: 48, png: rawPng }]));
+                  ct = 'image/x-icon';
+                } else if (p === '/favicon.ico' && isIco) {
+                  outBuf = Buffer.from(rawPng);
                   ct = 'image/x-icon';
                 } else {
                   outBuf = Buffer.from(rawPng);
@@ -201,13 +205,25 @@ seoRouter.get('/site.webmanifest', async (req, res) => {
         src: '/android-chrome-192x192.png',
         sizes: '192x192',
         type: 'image/png',
-        purpose: 'any maskable'
+        purpose: 'any'
+      },
+      {
+        src: '/android-chrome-192x192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'maskable'
       },
       {
         src: '/android-chrome-512x512.png',
         sizes: '512x512',
         type: 'image/png',
-        purpose: 'any maskable'
+        purpose: 'any'
+      },
+      {
+        src: '/android-chrome-512x512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'maskable'
       }
     ],
     theme_color: '#2563eb',

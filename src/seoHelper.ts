@@ -722,12 +722,21 @@ export async function injectSeoTags(template: string, urlPath: string, hostUrl?:
     .replace(/<script>window\.(?:__SSR_PATH__|__INITIAL_DATA__)[\s\S]*?<\/script>/gi, '')
     .replace(/<style\s+id=["']server-critical-css["']>[\s\S]*?<\/style>/gi, '');
 
+  if (!finalHtml.includes('id="vite-inline-css"')) {
+    if (/<link\b[^>]*rel=["']stylesheet["'][^>]*href=["'][^"']*\/assets\/[^"']+\.css["'][^>]*>/i.test(finalHtml)) {
+      finalHtml = finalHtml.replace(
+        /<link\b([^>]*rel=["']stylesheet["'][^>]*href=["'][^"']*\/assets\/[^"']+\.css["'][^>]*)>/i,
+        '<link id="vite-inline-css"$1>'
+      );
+    } else if (!finalHtml.includes('href="/src/index.css"')) {
+      finalHtml = finalHtml.replace(
+        '</head>',
+        '    <link id="vite-inline-css" rel="stylesheet" href="/src/index.css" />\n  </head>'
+      );
+    }
+  }
   const hasInlinedViteCss = finalHtml.includes('id="vite-inline-css"');
   const criticalCss = getCriticalCss(hasInlinedViteCss);
-  if (!hasInlinedViteCss && criticalCss.includes('@layer') && criticalCss.length > 4000) {
-    // Strip external stylesheet link when full compiled CSS is already inlined in server-critical-css
-    finalHtml = finalHtml.replace(/<link\b[^>]*rel=["']stylesheet["'][^>]*href=["']\/?assets\/[^"']+\.css["'][^>]*\/?>/gi, '');
-  }
 
   // Inject seoTags (title, description, and critical OpenGraph/Twitter tags) at the VERY TOP of <head>
   // so social crawlers (WhatsApp, Facebook, Twitter, Telegram, Discord, iMessage) encounter og:image within the first 1-2 KB.

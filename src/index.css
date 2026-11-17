@@ -4,6 +4,8 @@
 @source not "../dist";
 @source not "../public";
 @source not "../scripts";
+@source not "./server";
+@source not "../functions";
 @source not "./lib/*.json";
 @plugin "@tailwindcss/typography";
 

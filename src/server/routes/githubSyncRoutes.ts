@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
+import { getAllSiteIconUrls, isPngBytes, wrapPngsInIco } from '../../seo/utils';
 
 export const githubSyncRouter = Router();
 
@@ -167,6 +168,94 @@ githubSyncRouter.get('/api/github-sync/public-core-files', (req, res) => {
     res.json({ success: true, files });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
+// POST /api/github-sync/materialize-icons (CORS-free server-side brand icon download & .ico builder)
+githubSyncRouter.post('/api/github-sync/materialize-icons', async (req, res) => {
+  try {
+    const { settings = {}, origin = '' } = req.body || {};
+    const resolvedOrigin = String(origin || '').trim() || 'https://example.com';
+    const icons = getAllSiteIconUrls(settings, resolvedOrigin);
+    if (!icons.masterFavicon && !icons.masterLogo) {
+      return res.json({ success: true, files: [] });
+    }
+
+    const isSafeRemoteUrl = (rawUrl: string): boolean => {
+      try {
+        const u = new URL(rawUrl);
+        if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
+        const h = u.hostname.toLowerCase();
+        if (
+          h === 'localhost' ||
+          h === '127.0.0.1' ||
+          h === '0.0.0.0' ||
+          h.startsWith('10.') ||
+          h.startsWith('192.168.') ||
+          /^172\.(1[6-9]|2\d|3[0-1])\./.test(h) ||
+          h.endsWith('.local') ||
+          h.endsWith('.internal')
+        ) {
+          return false;
+        }
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const iconTargets: Array<{ size: number; url: string; paths: string[] }> = [
+      { size: 16, url: icons.favicon16, paths: ['public/favicon-16x16.png'] },
+      { size: 32, url: icons.favicon32, paths: ['public/favicon-32x32.png'] },
+      { size: 48, url: icons.favicon48, paths: ['public/favicon-48x48.png'] },
+      { size: 96, url: icons.favicon96, paths: ['public/favicon-96x96.png'] },
+      { size: 144, url: icons.favicon144, paths: ['public/favicon-144x144.png'] },
+      { size: 180, url: icons.appleTouch180, paths: ['public/apple-touch-icon.png', 'public/apple-touch-icon-precomposed.png'] },
+      { size: 192, url: icons.pwa192, paths: ['public/android-chrome-192x192.png', 'public/favicon.png'] },
+      { size: 512, url: icons.pwa512, paths: ['public/android-chrome-512x512.png', 'public/logo.png'] }
+    ];
+
+    const files: Array<{ path: string; content: string; encoding: 'base64' }> = [];
+    const downloadedPngs = new Map<number, Uint8Array>();
+
+    await Promise.all(
+      iconTargets.map(async ({ size, url, paths }) => {
+        if (!url || !isSafeRemoteUrl(url)) return;
+        try {
+          const upstream = await fetch(url, { signal: AbortSignal.timeout(8000) });
+          if (!upstream.ok) return;
+          const bytes = new Uint8Array(await upstream.arrayBuffer());
+          if (bytes.byteLength < 64 || bytes.byteLength > 5 * 1024 * 1024) return;
+          if (isPngBytes(bytes)) {
+            downloadedPngs.set(size, bytes);
+          }
+          const b64 = Buffer.from(bytes).toString('base64');
+          for (const p of paths) {
+            files.push({ path: p, content: b64, encoding: 'base64' });
+          }
+        } catch (_) {}
+      })
+    );
+
+    const icoEntries: Array<{ size: number; png: Uint8Array }> = [];
+    for (const sz of [48, 32, 16]) {
+      const pngBytes = downloadedPngs.get(sz);
+      if (pngBytes && isPngBytes(pngBytes)) icoEntries.push({ size: sz, png: pngBytes });
+    }
+    if (icoEntries.length > 0) {
+      const icoBytes = wrapPngsInIco(icoEntries);
+      if (icoBytes.byteLength > 64) {
+        files.push({
+          path: 'public/favicon.ico',
+          content: Buffer.from(icoBytes).toString('base64'),
+          encoding: 'base64'
+        });
+      }
+    }
+
+    return res.json({ success: true, files });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || 'Icon materialization failed' });
   }
 });
 

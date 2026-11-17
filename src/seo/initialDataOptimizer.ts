@@ -529,17 +529,25 @@ export function optimizeInitialDataForRoute(
   const basePageKeys = [
     'site_title', 'logo_url', 'favicon_url', 'seo_title', 'seo_description', 'seo_keywords',
     'meta_title', 'meta_description', 'social_links', 'categories', 'trending_searches',
-    'ticker_text', 'support_email', 'last_updated', 'animations_enabled',
+    'ticker_text', 'ticker_enabled', 'support_email', 'last_updated', 'animations_enabled',
     'quick_links', 'turnstile_site_key', 'helpline_whatsapp', 'helpline_telegram',
     'news_meta_title', 'news_meta_description'
   ];
 
+  const isHomeCatalogRoute =
+    isHomePage ||
+    cleanPathLower === '/new-apps' ||
+    cleanPathLower === '/categories' ||
+    cleanPathLower.startsWith('/category/') ||
+    cleanPathLower.startsWith('/categories/');
+
   const routeSpecificKeys: string[] = [];
-  if (isHomePage) {
+  if (isHomeCatalogRoute) {
     routeSpecificKeys.push(
       'hero_title_text', 'hero_title_subtitle', 'hero_title_color', 'hero_title_animation',
       'hero_title_visible', 'hero_title_style', 'portal_heading', 'secure_index_title',
-      'secure_index_subtitle', 'banners', 'website_faqs', 'faq_meta_title', 'faq_meta_description'
+      'secure_index_subtitle', 'banners', 'website_faqs', 'faq_meta_title', 'faq_meta_description',
+      'new_apps_meta_title', 'new_apps_meta_description', 'categories_meta_title', 'categories_meta_description'
     );
   } else if (cleanPathLower === '/about') {
     routeSpecificKeys.push('about_meta_title', 'about_meta_description', 'about_content', 'about_us');
@@ -565,10 +573,6 @@ export function optimizeInitialDataForRoute(
     routeSpecificKeys.push('website_faqs', 'faq_meta_title', 'faq_meta_description');
   } else if (isVideoPage) {
     routeSpecificKeys.push('videos_meta_title', 'videos_meta_description');
-  } else if (cleanPathLower === '/new-apps') {
-    routeSpecificKeys.push('new_apps_meta_title', 'new_apps_meta_description');
-  } else if (cleanPathLower === '/categories' || cleanPathLower.startsWith('/category/') || cleanPathLower.startsWith('/categories/')) {
-    routeSpecificKeys.push('categories_meta_title', 'categories_meta_description');
   } else if (cleanPathLower === '/safety' || cleanPathLower === '/safety-status') {
     routeSpecificKeys.push('safety_meta_title', 'safety_meta_description');
   }

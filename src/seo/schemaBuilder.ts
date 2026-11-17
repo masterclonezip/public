@@ -327,7 +327,7 @@ export async function buildJsonLdSchema(params: BuildSchemaParams): Promise<stri
       getField(v, 'image_url') ||
       getYoutubeThumbnail(youtubeUrl) ||
       params.logoUrl;
-    const sameOriginLogo = hostOrigin ? `${hostOrigin}/logo.png` : (params.logoUrl || '/logo.png');
+    const sameOriginLogo = params.logoUrl || (hostOrigin ? `${hostOrigin}/logo.png` : '/logo.png');
 
     schemas.push({
       "@context": "https://schema.org",
@@ -391,7 +391,7 @@ export async function buildJsonLdSchema(params: BuildSchemaParams): Promise<stri
       ]
     });
   } else if (params.pageType === 'collection') {
-    const sameOriginLogo = hostOrigin ? `${hostOrigin}/logo.png` : (params.logoUrl || '/logo.png');
+    const sameOriginLogo = params.logoUrl || (hostOrigin ? `${hostOrigin}/logo.png` : '/logo.png');
     const collectionSchema: any = {
       "@context": "https://schema.org",
       "@type": "CollectionPage",
@@ -451,7 +451,7 @@ export async function buildJsonLdSchema(params: BuildSchemaParams): Promise<stri
       });
     }
   } else if (params.pageType === 'home') {
-    const sameOriginLogo = hostOrigin ? `${hostOrigin}/logo.png` : (params.logoUrl || '/logo.png');
+    const sameOriginLogo = params.logoUrl || (hostOrigin ? `${hostOrigin}/logo.png` : '/logo.png');
     schemas.push({
       "@context": "https://schema.org",
       "@type": "WebSite",
@@ -497,7 +497,7 @@ export async function buildJsonLdSchema(params: BuildSchemaParams): Promise<stri
   } else {
     // Static pages (/about, /contact, /terms, /privacy, /faq, /developers, /videos, etc.):
     // Emit WebPage schema linked to WebSite and Organization so Google Search associates site name and brand logo
-    const sameOriginLogo = hostOrigin ? `${hostOrigin}/logo.png` : (params.logoUrl || '/logo.png');
+    const sameOriginLogo = params.logoUrl || (hostOrigin ? `${hostOrigin}/logo.png` : '/logo.png');
     schemas.push({
       "@context": "https://schema.org",
       "@type": "WebPage",

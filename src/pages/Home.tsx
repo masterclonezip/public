@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useMemo, useDeferredValue, useRef } from 'react';
-import { useSearchParams, useLocation, useNavigate, useNavigationType, useParams } from 'react-router-dom';
+import { useSearchParams, useLocation, useNavigate, useNavigationType, useParams, Link } from 'react-router-dom';
 import { useData } from '../contexts/DataContextPublic';
 import Meta from '../components/Meta';
 import { normalizeNonWwwDomain } from '../lib/seoUtils';
@@ -75,6 +75,12 @@ export default function Home() {
   const deferredSortBy = useDeferredValue(sortBy);
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && mockApps.length < 50) {
+      window.dispatchEvent(new Event('open-catalog-route'));
+    }
+  }, [mockApps.length]);
+
+  useEffect(() => {
     if (navType === 'POP') {
       try {
         const saved = sessionStorage.getItem(STORAGE_KEY);
@@ -99,9 +105,23 @@ export default function Home() {
       } catch (e) {
         // Ignore
       }
+      const tabQuery = (searchParams.get('tab') || '').trim();
+      const lowerTab = (tabQuery || categoryParam || '').toLowerCase();
+      const isSpecificCategoryJump = Boolean(
+        lowerTab && !['all', 'all apps', 'home', 'apps'].includes(lowerTab)
+      );
+      if (isSpecificCategoryJump && tabBarRef.current && typeof window !== 'undefined') {
+        const rafId = window.requestAnimationFrame(() => {
+          if (!tabBarRef.current) return;
+          const headerHeight = window.innerWidth >= 640 ? 64 : 56;
+          const tabBarTop = tabBarRef.current.getBoundingClientRect().top + window.scrollY - headerHeight;
+          window.scrollTo({ top: Math.max(0, tabBarTop), behavior: 'smooth' });
+        });
+        return () => window.cancelAnimationFrame(rafId);
+      }
       window.scrollTo(0, 0);
     }
-  }, [navType]);
+  }, [navType, searchParams, categoryParam]);
 
   const feedStateRef = useRef({ visibleCount, activeTab });
   useEffect(() => {
@@ -452,18 +472,13 @@ export default function Home() {
 
       {(() => {
         if (deferredSearchTerm) return null;
-        const activeTabLower = deferredActiveTab.toLowerCase();
-        const isHomeTab = activeTabLower === 'all apps' || 
-                          activeTabLower === 'all' || 
-                          activeTabLower === 'home' || 
-                          activeTabLower === 'apps';
         return isHomeTab && (
           <div className="px-0 sm:px-1">
             <div className="space-y-2">
-              {filteredApps.slice(0, visibleCount).map((app, index) => (
+              {tabFilteredApps.slice(0, visibleCount).map((app, index) => (
                 <AppListItem key={`${app.id}-${index}`} app={app} index={index + 1} />
               ))}
-              {filteredApps.length === 0 && (
+              {tabFilteredApps.length === 0 && (
                 <div className="p-8 text-center bg-zinc-50 dark:bg-zinc-900/60 rounded-2xl mx-1 mt-4 border border-zinc-200/80 dark:border-zinc-800">
                   <h3 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-1.5">No apps available</h3>
                   <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
@@ -507,7 +522,41 @@ export default function Home() {
 
       {hasMore && (
         <div ref={sentinelRef} className="py-8 flex flex-col items-center justify-center min-h-[72px]">
-          <div className="w-2 h-2 opacity-0" />
+          {(() => {
+            const totalPages = Math.max(1, Math.ceil(tabFilteredApps.length / ITEMS_PER_PAGE));
+            const currentPage = Math.min(totalPages, Math.max(1, Math.ceil(visibleCount / ITEMS_PER_PAGE)));
+            return (
+              <nav aria-label="Catalog pagination" className="flex items-center justify-center gap-2">
+                {currentPage > 1 && (
+                  <a
+                    href={currentPage === 2 ? '/' : `/?page=${currentPage - 1}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setVisibleCount(Math.max(ITEMS_PER_PAGE, (currentPage - 1) * ITEMS_PER_PAGE));
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl border border-black/10 dark:border-white/10 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition no-underline"
+                  >
+                    Previous
+                  </a>
+                )}
+                <span className="text-xs text-zinc-500 font-medium px-2">
+                  Page {currentPage} of {totalPages}
+                </span>
+                {currentPage < totalPages && (
+                  <a
+                    href={`/?page=${currentPage + 1}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setVisibleCount(Math.min(tabFilteredApps.length, (currentPage + 1) * ITEMS_PER_PAGE));
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl border border-black/10 dark:border-white/10 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition no-underline"
+                  >
+                    Next
+                  </a>
+                )}
+              </nav>
+            );
+          })()}
         </div>
       )}
 
@@ -524,6 +573,25 @@ export default function Home() {
             Showing all {tabFilteredApps.length} verified applications
           </p>
         </div>
+      )}
+
+      {!deferredSearchTerm && activeTabLower !== 'categories' && tabFilteredApps.length > visibleCount && (
+        <nav aria-label="Complete Application Directory" data-nosnippet className="mt-8 pt-6 border-t border-zinc-200/80 dark:border-zinc-800/80">
+          <h2 className="text-xs sm:text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-3 uppercase tracking-wider">
+            More Applications in Catalog ({tabFilteredApps.length - visibleCount})
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+            {tabFilteredApps.slice(visibleCount).map((app: any) => (
+              <Link
+                key={app.id || app.slug}
+                to={`/app/${encodeURIComponent(String(app.slug || '').trim())}`}
+                className="min-h-[38px] flex items-center px-3 py-1.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 hover:bg-blue-50 dark:hover:bg-blue-950/30 border border-zinc-200/60 dark:border-zinc-800/60 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 truncate no-underline transition-colors"
+              >
+                <span className="truncate">{app.name}</span>
+              </Link>
+            ))}
+          </div>
+        </nav>
       )}
 
       <HomeFaqSection faqs={mockSettings.website_faqs} searchTerm={deferredSearchTerm} />

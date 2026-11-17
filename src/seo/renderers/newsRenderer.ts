@@ -3,24 +3,24 @@ import { escapeHtml, sanitizeHtml } from './common';
 import { formatNewsDate, calculateReadingTime, getNextNewsChain, getPlainTextSnippet, resolveRelatedAppForNews } from '../../lib/newsUtils';
 
 const RICH_HTML_CONTENT_STYLE = `
-  rich-html-boundary w-full text-sm sm:text-base text-zinc-800 dark:text-zinc-200 leading-relaxed
+  rich-html-boundary w-full text-[15px] sm:text-base text-zinc-800 dark:text-zinc-200 leading-[1.7]
   [&_strong]:text-blue-600 dark:[&_strong]:text-blue-400 [&_strong]:font-semibold
   [&_b]:text-blue-600 dark:[&_b]:text-blue-400 [&_b]:font-semibold
-  [&_p]:mb-4 [&_p]:leading-relaxed [&_p]:text-zinc-800 dark:[&_p]:text-zinc-200
+  [&_p]:mb-4 [&_p]:leading-[1.7] [&_p]:text-zinc-800 dark:[&_p]:text-zinc-200
   [&_a]:text-blue-600 dark:[&_a]:text-blue-400 [&_a]:font-semibold [&_a]:underline [&_a]:hover:text-blue-700
   [&_h1]:text-lg sm:[&_h1]:text-2xl [&_h1]:font-black [&_h1]:tracking-tight [&_h1]:text-zinc-900 dark:[&_h1]:text-zinc-100 [&_h1]:mt-5 [&_h1]:mb-2.5
   [&_h2]:text-base sm:[&_h2]:text-xl [&_h2]:font-extrabold [&_h2]:tracking-tight [&_h2]:text-zinc-900 dark:[&_h2]:text-zinc-100 [&_h2]:mt-5 [&_h2]:mb-2.5 [&_h2]:pt-3 [&_h2]:border-t [&_h2]:border-zinc-200/80 dark:[&_h2]:border-zinc-800/80 [&_h2:first-child]:border-t-0 [&_h2:first-child]:pt-0 [&_h2:first-child]:mt-0
-  [&_h3]:text-sm sm:[&_h3]:text-lg [&_h3]:font-bold [&_h3]:tracking-tight [&_h3]:text-zinc-900 dark:[&_h3]:text-zinc-100 [&_h3]:mt-4 [&_h3]:mb-2
-  [&_h4]:text-xs sm:[&_h4]:text-base [&_h4]:font-semibold [&_h4]:tracking-tight [&_h4]:text-zinc-900 dark:[&_h4]:text-zinc-100 [&_h4]:mt-3.5 [&_h4]:mb-1.5
+  [&_h3]:text-[15px] sm:[&_h3]:text-lg [&_h3]:font-bold [&_h3]:tracking-tight [&_h3]:text-zinc-900 dark:[&_h3]:text-zinc-100 [&_h3]:mt-4 [&_h3]:mb-2
+  [&_h4]:text-sm sm:[&_h4]:text-base [&_h4]:font-semibold [&_h4]:tracking-tight [&_h4]:text-zinc-900 dark:[&_h4]:text-zinc-100 [&_h4]:mt-3.5 [&_h4]:mb-1.5
   [&_ul]:my-3 [&_ul]:space-y-1.5 [&_ul]:list-disc [&_ul]:pl-5
   [&_ol]:my-3 [&_ol]:space-y-1.5 [&_ol]:list-decimal [&_ol]:pl-5
-  [&_li]:leading-relaxed [&_li]:pl-1 [&_li::marker]:text-blue-600 dark:[&_li::marker]:text-blue-400 [&_li::marker]:font-bold
+  [&_li]:leading-[1.65] [&_li]:pl-1 [&_li::marker]:text-blue-600 dark:[&_li::marker]:text-blue-400 [&_li::marker]:font-bold
   [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4 [&_blockquote]:bg-blue-50/50 dark:[&_blockquote]:bg-blue-950/20 [&_blockquote]:rounded-r-xl [&_blockquote]:italic
 `.trim().replace(/\s+/g, ' ');
 
 export function renderNewsList(news: any[], _settings: any, pageNum: number = 1): string {
   const publicNewsList = (Array.isArray(news) ? news : [])
-    .filter(item => item && item.sync_to_public !== false)
+    .filter(item => item && item.sync_to_public !== false && String(item.sync_to_public) !== 'false' && item.is_published !== false && item.is_draft !== true)
     .sort((a, b) => {
       if (a.is_pinned && !b.is_pinned) return -1;
       if (!a.is_pinned && b.is_pinned) return 1;
@@ -93,13 +93,13 @@ export function renderNewsList(news: any[], _settings: any, pageNum: number = 1)
           <a href="${articleUrl}" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors block mb-2 no-underline">
             <h2 class="text-base sm:text-lg font-bold text-zinc-900 dark:text-white line-clamp-2 leading-snug">${escapeHtml(title)}</h2>
           </a>
-          ${snippet ? `<p class="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 line-clamp-3 leading-relaxed mb-4 flex-1">${escapeHtml(snippet)}</p>` : ''}
-          <div class="pt-3 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between text-xs font-semibold mt-auto">
-            <a href="${articleUrl}" class="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 no-underline">
+          ${snippet ? `<p class="text-[13px] sm:text-sm text-zinc-600 dark:text-zinc-400 line-clamp-3 leading-relaxed mb-4 flex-1">${escapeHtml(snippet)}</p>` : ''}
+          <div class="pt-2 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between text-xs font-semibold mt-auto">
+            <a href="${articleUrl}" class="min-h-[38px] text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 no-underline">
               <span>Read Article →</span>
             </a>
-            <button type="button" class="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors cursor-pointer" title="Share article" aria-label="Share article">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3" stroke-width="2"></circle><circle cx="6" cy="12" r="3" stroke-width="2"></circle><circle cx="18" cy="19" r="3" stroke-width="2"></circle><line x1="8.59" x2="15.42" y1="13.51" y2="17.49" stroke-width="2"></line><line x1="15.41" x2="8.59" y1="6.51" y2="10.49" stroke-width="2"></line></svg>
+            <button type="button" class="w-10 h-10 -mr-1.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-colors cursor-pointer" title="Share article" aria-label="Share article">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3" stroke-width="2"></circle><circle cx="6" cy="12" r="3" stroke-width="2"></circle><circle cx="18" cy="19" r="3" stroke-width="2"></circle><line x1="8.59" x2="15.42" y1="13.51" y2="17.49" stroke-width="2"></line><line x1="15.41" x2="8.59" y1="6.51" y2="10.49" stroke-width="2"></line></svg>
             </button>
           </div>
         </div>
@@ -120,14 +120,14 @@ export function renderNewsList(news: any[], _settings: any, pageNum: number = 1)
     }
     const getPageUrl = (p: number) => (p <= 1 ? '/news' : `/news?page=${p}`);
     paginationHtml = `
-      <nav aria-label="News pagination" class="mt-10 flex items-center justify-center gap-1.5 sm:gap-2">
+      <nav aria-label="News pagination" class="mt-10 flex items-center justify-center gap-1.5 sm:gap-2 flex-wrap">
         ${safeCurrentPage > 1 ? `
-          <a href="${getPageUrl(safeCurrentPage - 1)}" class="p-2 sm:px-3 sm:py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer no-underline" aria-label="Previous page">
+          <a href="${getPageUrl(safeCurrentPage - 1)}" class="min-h-[40px] min-w-[40px] px-2.5 sm:px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-center justify-center gap-1 text-xs font-semibold cursor-pointer no-underline" aria-label="Previous page">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
             <span class="hidden sm:inline">Previous</span>
           </a>
         ` : `
-          <span class="p-2 sm:px-3 sm:py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 opacity-40 cursor-not-allowed flex items-center gap-1 text-xs font-semibold select-none" aria-disabled="true">
+          <span class="min-h-[40px] min-w-[40px] px-2.5 sm:px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 opacity-40 cursor-not-allowed flex items-center justify-center gap-1 text-xs font-semibold select-none" aria-disabled="true">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
             <span class="hidden sm:inline">Previous</span>
           </span>
@@ -138,15 +138,15 @@ export function renderNewsList(news: any[], _settings: any, pageNum: number = 1)
           }
           const pNum = Number(p);
           const isCurr = pNum === safeCurrentPage;
-          return `<a href="${getPageUrl(pNum)}" ${isCurr ? 'aria-current="page"' : ''} class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl text-xs font-bold transition-all flex items-center justify-center cursor-pointer no-underline ${isCurr ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20 pointer-events-none' : 'border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800'}">${p}</a>`;
+          return `<a href="${getPageUrl(pNum)}" ${isCurr ? 'aria-current="page"' : ''} class="w-10 h-10 rounded-xl text-xs font-bold transition-all flex items-center justify-center cursor-pointer no-underline ${isCurr ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20 pointer-events-none' : 'border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800'}">${p}</a>`;
         }).join('')}
         ${safeCurrentPage < totalPages ? `
-          <a href="${getPageUrl(safeCurrentPage + 1)}" class="p-2 sm:px-3 sm:py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer no-underline" aria-label="Next page">
+          <a href="${getPageUrl(safeCurrentPage + 1)}" class="min-h-[40px] min-w-[40px] px-2.5 sm:px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-center justify-center gap-1 text-xs font-semibold cursor-pointer no-underline" aria-label="Next page">
             <span class="hidden sm:inline">Next</span>
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
           </a>
         ` : `
-          <span class="p-2 sm:px-3 sm:py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 opacity-40 cursor-not-allowed flex items-center gap-1 text-xs font-semibold select-none" aria-disabled="true">
+          <span class="min-h-[40px] min-w-[40px] px-2.5 sm:px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 opacity-40 cursor-not-allowed flex items-center justify-center gap-1 text-xs font-semibold select-none" aria-disabled="true">
             <span class="hidden sm:inline">Next</span>
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
           </span>
@@ -157,13 +157,13 @@ export function renderNewsList(news: any[], _settings: any, pageNum: number = 1)
 
   const remainingNews = publicNewsList.slice(ITEMS_PER_PAGE);
   const fullNewsArchiveHtml = (safeCurrentPage === 1 && remainingNews.length > 0) ? `
-    <nav aria-label="Complete News Archive" data-nosnippet class="mt-10 pt-6 border-t border-zinc-200/80 dark:border-zinc-800/80 px-3 sm:px-0">
+    <nav aria-label="Complete News Archive" data-nosnippet class="mt-10 pt-6 border-t border-zinc-200/80 dark:border-zinc-800/80">
       <h2 class="text-xs sm:text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-3 uppercase tracking-wider">More News &amp; Updates (${remainingNews.length})</h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
         ${remainingNews.map((n: any) => {
           const nTitle = getField(n, 'title') || 'News Article';
           const nSlug = String(getField(n, 'slug') || getField(n, 'id') || '').trim();
-          return `<a href="/news/${encodeURIComponent(nSlug)}" class="px-3 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 hover:bg-blue-50 dark:hover:bg-blue-950/30 border border-zinc-200/60 dark:border-zinc-800/60 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 truncate no-underline transition-colors">${escapeHtml(nTitle)}</a>`;
+          return `<a href="/news/${encodeURIComponent(nSlug)}" class="min-h-[42px] flex items-center px-3.5 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 hover:bg-blue-50 dark:hover:bg-blue-950/30 border border-zinc-200/60 dark:border-zinc-800/60 text-[13px] sm:text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 truncate no-underline transition-colors"><span class="truncate">${escapeHtml(nTitle)}</span></a>`;
         }).join('')}
       </div>
     </nav>
@@ -171,38 +171,38 @@ export function renderNewsList(news: any[], _settings: any, pageNum: number = 1)
 
   return `
     <div class="w-full text-zinc-900 dark:text-zinc-100 pb-20 text-left min-h-[70vh]">
-      <div class="pt-0.5 pb-0.5 px-3 sm:px-0">
-        <a href="/" class="inline-flex items-center gap-2 text-sm sm:text-base font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors group shrink-0 no-underline">
-          <div class="p-1.5 sm:p-2 rounded-full bg-blue-50 dark:bg-blue-900/30 group-hover:-translate-x-1 transition-transform shadow-xs">
-            <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 12H5M12 19l-7-7 7-7"></path></svg>
+      <div class="pt-0.5 pb-1 px-0">
+        <a href="/" class="inline-flex items-center gap-1.5 min-h-[36px] py-1 text-xs sm:text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors group shrink-0 no-underline">
+          <div class="p-1 rounded-full bg-blue-50 dark:bg-blue-900/30 group-hover:-translate-x-1 transition-transform">
+            <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 12H5M12 19l-7-7 7-7"></path></svg>
           </div>
           <span>Back to storefront</span>
         </a>
       </div>
-      <div class="px-3 sm:px-0 mt-0.5 mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+      <div class="px-0 mt-0.5 mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         <h1 class="text-2xl sm:text-3xl font-extrabold text-zinc-900 dark:text-white tracking-tight">News &amp; Updates</h1>
         <div class="relative w-full sm:w-80 shrink-0">
-          <input type="text" readonly class="w-full py-2.5 pl-10 pr-9 text-sm text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800/90 border border-zinc-200 dark:border-zinc-700/80 rounded-xl placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium" placeholder="Search news or topics..." value="" aria-label="Search news articles" />
-          <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke-width="2"></circle><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.3-4.3"></path></svg>
+          <input type="text" readonly class="w-full py-2.5 pl-10 pr-11 min-h-[44px] text-base sm:text-sm text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800/90 border border-zinc-200 dark:border-zinc-700/80 rounded-xl placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium" placeholder="Search news or topics..." value="" aria-label="Search news articles" />
+          <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke-width="2"></circle><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.3-4.3"></path></svg>
         </div>
       </div>
       ${categories.length > 1 ? `
-        <div class="px-3 sm:px-0 mb-6 flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+        <div class="-mx-2.5 px-2.5 sm:mx-0 sm:px-0 mb-6 flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
           ${categories.map((cat, i) => {
             const catHref = cat === 'All' ? '/news' : `/news?category=${encodeURIComponent(cat)}`;
             return `
-              <a href="${catHref}" class="px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer no-underline ${i === 0 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'}">${escapeHtml(cat)}</a>
+              <a href="${catHref}" class="min-h-[38px] inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer no-underline ${i === 0 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'}">${escapeHtml(cat)}</a>
             `;
           }).join('')}
         </div>
       ` : ''}
       ${currentSlice.length === 0 ? `
-        <div class="py-16 text-center bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50 mx-3 sm:mx-0">
+        <div class="py-16 px-4 text-center bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50">
           <p class="text-base font-bold text-zinc-800 dark:text-zinc-200">No news articles found</p>
           <p class="text-xs text-zinc-400 mt-1 mb-4">Try adjusting your category or search keywords</p>
         </div>
       ` : `
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 px-3 sm:px-0">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
           ${cards}
         </div>
       `}
@@ -280,12 +280,12 @@ export function renderNewsDetail(slug: string, news: any[], _settings: any, apps
       </div>
       <div class="flex items-center gap-2.5 w-full sm:w-auto shrink-0">
         ${isInternalAction ? `
-          <a href="${escapeHtml(detailUrl)}" class="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-500/20 active:scale-95 no-underline" title="View App Details">
+          <a href="${escapeHtml(detailUrl)}" class="w-full sm:w-auto min-h-[44px] px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm sm:text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-500/20 active:scale-95 no-underline" title="View App Details">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
             <span>App Details</span>
           </a>
         ` : `
-          <a href="${escapeHtml(downloadTarget?.url || '#')}" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-500/20 active:scale-95">
+          <a href="${escapeHtml(downloadTarget?.url || '#')}" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto min-h-[44px] px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm sm:text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-500/20 active:scale-95">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
             <span>Download</span>
             <svg class="w-3 h-3 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"></path></svg>
@@ -298,12 +298,12 @@ export function renderNewsDetail(slug: string, news: any[], _settings: any, apps
   const recentNews = getNextNewsChain(item, news, 6);
 
   const recentNewsHtml = recentNews.length > 0 ? `
-    <section aria-labelledby="recent-news-heading" class="mt-8 pt-6 border-t border-zinc-200/80 dark:border-zinc-800/80 px-1 sm:px-4 text-left">
+    <section aria-labelledby="recent-news-heading" class="mt-8 pt-6 border-t border-zinc-200/80 dark:border-zinc-800/80 px-0 sm:px-4 text-left">
       <div class="flex items-center justify-between gap-2 mb-4">
         <h2 id="recent-news-heading" class="text-base sm:text-lg font-bold text-zinc-900 dark:text-zinc-100">
           Latest News &amp; Updates
         </h2>
-        <a href="/news" class="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline no-underline">
+        <a href="/news" class="min-h-[36px] inline-flex items-center text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline no-underline">
           View all news →
         </a>
       </div>
@@ -315,14 +315,14 @@ export function renderNewsDetail(slug: string, news: any[], _settings: any, apps
           const rnDate = formatNewsDate(getField(rn, 'date'), getField(rn, 'published_at'), getField(rn, 'created_at'));
           const rnDesc = getPlainTextSnippet(getField(rn, 'description') || getField(rn, 'seo_description') || getField(rn, 'content'), 110);
           return `
-            <a href="/news/${encodeURIComponent(rnSlug)}" class="p-3.5 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/50 hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80 transition-colors flex flex-col justify-between gap-1.5 no-underline">
+            <a href="/news/${encodeURIComponent(rnSlug)}" class="p-3.5 min-h-[56px] rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/50 hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80 transition-colors flex flex-col justify-between gap-1.5 no-underline">
               <div>
                 <div class="flex items-center gap-2 text-[10px] font-medium text-zinc-500 dark:text-zinc-400 mb-1">
                   <span class="text-blue-600 dark:text-blue-400 font-semibold uppercase tracking-wider">${escapeHtml(rnCat)}</span>
                   ${rnDate ? `<span>•</span><span>${escapeHtml(rnDate)}</span>` : ''}
                 </div>
-                <h3 class="text-xs sm:text-sm font-bold text-zinc-900 dark:text-zinc-100 line-clamp-2 leading-snug">${escapeHtml(rnTitle)}</h3>
-                ${rnDesc ? `<p class="text-[11px] text-zinc-500 dark:text-zinc-400 line-clamp-2 mt-1 leading-relaxed">${escapeHtml(rnDesc)}</p>` : ''}
+                <h3 class="text-[13px] sm:text-sm font-bold text-zinc-900 dark:text-zinc-100 line-clamp-2 leading-snug">${escapeHtml(rnTitle)}</h3>
+                ${rnDesc ? `<p class="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2 mt-1 leading-relaxed">${escapeHtml(rnDesc)}</p>` : ''}
               </div>
             </a>
           `;
@@ -333,23 +333,23 @@ export function renderNewsDetail(slug: string, news: any[], _settings: any, apps
 
   // 1:1 Layout Match with NewsDetailPage.tsx
   return `
-    <article class="max-w-3xl mx-auto px-3 sm:px-0 pb-20 text-left">
-      <div class="flex items-center justify-between gap-3 px-1 sm:px-4 mb-4">
-        <a href="/news" class="inline-flex items-center gap-2 text-xs xs:text-sm font-medium text-blue-500 hover:text-blue-600 transition-colors group shrink-0">
+    <article class="max-w-3xl mx-auto px-0 pb-20 text-left">
+      <div class="flex items-center justify-between gap-3 px-0 sm:px-4 mb-4">
+        <a href="/news" class="inline-flex items-center gap-2 min-h-[40px] py-1 text-xs xs:text-sm font-medium text-blue-500 hover:text-blue-600 transition-colors group shrink-0">
           <div class="p-1.5 rounded-full bg-blue-50 dark:bg-blue-900/20 group-hover:-translate-x-1 transition-transform">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 12H5M12 19l-7-7 7-7"></path></svg>
           </div>
           <span>Back to News</span>
         </a>
-        <button type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-zinc-700 dark:text-zinc-200 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-all border border-black/5 dark:border-white/10 shrink-0 cursor-pointer" title="Share article">
+        <button type="button" class="inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-1.5 rounded-full text-xs font-semibold text-zinc-700 dark:text-zinc-200 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-all border border-black/5 dark:border-white/10 shrink-0 cursor-pointer" title="Share article">
           <svg class="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3" stroke-width="2"></circle><circle cx="6" cy="12" r="3" stroke-width="2"></circle><circle cx="18" cy="19" r="3" stroke-width="2"></circle><line x1="8.59" x2="15.42" y1="13.51" y2="17.49" stroke-width="2"></line><line x1="15.41" x2="8.59" y1="6.51" y2="10.49" stroke-width="2"></line></svg>
           <span>Share</span>
         </button>
       </div>
 
-      <header class="mb-4 text-left px-1 sm:px-4">
+      <header class="mb-4 text-left px-0 sm:px-4">
         <div class="flex flex-wrap items-center gap-2 mb-2 text-xs">
-          <a href="/news?category=${encodeURIComponent(cat)}" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors no-underline">
+          <a href="/news?category=${encodeURIComponent(cat)}" class="inline-flex items-center min-h-[26px] px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors no-underline">
             ${escapeHtml(cat)}
           </a>
           ${formattedDate ? `
@@ -383,22 +383,22 @@ export function renderNewsDetail(slug: string, news: any[], _settings: any, apps
 
       ${actionBoxHtml}
 
-      <div class="mt-6 px-1 sm:px-4 ${RICH_HTML_CONTENT_STYLE}">
+      <div class="mt-6 px-0 sm:px-4 ${RICH_HTML_CONTENT_STYLE}">
         ${sanitizedContent}
       </div>
 
-      <nav aria-label="Article Topic Navigation" class="mt-8 pt-5 border-t border-zinc-200/80 dark:border-zinc-800/80 px-1 sm:px-4 flex flex-wrap items-center gap-2 text-xs">
+      <nav aria-label="Article Topic Navigation" class="mt-8 pt-5 border-t border-zinc-200/80 dark:border-zinc-800/80 px-0 sm:px-4 flex flex-wrap items-center gap-2 text-xs">
         <span class="font-bold text-zinc-500 dark:text-zinc-400 mr-1">Explore Topics:</span>
-        <a href="/news?category=${encodeURIComponent(cat)}" class="px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold border border-blue-200/50 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors no-underline">
+        <a href="/news?category=${encodeURIComponent(cat)}" class="min-h-[36px] inline-flex items-center px-3.5 py-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold border border-blue-200/50 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors no-underline">
           ${escapeHtml(cat)} News
         </a>
-        <a href="/news" class="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors no-underline">
+        <a href="/news" class="min-h-[36px] inline-flex items-center px-3.5 py-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors no-underline">
           All News &amp; Updates
         </a>
-        <a href="/new-apps" class="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors no-underline">
+        <a href="/new-apps" class="min-h-[36px] inline-flex items-center px-3.5 py-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors no-underline">
           New Apps
         </a>
-        <a href="/categories" class="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors no-underline">
+        <a href="/categories" class="min-h-[36px] inline-flex items-center px-3.5 py-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors no-underline">
           App Categories
         </a>
       </nav>

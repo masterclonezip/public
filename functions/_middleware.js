@@ -14,6 +14,17 @@ function getEdgeSizedLogoUrl(url, size = 192) {
   return trimmed;
 }
 
+function isPngBytesEdge(bytes) {
+  return Boolean(
+    bytes &&
+      bytes.byteLength > 64 &&
+      bytes[0] === 0x89 &&
+      bytes[1] === 0x50 &&
+      bytes[2] === 0x4e &&
+      bytes[3] === 0x47
+  );
+}
+
 function wrapPngInIcoEdge(pngBytes, size = 48) {
   const len = pngBytes.byteLength;
   const ico = new Uint8Array(22 + len);
@@ -32,6 +43,47 @@ function wrapPngInIcoEdge(pngBytes, size = 48) {
   view.setUint32(18, 22, true); // ImageOffset = 22
   ico.set(pngBytes, 22);
   return ico;
+}
+
+function fromEdgeRestValueSimple(field) {
+  if (!field || typeof field !== 'object') return undefined;
+  if ('stringValue' in field) return field.stringValue;
+  if ('integerValue' in field) return Number(field.integerValue);
+  if ('doubleValue' in field) return Number(field.doubleValue);
+  if ('booleanValue' in field) return Boolean(field.booleanValue);
+  return undefined;
+}
+
+async function getEdgePublicSettings(envObj) {
+  const base = (staticData && staticData.settings) || {};
+  const now = Date.now();
+  if (globalThis.__EDGE_MW_SETTINGS_CACHE__ && now < globalThis.__EDGE_MW_SETTINGS_CACHE__.expiresAt) {
+    return globalThis.__EDGE_MW_SETTINGS_CACHE__.data;
+  }
+  const projectId = String(envObj?.VITE_FIREBASE_PROJECT_ID || envObj?.FIREBASE_PROJECT_ID || '').trim();
+  const apiKey = String(envObj?.VITE_FIREBASE_API_KEY || envObj?.FIREBASE_API_KEY || '').trim();
+  const databaseId = String(envObj?.VITE_FIREBASE_DATABASE_ID || envObj?.FIREBASE_DATABASE_ID || '(default)').trim() || '(default)';
+  let merged = { ...base };
+  if (projectId) {
+    try {
+      const readUrl = new URL(`https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/${encodeURIComponent(databaseId)}/documents/store_data/public_settings`);
+      if (apiKey) readUrl.searchParams.set('key', apiKey);
+      const res = await fetch(readUrl.toString(), { headers: { Accept: 'application/json' } });
+      if (res.ok) {
+        const json = await res.json().catch(() => null);
+        if (json && json.fields) {
+          for (const [k, f] of Object.entries(json.fields)) {
+            const val = fromEdgeRestValueSimple(f);
+            if (val !== undefined && val !== '') {
+              merged[k] = val;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+  }
+  globalThis.__EDGE_MW_SETTINGS_CACHE__ = { data: merged, expiresAt: now + 60 * 1000 };
+  return merged;
 }
 
 export async function onRequest(context) {
@@ -73,8 +125,8 @@ export async function onRequest(context) {
     lowerPath === '/site.webmanifest';
 
   if (isIconOrManifest && !rawHost.startsWith('admin.') && !rawHost.startsWith('masterworld.')) {
-    const settings = (staticData && staticData.settings) || {};
     const envObj = context.env || {};
+    const settings = await getEdgePublicSettings(envObj);
     const rawLogo = String(
       settings.logo_url ||
         settings.favicon_url ||
@@ -106,8 +158,10 @@ export async function onRequest(context) {
             { src: '/favicon-48x48.png', sizes: '48x48', type: 'image/png', purpose: 'any' },
             { src: '/favicon-96x96.png', sizes: '96x96', type: 'image/png', purpose: 'any' },
             { src: '/favicon-144x144.png', sizes: '144x144', type: 'image/png', purpose: 'any' },
-            { src: '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-            { src: '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+            { src: '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+            { src: '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+            { src: '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+            { src: '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
           ],
           theme_color: '#2563eb',
           background_color: '#ffffff',
@@ -149,14 +203,17 @@ export async function onRequest(context) {
             cf: { cacheEverything: true, cacheTtl: 86400 }
           });
           if (iconRes.ok) {
+            const upstreamContentType = iconRes.headers.get('content-type') || 'image/png';
             if (lowerPath === '/favicon.ico') {
-              const pngBytes = new Uint8Array(await iconRes.arrayBuffer());
-              if (pngBytes.byteLength > 64) {
-                const icoBytes = wrapPngInIcoEdge(pngBytes, 48);
-                return new Response(icoBytes, {
+              const rawBytes = new Uint8Array(await iconRes.arrayBuffer());
+              if (rawBytes.byteLength > 64) {
+                const isIco = rawBytes[0] === 0 && rawBytes[1] === 0 && rawBytes[2] === 1 && rawBytes[3] === 0;
+                const bodyBytes = isPngBytesEdge(rawBytes) ? wrapPngInIcoEdge(rawBytes, 48) : rawBytes;
+                const contentType = isPngBytesEdge(rawBytes) || isIco ? 'image/x-icon' : upstreamContentType;
+                return new Response(bodyBytes, {
                   status: 200,
                   headers: {
-                    'Content-Type': 'image/x-icon',
+                    'Content-Type': contentType,
                     'Cache-Control': 'public, max-age=3600, s-maxage=86400',
                     'Access-Control-Allow-Origin': '*',
                     'Timing-Allow-Origin': '*'
@@ -167,7 +224,7 @@ export async function onRequest(context) {
             return new Response(iconRes.body, {
               status: 200,
               headers: {
-                'Content-Type': 'image/png',
+                'Content-Type': upstreamContentType,
                 'Cache-Control': 'public, max-age=3600, s-maxage=86400',
                 'Access-Control-Allow-Origin': '*',
                 'Timing-Allow-Origin': '*'
@@ -347,8 +404,12 @@ export async function onRequest(context) {
       text = await response.text();
     }
 
-    // Self-heal if static file was missing OR if sitemap-apps.xml was built with 0 apps while staticData.apps is populated
-    if (!text || (lowerPath === '/sitemap-apps.xml' && apps.length > 0 && !text.includes('/app/'))) {
+    // Self-heal if static file was missing OR if sitemaps were built empty while staticData is populated
+    if (
+      !text ||
+      (lowerPath === '/sitemap-apps.xml' && apps.length > 0 && !text.includes('/app/')) ||
+      (lowerPath === '/sitemap-news.xml' && news.length > 0 && !text.includes('/news/'))
+    ) {
       if (lowerPath === '/sitemap.xml') {
         text = `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <sitemap><loc>${canonicalOrigin}/sitemap-apps.xml</loc><lastmod>${latestDate}</lastmod></sitemap>\n  <sitemap><loc>${canonicalOrigin}/sitemap-static.xml</loc><lastmod>${latestDate}</lastmod></sitemap>\n  <sitemap><loc>${canonicalOrigin}/sitemap-news.xml</loc><lastmod>${latestDate}</lastmod></sitemap>\n  <sitemap><loc>${canonicalOrigin}/sitemap-videos.xml</loc><lastmod>${latestDate}</lastmod></sitemap>\n  <sitemap><loc>${canonicalOrigin}/sitemap-developers.xml</loc><lastmod>${latestDate}</lastmod></sitemap>\n</sitemapindex>`;
         status = 200;
@@ -401,6 +462,7 @@ export async function onRequest(context) {
         .replace(hostVariantRegex, canonicalOrigin)
         .replace(/https?:\/\/localhost(?::\d+)?/gi, canonicalOrigin)
         .replace(/https?:\/\/127\.0\.0\.1(?::\d+)?/gi, canonicalOrigin)
+        .replace(/https?:\/\/example\.com(?=[/"'<])/gi, canonicalOrigin)
         .replace(/<loc>\s*https?:\/\/[^/<]+(\/[^<]*)?<\/loc>/gi, (_, p) => `<loc>${canonicalOrigin}${p || ''}</loc>`)
         .replace(
           /(<(?:loc|image:loc|video:thumbnail_loc)>\s*https?:\/\/)(?:www\.|admin\.|masterworld\.)+([^<\s]+\s*<\/(?:loc|image:loc|video:thumbnail_loc)>)/gi,
@@ -474,13 +536,12 @@ export async function onRequest(context) {
       }
     );
 
-    // Optimize payload for Social Scrapers (WhatsApp, Facebook, Twitter, Telegram, LinkedIn, Discord, Slack, iMessage)
+    // Optimize payload for pure Social Preview Scrapers (keep #server-critical-css intact; Applebot retains full CSS)
     const ua = (context.request.headers.get('user-agent') || '').toLowerCase();
-    const isSocialScraper = /whatsapp|facebookexternalhit|facebot|twitterbot|telegrambot|linkedinbot|slackbot|discordbot|applebot|pinterest|skypeuripreview/i.test(ua);
+    const isSocialScraper = /whatsapp|facebookexternalhit|facebot|twitterbot|telegrambot|linkedinbot|slackbot|discordbot|pinterest|skypeuripreview/i.test(ua);
     if (isSocialScraper) {
-      // Remove heavy inlined CSS so social crawlers read OpenGraph tags within the first 10 KB without buffer truncation
+      // Remove heavy inlined CSS so social previewers read OpenGraph tags within the first 10 KB while retaining #server-critical-css
       html = html.replace(/<style\s+id=["']vite-inline-css["']>[\s\S]*?<\/style>/gi, '');
-      html = html.replace(/<style\s+id=["']server-critical-css["']>[\s\S]*?<\/style>/gi, '');
     }
 
     const headers = new Headers(response.headers);

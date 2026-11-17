@@ -395,7 +395,6 @@ export default function ImageUpload({ format = 'webp', value, defaultValue, onCh
                 src={internalValue} 
                 alt="Thumbnail Preview" 
                 referrerPolicy="no-referrer"
-                crossOrigin="anonymous"
                 className="w-full h-full object-contain rounded-lg transition-transform group-hover:scale-105"
                 onLoad={(e) => {
                   setImgLoadError(false);
@@ -572,7 +571,6 @@ export default function ImageUpload({ format = 'webp', value, defaultValue, onCh
                 src={internalValue} 
                 alt="Full Image Preview" 
                 referrerPolicy="no-referrer"
-                crossOrigin="anonymous"
                 className="max-w-full max-h-[72vh] object-contain rounded-xl shadow-lg border border-slate-200/50 dark:border-slate-800"
                 onLoad={(e) => {
                   const img = e.currentTarget;

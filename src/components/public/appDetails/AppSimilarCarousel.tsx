@@ -32,7 +32,7 @@ const SimilarAppIcon: React.FC<SimilarAppIconProps> = ({ src, name }) => {
 
   if (!src || failed) {
     return (
-      <div className="w-[54px] h-[54px] xxs:w-[60px] xxs:h-[60px] xs:w-[66px] xs:h-[66px] sm:w-[80px] sm:h-[80px] rounded-[24%] shadow-[0_2px_8px_rgba(0,0,0,0.08)] bg-zinc-100 dark:bg-zinc-800 border border-black/5 dark:border-white/10 flex items-center justify-center text-base sm:text-xl font-bold text-zinc-500 dark:text-zinc-400 select-none pointer-events-none">
+      <div className="w-[60px] h-[60px] xxs:w-[66px] xxs:h-[66px] xs:w-[72px] xs:h-[72px] sm:w-[84px] sm:h-[84px] rounded-[24%] shadow-[0_2px_8px_rgba(0,0,0,0.08)] bg-zinc-100 dark:bg-zinc-800 border border-black/5 dark:border-white/10 flex items-center justify-center text-base sm:text-xl font-bold text-zinc-500 dark:text-zinc-400 select-none pointer-events-none">
         {initialLetter}
       </div>
     );
@@ -42,12 +42,12 @@ const SimilarAppIcon: React.FC<SimilarAppIconProps> = ({ src, name }) => {
     <img
       src={src}
       alt={name}
-      width={80}
-      height={80}
+      width={84}
+      height={84}
       decoding="async"
       fetchPriority="low"
       onError={() => setFailed(true)}
-      className="w-[54px] h-[54px] xxs:w-[60px] xxs:h-[60px] xs:w-[66px] xs:h-[66px] sm:w-[80px] sm:h-[80px] rounded-[24%] shadow-[0_2px_8px_rgba(0,0,0,0.08)] object-cover group-hover:scale-105 transition-transform duration-200 block pointer-events-none select-none"
+      className="w-[60px] h-[60px] xxs:w-[66px] xxs:h-[66px] xs:w-[72px] xs:h-[72px] sm:w-[84px] sm:h-[84px] rounded-[24%] shadow-[0_2px_8px_rgba(0,0,0,0.08)] object-cover group-hover:scale-105 transition-transform duration-200 block pointer-events-none select-none"
       loading="lazy"
     />
   );
@@ -82,7 +82,7 @@ export const AppSimilarCarousel: React.FC<AppSimilarCarouselProps> = ({
         <div className="grid grid-rows-2 grid-flow-col auto-cols-[calc((100%-1.75rem)/4.25)] xs:auto-cols-[calc((100%-2.5rem)/4.25)] sm:auto-cols-[calc((100%-5.25rem)/8)] gap-x-2 xs:gap-x-3 gap-y-3 xs:gap-y-3.5 overflow-hidden pt-2.5 pb-2 -mx-2.5 px-2.5 sm:mx-0 sm:px-0">
           {Array.from({ length: 16 }).map((_, idx) => (
             <div key={idx} className="flex flex-col items-center gap-1.5 w-full shrink-0">
-              <div className="w-[54px] h-[54px] xxs:w-[60px] xxs:h-[60px] xs:w-[66px] xs:h-[66px] sm:w-[80px] sm:h-[80px] rounded-[24%] bg-zinc-200/70 dark:bg-zinc-800/70 animate-pulse" />
+              <div className="w-[60px] h-[60px] xxs:w-[66px] xxs:h-[66px] xs:w-[72px] xs:h-[72px] sm:w-[84px] sm:h-[84px] rounded-[24%] bg-zinc-200/70 dark:bg-zinc-800/70 animate-pulse" />
               <div className="h-3 w-14 rounded bg-zinc-200/70 dark:bg-zinc-800/70 animate-pulse" />
             </div>
           ))}
@@ -98,15 +98,19 @@ export const AppSimilarCarousel: React.FC<AppSimilarCarouselProps> = ({
   return (
     <aside data-nosnippet aria-labelledby="related-apps-heading" className="my-5 xs:my-6 px-0 sm:px-4 md:px-6">
       <div className="flex items-center justify-between gap-2 mb-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <h2 id="related-apps-heading" className="text-base xs:text-lg sm:text-xl font-bold flex items-center gap-1.5 xs:gap-2 text-zinc-900 dark:text-zinc-100 truncate">
-            <span>Similar Applications</span>
-            {specificCategory && specificCategory !== 'All Apps' && (
-              <span className="text-[10px] xs:text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 xs:px-2.5 py-0.5 rounded-full border border-blue-200/50 dark:border-blue-800/50 truncate">
-                {specificCategory}
-              </span>
-            )}
+        <div className="flex items-center gap-1.5 xs:gap-2 min-w-0">
+          <h2 id="related-apps-heading" className="text-base xs:text-lg sm:text-xl font-bold text-zinc-900 dark:text-zinc-100 truncate">
+            Similar Applications
           </h2>
+          {specificCategory && specificCategory !== 'All Apps' && (
+            <Link
+              to={`/?tab=${encodeURIComponent(specificCategory)}`}
+              className="inline-flex items-center text-[10px] xs:text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 hover:bg-blue-100 active:scale-95 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 px-2 xs:px-2.5 py-0.5 rounded-full border border-blue-200/50 dark:border-blue-800/50 truncate transition-all no-underline shrink-0"
+              title={`Browse ${specificCategory} category on storefront`}
+            >
+              {specificCategory}
+            </Link>
+          )}
         </div>
         <Link 
           to={`/?tab=${encodeURIComponent(specificCategory)}`}
@@ -124,7 +128,7 @@ export const AppSimilarCarousel: React.FC<AppSimilarCarouselProps> = ({
         style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y', overscrollBehaviorX: 'contain' }}
       >
         {relatedApps.slice(0, 16).map((relatedApp, index) => {
-          const iconSrc = relatedApp.icon_url ? getOptimizedImageUrl(relatedApp.icon_url, 96) : '';
+          const iconSrc = relatedApp.icon_url ? getOptimizedImageUrl(relatedApp.icon_url, 144) : '';
 
           return (
             <Link

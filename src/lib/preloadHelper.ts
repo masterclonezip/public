@@ -7,8 +7,22 @@
 
 import { getOptimizedImageUrl } from '../seo/utils';
 
-// Ultra-fast in-memory cache mapping normalized slugs and IDs to full app specs
+// Ultra-fast in-memory cache mapping normalized slugs and IDs to full app specs (bounded to prevent mobile RAM bloat)
+const MAX_APP_CACHE_ENTRIES = 80;
 export const appDetailMemoryCache = new Map<string, any>();
+
+const setBoundedAppCache = (key: string, value: any) => {
+  if (!key) return;
+  if (appDetailMemoryCache.has(key)) {
+    appDetailMemoryCache.delete(key);
+  } else if (appDetailMemoryCache.size >= MAX_APP_CACHE_ENTRIES) {
+    const oldestKey = appDetailMemoryCache.keys().next().value;
+    if (oldestKey !== undefined) {
+      appDetailMemoryCache.delete(oldestKey);
+    }
+  }
+  appDetailMemoryCache.set(key, value);
+};
 
 // In-flight request tracking to deduplicate concurrent network roundtrips
 const inFlightFetches = new Map<string, Promise<any>>();
@@ -33,9 +47,9 @@ export const preloadAppDetails = (slugOrApp?: string | { slug?: string; id?: str
     if (rawSlug) {
       const k = String(rawSlug).toLowerCase().trim();
       if (!appDetailMemoryCache.has(k) || (slugOrApp.description_html && !appDetailMemoryCache.get(k)?.description_html)) {
-        appDetailMemoryCache.set(k, slugOrApp);
-        if (slugOrApp.slug) appDetailMemoryCache.set(String(slugOrApp.slug).toLowerCase().trim(), slugOrApp);
-        if (slugOrApp.id) appDetailMemoryCache.set(String(slugOrApp.id).toLowerCase().trim(), slugOrApp);
+        setBoundedAppCache(k, slugOrApp);
+        if (slugOrApp.slug) setBoundedAppCache(String(slugOrApp.slug).toLowerCase().trim(), slugOrApp);
+        if (slugOrApp.id) setBoundedAppCache(String(slugOrApp.id).toLowerCase().trim(), slugOrApp);
       }
     }
   }
@@ -74,9 +88,9 @@ export const preloadAppDetails = (slugOrApp?: string | { slug?: string; id?: str
       .then(data => {
         if (data?.status === 'OK' && data?.app) {
           const app = data.app;
-          appDetailMemoryCache.set(cleanKey, app);
-          if (app.slug) appDetailMemoryCache.set(String(app.slug).toLowerCase().trim(), app);
-          if (app.id) appDetailMemoryCache.set(String(app.id).toLowerCase().trim(), app);
+          setBoundedAppCache(cleanKey, app);
+          if (app.slug) setBoundedAppCache(String(app.slug).toLowerCase().trim(), app);
+          if (app.id) setBoundedAppCache(String(app.id).toLowerCase().trim(), app);
 
           // Dispatch event so any currently mounted components can consume it immediately
           if (typeof window !== 'undefined') {
@@ -84,9 +98,13 @@ export const preloadAppDetails = (slugOrApp?: string | { slug?: string; id?: str
           }
           return app;
         }
+        prefetchedKeys.delete(cleanKey);
         return null;
       })
-      .catch(() => null)
+      .catch(() => {
+        prefetchedKeys.delete(cleanKey);
+        return null;
+      })
       .finally(() => {
         inFlightFetches.delete(cleanKey);
       });

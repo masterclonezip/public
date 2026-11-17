@@ -305,85 +305,94 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // Fetch from server backup endpoint with fast memory caching and strict timeout so mobile navigation never stalls
+  // Fetch from server backup endpoint with fast memory caching, request deduplication, and strict timeout so mobile navigation never stalls
+  const inFlightBackupRef = React.useRef<Promise<void> | null>(null);
   const fetchBackupData = useCallback(async (silent = false) => {
+    if (inFlightBackupRef.current) {
+      return inFlightBackupRef.current;
+    }
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
-    try {
-      if (!silent && apps.length === 0 && news.length === 0) setLoading(true);
-      const res = await fetch('/api/v1/public/backup-data', {
-        headers: { 'Accept': 'application/json' },
-        signal: controller.signal
-      });
-      if (res.ok) {
-        const backup = await res.json();
-        if (backup) {
-          try {
-            localStorage.removeItem(DATA_CACHE_KEY);
-          } catch (_e) {}
+    const runPromise = (async () => {
+      try {
+        if (!silent && apps.length === 0 && news.length === 0) setLoading(true);
+        const res = await fetch('/api/v1/public/backup-data', {
+          headers: { 'Accept': 'application/json' },
+          signal: controller.signal
+        });
+        if (res.ok) {
+          const backup = await res.json();
+          if (backup) {
+            try {
+              localStorage.removeItem(DATA_CACHE_KEY);
+            } catch (_e) {}
 
-          if (backup.apps && Array.isArray(backup.apps)) {
-            if (backup.apps.length > 0) {
-              setApps(prev => {
-                if (prev.length === backup.apps.length) {
-                  const prevHasNewerOrEqual = prev.every((p, idx) => {
-                    const b = backup.apps[idx];
-                    return b && p.slug === b.slug && p.seo_title === b.seo_title && p.updated_at === b.updated_at && Boolean(p.description_html) === Boolean(b.description_html);
-                  });
-                  if (prevHasNewerOrEqual) return prev;
+            if (backup.apps && Array.isArray(backup.apps)) {
+              if (backup.apps.length > 0) {
+                setApps(prev => {
+                  if (prev.length === backup.apps.length) {
+                    const prevHasNewerOrEqual = prev.every((p, idx) => {
+                      const b = backup.apps[idx];
+                      return b && p.slug === b.slug && p.seo_title === b.seo_title && p.updated_at === b.updated_at && Boolean(p.description_html) === Boolean(b.description_html);
+                    });
+                    if (prevHasNewerOrEqual) return prev;
+                  }
+                  return mergeUniqueApps(prev, backup.apps);
+                });
+              }
+            } else {
+              loadFullStaticDataset().then(full => {
+                if (full?.apps && full.apps.length > 0) {
+                  setApps(prev => mergeUniqueApps(prev, full.apps));
                 }
-                return mergeUniqueApps(prev, backup.apps);
               });
             }
-          } else {
-            loadFullStaticDataset().then(full => {
-              if (full?.apps && full.apps.length > 0) {
-                setApps(prev => mergeUniqueApps(prev, full.apps));
-              }
-            });
+            if (backup.settings && Object.keys(backup.settings).length > 0) {
+              setSettings(prev => {
+                const prevStr = JSON.stringify(prev);
+                const nextObj = { ...prev, ...backup.settings };
+                return JSON.stringify(nextObj) === prevStr ? prev : nextObj;
+              });
+            }
+            if (backup.news && Array.isArray(backup.news) && backup.news.length > 0) {
+              setNews(prev => {
+                if (prev.length === backup.news.length && prev[0]?.slug === backup.news[0]?.slug && prev[0]?.updated_at === backup.news[0]?.updated_at) {
+                  return prev;
+                }
+                return mergeUniqueNews(prev, backup.news);
+              });
+            }
+            if (backup.videos && Array.isArray(backup.videos) && backup.videos.length > 0) {
+              setVideos(prev => {
+                if (prev.length === backup.videos.length && prev[0]?.id === backup.videos[0]?.id) {
+                  return prev;
+                }
+                return backup.videos;
+              });
+            }
+            setLoadedFromServer(true);
           }
-          if (backup.settings && Object.keys(backup.settings).length > 0) {
-            setSettings(prev => {
-              const prevStr = JSON.stringify(prev);
-              const nextObj = { ...prev, ...backup.settings };
-              return JSON.stringify(nextObj) === prevStr ? prev : nextObj;
-            });
-          }
-          if (backup.news && Array.isArray(backup.news) && backup.news.length > 0) {
-            setNews(prev => {
-              if (prev.length === backup.news.length && prev[0]?.slug === backup.news[0]?.slug && prev[0]?.updated_at === backup.news[0]?.updated_at) {
-                return prev;
-              }
-              return mergeUniqueNews(prev, backup.news);
-            });
-          }
-          if (backup.videos && Array.isArray(backup.videos) && backup.videos.length > 0) {
-            setVideos(prev => {
-              if (prev.length === backup.videos.length && prev[0]?.id === backup.videos[0]?.id) {
-                return prev;
-              }
-              return backup.videos;
-            });
-          }
-          setLoadedFromServer(true);
         }
+      } catch (_e) {
+        loadFullStaticDataset().then(full => {
+          if (full?.apps && full.apps.length > 0) {
+            setApps(prev => mergeUniqueApps(prev, full.apps));
+          }
+          if (full?.news && full.news.length > 0) {
+            setNews(prev => mergeUniqueNews(prev, full.news));
+          }
+          if (full?.videos && full.videos.length > 0) {
+            setVideos(prev => (prev.length >= full.videos.length ? prev : full.videos));
+          }
+        });
+      } finally {
+        clearTimeout(timeoutId);
+        inFlightBackupRef.current = null;
+        setLoading(false);
       }
-    } catch (_e) {
-      loadFullStaticDataset().then(full => {
-        if (full?.apps && full.apps.length > 0) {
-          setApps(prev => mergeUniqueApps(prev, full.apps));
-        }
-        if (full?.news && full.news.length > 0) {
-          setNews(prev => mergeUniqueNews(prev, full.news));
-        }
-        if (full?.videos && full.videos.length > 0) {
-          setVideos(prev => (prev.length >= full.videos.length ? prev : full.videos));
-        }
-      });
-    } finally {
-      clearTimeout(timeoutId);
-      setLoading(false);
-    }
+    })();
+    inFlightBackupRef.current = runPromise;
+    return runPromise;
   }, [apps.length, news.length]);
 
   const hydrateFromStaticDataset = useCallback((full: any) => {
@@ -486,9 +495,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     window.addEventListener('popstate', checkCatalogRoute);
     window.addEventListener('open-search-modal', ensureFullCatalogLoaded);
+    window.addEventListener('open-catalog-route', ensureFullCatalogLoaded);
     return () => {
       window.removeEventListener('popstate', checkCatalogRoute);
       window.removeEventListener('open-search-modal', ensureFullCatalogLoaded);
+      window.removeEventListener('open-catalog-route', ensureFullCatalogLoaded);
     };
   }, [apps.length, fetchBackupData, hydrateFromStaticDataset]);
 

@@ -106,11 +106,11 @@ export function PublicHeader() {
                   loading="eager" 
                   fetchPriority="high" 
                   decoding="async" 
-                  className="w-8 h-8 sm:w-10 sm:h-10 object-contain drop-shadow-sm" 
+                  className="w-9 h-9 sm:w-10 sm:h-10 object-contain drop-shadow-sm" 
                   alt={`${settings.site_title || 'Official'} Logo`} 
                 />
               ) : (
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-500 rounded-xl flex items-center justify-center text-white font-semibold text-sm sm:text-base">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-blue-500 rounded-xl flex items-center justify-center text-white font-semibold text-sm sm:text-base">
                   {(settings.site_title || 'A').substring(0, 1).toUpperCase()}
                 </div>
               )}

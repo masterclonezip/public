@@ -19,7 +19,7 @@ export function AppDetailsSkeleton() {
         {/* 2. AppHeader Skeleton: EXACT 1:1 match with AppHeader.tsx */}
         <div className="flex w-full items-center gap-3 xs:gap-4 sm:gap-6 mb-4 sm:mb-6 px-0 sm:px-4 md:px-6 mt-1 sm:mt-2">
           {/* App Icon rounded box */}
-          <div className="w-[64px] h-[64px] xs:w-[72px] xs:h-[72px] sm:w-[96px] sm:h-[96px] md:w-[112px] md:h-[112px] shrink-0 rounded-[16px] xs:rounded-[18px] sm:rounded-[24px] bg-zinc-200 dark:bg-zinc-800 animate-pulse border border-black/5 dark:border-white/10 shadow-sm" />
+          <div className="w-[72px] h-[72px] xs:w-[80px] xs:h-[80px] sm:w-[104px] sm:h-[104px] md:w-[116px] md:h-[116px] shrink-0 rounded-[18px] xs:rounded-[20px] sm:rounded-[24px] bg-zinc-200 dark:bg-zinc-800 animate-pulse border border-black/5 dark:border-white/10 shadow-sm" />
           
           {/* Title, Developer, and Safety Badges */}
           <div className="flex flex-col justify-center flex-1 min-w-0 space-y-2">
@@ -74,7 +74,7 @@ export function AppDetailsSkeleton() {
           <div className="grid grid-rows-2 grid-flow-col auto-cols-[calc((100%-1.75rem)/4.25)] xs:auto-cols-[calc((100%-2.5rem)/4.25)] sm:auto-cols-[calc((100%-5.25rem)/8)] gap-x-2 xs:gap-x-3 gap-y-3 overflow-hidden -mx-2.5 px-2.5 sm:mx-0 sm:px-0">
             {Array.from({ length: 10 }).map((_, i) => (
               <div key={`sim-skel-${i}`} className="flex flex-col items-center gap-1.5 w-full shrink-0">
-                <div className="w-[54px] h-[54px] xxs:w-[60px] xxs:h-[60px] xs:w-[66px] xs:h-[66px] sm:w-[80px] sm:h-[80px] rounded-[24%] bg-zinc-200 dark:bg-zinc-800 animate-pulse" />
+                <div className="w-[60px] h-[60px] xxs:w-[66px] xxs:h-[66px] xs:w-[72px] xs:h-[72px] sm:w-[84px] sm:h-[84px] rounded-[24%] bg-zinc-200 dark:bg-zinc-800 animate-pulse" />
                 <div className="h-3 w-14 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
               </div>
             ))}

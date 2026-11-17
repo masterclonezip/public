@@ -23,6 +23,7 @@ export interface GlobalSettings {
   portal_heading?: string;
   important_notice_heading?: string;
   ticker_text: string;
+  ticker_enabled?: boolean;
   animations_enabled: boolean;
   seo_keywords?: string;
   about_content?: string;

@@ -7,7 +7,7 @@ import { generateAllSitemaps, normalizeSitemapHost } from '../lib/sitemapGenerat
 import { ensureDefaultSettings } from '../lib/defaultLegalContent';
 import { AppConfig, GlobalSettings, NewsItem, VideoItem } from '../types';
 import { getResolvedCommunityFirebaseConfig, parseFirestoreFields, buildPublicCommunitySyncBundle } from '../lib/communityFirebase';
-import { getAllSiteIconUrls, wrapPngsInIco } from '../seo/utils';
+import { getAllSiteIconUrls, isPngBytes, wrapPngsInIco } from '../seo/utils';
 
 import communityCatalogStats from '../lib/communityCatalogStats.json';
 import communityStaticReviews from '../lib/communityStaticReviews.json';
@@ -15,6 +15,7 @@ import communityStaticReviews from '../lib/communityStaticReviews.json';
 import rawIndexHtml from '../../index.html?raw';
 import rawMiddlewareJs from '../../functions/_middleware.js?raw';
 import rawHeadersFile from '../../public/_headers?raw';
+import rawRedirectsFile from '../../public/_redirects?raw';
 import rawPrerenderTs from '../../scripts/prerender.ts?raw';
 import rawCompressDistTs from '../../scripts/compress-dist.ts?raw';
 import rawBuildApiJs from '../../scripts/build-api.js?raw';
@@ -65,6 +66,7 @@ const BUNDLED_PUBLIC_CORE_FILES: Record<string, string> = {
   'functions/_middleware.js': rawMiddlewareJs,
   'functions/api/[[catchall]].js': rawCatchallJs,
   'public/_headers': rawHeadersFile,
+  'public/_redirects': rawRedirectsFile,
   'vercel.json': rawVercelJson,
   'vite.config.ts': rawViteConfigTs,
   'scripts/prerender.ts': rawPrerenderTs,
@@ -916,13 +918,25 @@ export function useGitHubSync(
               src: '/android-chrome-192x192.png',
               sizes: '192x192',
               type: 'image/png',
-              purpose: 'any maskable'
+              purpose: 'any'
+            },
+            {
+              src: '/android-chrome-192x192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'maskable'
             },
             {
               src: '/android-chrome-512x512.png',
               sizes: '512x512',
               type: 'image/png',
-              purpose: 'any maskable'
+              purpose: 'any'
+            },
+            {
+              src: '/android-chrome-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'maskable'
             }
           ],
           theme_color: '#2563eb',
@@ -954,8 +968,31 @@ export function useGitHubSync(
           content: openSearchXml
         });
 
-        // Materialize binary brand icons into public/ so static edge hosting and XML sitemaps always serve the real brand logo
+        // Materialize binary brand icons into public/ (prefer server-side CORS-free proxy, fallback to browser fetch)
         if (icons.masterFavicon || icons.masterLogo) {
+          const materializedIconMap = new Map<string, string>();
+          try {
+            const idToken = await getAdminToken();
+            const matRes = await adminFetch('/api/github-sync/materialize-icons', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {})
+              },
+              body: JSON.stringify({ settings: finalSettings, origin: publicDomain })
+            });
+            if (matRes.ok) {
+              const matData = await matRes.json();
+              if (matData?.success && Array.isArray(matData.files)) {
+                for (const mf of matData.files) {
+                  if (mf?.path && mf?.content) {
+                    materializedIconMap.set(mf.path, mf.content);
+                  }
+                }
+              }
+            }
+          } catch (_) {}
+
           const uint8ToBase64 = (bytes: Uint8Array): string => {
             let binary = '';
             const chunkSize = 0x8000;
@@ -976,42 +1013,53 @@ export function useGitHubSync(
             { size: 512, url: icons.pwa512, paths: ['public/android-chrome-512x512.png', 'public/logo.png'] }
           ];
 
+          const needsBrowserFallback = iconTargets.some(t => t.paths.some(p => !materializedIconMap.has(p))) || !materializedIconMap.has('public/favicon.ico');
           const downloadedPngs = new Map<number, Uint8Array>();
-          await Promise.all(
-            iconTargets.map(async ({ size, url, paths }) => {
-              if (!url || (!url.startsWith('https://') && !url.startsWith('http://'))) return;
-              try {
-                const res = await fetch(url);
-                if (!res.ok) return;
-                const bytes = new Uint8Array(await res.arrayBuffer());
-                if (bytes.byteLength < 100) return;
-                downloadedPngs.set(size, bytes);
-                const b64 = uint8ToBase64(bytes);
-                for (const p of paths) {
-                  primaryBatchFiles.push({
-                    path: p,
-                    content: b64,
-                    encoding: 'base64'
-                  });
-                }
-              } catch (_) {}
-            })
-          );
 
-          const icoEntries: Array<{ size: number; png: Uint8Array }> = [];
-          for (const sz of [48, 32, 16]) {
-            const pngBytes = downloadedPngs.get(sz);
-            if (pngBytes) icoEntries.push({ size: sz, png: pngBytes });
-          }
-          if (icoEntries.length > 0) {
-            const icoBytes = wrapPngsInIco(icoEntries);
-            if (icoBytes.byteLength > 100) {
-              primaryBatchFiles.push({
-                path: 'public/favicon.ico',
-                content: uint8ToBase64(icoBytes),
-                encoding: 'base64'
-              });
+          if (needsBrowserFallback) {
+            await Promise.all(
+              iconTargets.map(async ({ size, url, paths }) => {
+                if (paths.every(p => materializedIconMap.has(p))) return;
+                if (!url || (!url.startsWith('https://') && !url.startsWith('http://'))) return;
+                try {
+                  const res = await fetch(url);
+                  if (!res.ok) return;
+                  const bytes = new Uint8Array(await res.arrayBuffer());
+                  if (bytes.byteLength < 64) return;
+                  if (isPngBytes(bytes)) {
+                    downloadedPngs.set(size, bytes);
+                  }
+                  const b64 = uint8ToBase64(bytes);
+                  for (const p of paths) {
+                    if (!materializedIconMap.has(p)) {
+                      materializedIconMap.set(p, b64);
+                    }
+                  }
+                } catch (_) {}
+              })
+            );
+
+            if (!materializedIconMap.has('public/favicon.ico')) {
+              const icoEntries: Array<{ size: number; png: Uint8Array }> = [];
+              for (const sz of [48, 32, 16]) {
+                const pngBytes = downloadedPngs.get(sz);
+                if (pngBytes && isPngBytes(pngBytes)) icoEntries.push({ size: sz, png: pngBytes });
+              }
+              if (icoEntries.length > 0) {
+                const icoBytes = wrapPngsInIco(icoEntries);
+                if (icoBytes.byteLength > 64) {
+                  materializedIconMap.set('public/favicon.ico', uint8ToBase64(icoBytes));
+                }
+              }
             }
+          }
+
+          for (const [iconPath, iconB64] of materializedIconMap.entries()) {
+            primaryBatchFiles.push({
+              path: iconPath,
+              content: iconB64,
+              encoding: 'base64'
+            });
           }
         }
       } catch (sitemapErr) {

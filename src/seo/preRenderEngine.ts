@@ -11,7 +11,7 @@ function wrapWithLayout(bodyContent: string, settings: any): string {
     <div class="flex flex-col min-h-screen">
       <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:font-semibold focus:rounded-lg focus:shadow-lg focus:outline-none">Skip to main content</a>
       ${headerHtml}
-      <main id="main-content" tabindex="-1" class="flex-1 w-full max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-0 sm:py-3 pb-16 sm:pb-24 overflow-x-hidden relative focus:outline-none">
+      <main id="main-content" tabindex="-1" class="flex-1 w-full max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-8 py-0 sm:py-3 pb-16 sm:pb-24 [overflow-x:clip] relative focus:outline-none">
         <div class="w-full h-full">
           ${bodyContent}
         </div>
@@ -55,45 +55,31 @@ export async function getPagePreRender(urlPath: string, data: any): Promise<stri
     } catch (_) {}
     bodyHtml = renderers.renderHome(apps, settings, news, videos, pageNum);
   } else if (cleanPathLower === '/new-apps') {
-    const newAppsList = apps.filter((a: any) => {
-      const isNew = a.is_new === true || (a.is_new && typeof a.is_new === 'object' && a.is_new.booleanValue === true);
-      const isHot = a.is_hot === true || (a.is_hot && typeof a.is_hot === 'object' && a.is_hot.booleanValue === true);
-      return isNew || isHot;
+    bodyHtml = renderers.renderHome(apps, settings, news, videos, 1, {
+      activeTab: 'All Apps',
+      isNewAppsRoute: true
     });
-    const displayNew = newAppsList.length > 0 ? newAppsList : [...apps].slice(0, 24);
-    bodyHtml = renderers.renderNewApps(displayNew, settings);
   } else if (cleanPathLower === '/categories') {
-    const catMap = new Map<string, { name: string; slug: string; count: number }>();
-    apps.forEach((a: any) => {
-      const rawCat = getField(a, 'category', '');
-      if (rawCat) {
-        rawCat.split(',').forEach((c: string) => {
-          const trimmed = c.trim();
-          if (trimmed && trimmed.toLowerCase() !== 'all apps' && trimmed.toLowerCase() !== 'all' && trimmed.toLowerCase() !== 'apps' && trimmed.toLowerCase() !== 'general') {
-            const slug = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-            if (!catMap.has(slug)) {
-              catMap.set(slug, { name: trimmed, slug, count: 1 });
-            } else {
-              catMap.get(slug)!.count++;
-            }
-          }
-        });
-      }
+    bodyHtml = renderers.renderHome(apps, settings, news, videos, 1, {
+      activeTab: 'Categories'
     });
-    const categoriesList = Array.from(catMap.values()).sort((a, b) => b.count - a.count);
-    bodyHtml = renderers.renderCategoriesList(categoriesList, settings);
   } else if (cleanPathLower.startsWith('/category/') || cleanPathLower.startsWith('/categories/')) {
     const rawCatSlug = cleanPathLower.replace(/^\/(category|categories)\/?/, '').replace(/^\/|\/$/g, '');
-    const catName = rawCatSlug
-      ? rawCatSlug.split(/[-_]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
-      : 'All Categories';
-    const categoryApps = apps.filter((a: any) => {
-      const cat = getField(a, 'category', '');
-      if (!cat) return false;
-      const cats = cat.split(',').map((c: string) => c.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''));
-      return cats.some((c: string) => c === rawCatSlug || c.includes(rawCatSlug) || rawCatSlug.includes(c));
+    const rawCat = rawCatSlug.toLowerCase().replace(/[-_]+/g, ' ').trim();
+    const allKnownCats = (Array.isArray(settings?.categories) && settings.categories.length > 0)
+      ? settings.categories
+      : ['All Apps', 'Games', 'Apps', 'Entertainment'];
+    const matched = allKnownCats.find((c: string) =>
+      c.toLowerCase().trim() === rawCat ||
+      c.toLowerCase().replace(/[-_\s]+/g, '') === rawCat.replace(/\s+/g, '') ||
+      rawCat.includes(c.toLowerCase().trim())
+    );
+    const resolvedTab = matched || (rawCat
+      ? rawCat.split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+      : 'All Apps');
+    bodyHtml = renderers.renderHome(apps, settings, news, videos, 1, {
+      activeTab: resolvedTab
     });
-    bodyHtml = renderers.renderCategory(catName, rawCatSlug, categoryApps, settings);
   } else if (cleanPathLower === '/news') {
     let pageNum = 1;
     try {

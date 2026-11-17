@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Share2, Flag } from 'lucide-react';
 import { AppConfig } from '../../types';
@@ -23,10 +24,14 @@ export default function AppActionButtons({
   handleShare,
 }: AppActionButtonsProps) {
   const navigate = useNavigate();
+  const lastClickTsRef = useRef<number>(0);
 
   const handleDownload = () => {
-    const targetSlug = String(app.slug || app.id || '').trim();
     const now = Date.now();
+    if (now - lastClickTsRef.current < 800) return;
+    lastClickTsRef.current = now;
+
+    const targetSlug = String(app.slug || app.id || '').trim();
     try {
       window.__rdNav = { slug: targetSlug.toLowerCase(), ts: now };
     } catch {

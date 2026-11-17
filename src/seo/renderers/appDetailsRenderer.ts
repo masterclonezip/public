@@ -21,20 +21,28 @@ function getAvatarStyle(name: string): string {
 }
 
 const RICH_HTML_CONTENT_STYLE = `
-  rich-html-boundary open-page-body w-full text-xs xs:text-sm sm:text-base text-zinc-700 dark:text-zinc-300 leading-relaxed
+  rich-html-boundary open-page-body w-full text-[15px] sm:text-base text-zinc-700 dark:text-zinc-300 leading-[1.7]
   [&_strong]:text-blue-600 dark:[&_strong]:text-blue-400 [&_strong]:font-semibold
   [&_b]:text-blue-600 dark:[&_b]:text-blue-400 [&_b]:font-semibold
-  [&_p]:mb-3 [&_p]:leading-relaxed [&_p]:text-zinc-700 dark:[&_p]:text-zinc-300
+  [&_p]:mb-3 [&_p]:leading-[1.7] [&_p]:text-zinc-700 dark:[&_p]:text-zinc-300
   [&_a]:text-blue-600 dark:[&_a]:text-blue-400 [&_a]:font-semibold [&_a]:underline [&_a]:hover:text-blue-700
-  [&_h1]:text-base sm:[&_h1]:text-2xl [&_h1]:font-black [&_h1]:tracking-tight [&_h1]:text-zinc-900 dark:[&_h1]:text-zinc-100 [&_h1]:mt-4 [&_h1]:mb-2
-  [&_h2]:text-sm sm:[&_h2]:text-xl [&_h2]:font-extrabold [&_h2]:tracking-tight [&_h2]:text-zinc-900 dark:[&_h2]:text-zinc-100 [&_h2]:mt-4 [&_h2]:mb-2 [&_h2]:pt-2.5 [&_h2]:border-t [&_h2]:border-zinc-200/80 dark:[&_h2]:border-zinc-800/80 [&_h2:first-child]:border-t-0 [&_h2:first-child]:pt-0 [&_h2:first-child]:mt-0
-  [&_h3]:text-xs sm:[&_h3]:text-lg [&_h3]:font-bold [&_h3]:tracking-tight [&_h3]:text-zinc-900 dark:[&_h3]:text-zinc-100 [&_h3]:mt-3.5 [&_h3]:mb-1.5
-  [&_h4]:text-[11px] sm:[&_h4]:text-base [&_h4]:font-semibold [&_h4]:tracking-tight [&_h4]:text-zinc-900 dark:[&_h4]:text-zinc-100 [&_h4]:mt-3 [&_h4]:mb-1
-  [&_ul]:my-2.5 [&_ul]:space-y-1 [&_ul]:list-disc [&_ul]:pl-4 xs:[&_ul]:pl-5
-  [&_ol]:my-2.5 [&_ol]:space-y-1 [&_ol]:list-decimal [&_ol]:pl-4 xs:[&_ul]:pl-5
-  [&_li]:leading-relaxed [&_li]:pl-1 [&_li::marker]:text-blue-600 dark:[&_li::marker]:text-blue-400 [&_li::marker]:font-bold
+  [&_h1]:text-lg sm:[&_h1]:text-2xl [&_h1]:font-black [&_h1]:tracking-tight [&_h1]:text-zinc-900 dark:[&_h1]:text-zinc-100 [&_h1]:mt-4 [&_h1]:mb-2
+  [&_h2]:text-base sm:[&_h2]:text-xl [&_h2]:font-extrabold [&_h2]:tracking-tight [&_h2]:text-zinc-900 dark:[&_h2]:text-zinc-100 [&_h2]:mt-4 [&_h2]:mb-2 [&_h2]:pt-2.5 [&_h2]:border-t [&_h2]:border-zinc-200/80 dark:[&_h2]:border-zinc-800/80 [&_h2:first-child]:border-t-0 [&_h2:first-child]:pt-0 [&_h2:first-child]:mt-0
+  [&_h3]:text-[15px] sm:[&_h3]:text-lg [&_h3]:font-bold [&_h3]:tracking-tight [&_h3]:text-zinc-900 dark:[&_h3]:text-zinc-100 [&_h3]:mt-3.5 [&_h3]:mb-1.5
+  [&_h4]:text-sm sm:[&_h4]:text-base [&_h4]:font-semibold [&_h4]:tracking-tight [&_h4]:text-zinc-900 dark:[&_h4]:text-zinc-100 [&_h4]:mt-3 [&_h4]:mb-1
+  [&_ul]:my-2.5 [&_ul]:space-y-1.5 [&_ul]:list-disc [&_ul]:pl-5
+  [&_ol]:my-2.5 [&_ol]:space-y-1.5 [&_ol]:list-decimal [&_ol]:pl-5
+  [&_li]:leading-[1.65] [&_li]:pl-1 [&_li::marker]:text-blue-600 dark:[&_li::marker]:text-blue-400 [&_li::marker]:font-bold
   [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500 [&_blockquote]:pl-3.5 [&_blockquote]:py-1.5 [&_blockquote]:my-3 [&_blockquote]:bg-blue-50/50 dark:[&_blockquote]:bg-blue-950/20 [&_blockquote]:rounded-r-xl [&_blockquote]:italic
+  [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-xl [&_table]:block [&_table]:w-full [&_table]:overflow-x-auto [&_pre]:overflow-x-auto
 `.trim().replace(/\s+/g, ' ');
+
+function getYouTubeId(url: string): string | null {
+  if (!url) return null;
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[2].length === 11) ? match[2] : null;
+}
 
 export function renderAppDetails(slug: string, apps: any[], _settings: any, sampleReviews: any[] = [], liveStats: any = null, news: any[] = []): string {
   const cleanSlug = decodeURIComponent(slug).toLowerCase().trim().replace(/\/+$/, '');
@@ -122,33 +130,33 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
   let alertsHtml = '';
   if (hasRed || hasYellow || hasIdea) {
     alertsHtml = `
-      <div class="px-1 xs:px-2 sm:px-4 md:px-6 space-y-2.5 xs:space-y-3 mb-6 xs:mb-8 w-full text-left">
+      <div class="px-0 sm:px-4 md:px-6 space-y-2.5 xs:space-y-3 mb-6 xs:mb-8 w-full">
         ${hasRed ? `
-          <div class="bg-rose-50/50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 p-3 xs:p-4 rounded-xl xs:rounded-2xl flex items-start gap-2.5 xs:gap-4 shadow-sm group">
-            <div class="p-1.5 xs:p-2 bg-rose-100 dark:bg-rose-500/20 rounded-lg xs:rounded-xl text-rose-600 shrink-0">
+          <div class="bg-rose-50/50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 p-3.5 xs:p-4 rounded-xl xs:rounded-2xl flex items-start gap-3 xs:gap-4 shadow-sm group">
+            <div class="p-2 bg-rose-100 dark:bg-rose-500/20 rounded-lg xs:rounded-xl text-rose-600 shrink-0">
               <svg class="w-4 h-4 xs:w-5 xs:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
             </div>
-            <div class="text-xs xs:text-sm font-medium text-rose-800 dark:text-rose-200 leading-relaxed pt-0.5">
+            <div class="text-[13.5px] sm:text-sm font-medium text-rose-800 dark:text-rose-200 leading-relaxed pt-0.5">
               ${escapeHtml(app.red_box_msg)}
             </div>
           </div>
         ` : ''}
         ${hasYellow ? `
-          <div class="bg-orange-50/50 dark:bg-orange-500/10 border border-orange-100 dark:border-orange-500/20 p-3 xs:p-4 rounded-xl xs:rounded-2xl flex items-start gap-2.5 xs:gap-4 shadow-sm group">
-            <div class="p-1.5 xs:p-2 bg-orange-100 dark:bg-orange-500/20 rounded-lg xs:rounded-xl text-orange-600 shrink-0">
+          <div class="bg-orange-50/50 dark:bg-orange-500/10 border border-orange-100 dark:border-orange-500/20 p-3.5 xs:p-4 rounded-xl xs:rounded-2xl flex items-start gap-3 xs:gap-4 shadow-sm group">
+            <div class="p-2 bg-orange-100 dark:bg-orange-500/20 rounded-lg xs:rounded-xl text-orange-600 shrink-0">
               <svg class="w-4 h-4 xs:w-5 xs:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             </div>
-            <div class="text-xs xs:text-sm font-medium text-orange-800 dark:text-orange-200 leading-relaxed pt-0.5">
+            <div class="text-[13.5px] sm:text-sm font-medium text-orange-800 dark:text-orange-200 leading-relaxed pt-0.5">
               ${escapeHtml(app.yellow_box_msg)}
             </div>
           </div>
         ` : ''}
         ${hasIdea ? `
-          <div class="bg-blue-50/50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20 p-3 xs:p-4 rounded-xl xs:rounded-2xl flex items-start gap-2.5 xs:gap-4 shadow-sm group">
-            <div class="p-1.5 xs:p-2 bg-blue-100 dark:bg-blue-500/20 rounded-lg xs:rounded-xl text-blue-600 shrink-0">
+          <div class="bg-blue-50/50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20 p-3.5 xs:p-4 rounded-xl xs:rounded-2xl flex items-start gap-3 xs:gap-4 shadow-sm group">
+            <div class="p-2 bg-blue-100 dark:bg-blue-500/20 rounded-lg xs:rounded-xl text-blue-600 shrink-0">
               <svg class="w-4 h-4 xs:w-5 xs:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
             </div>
-            <div class="text-xs xs:text-sm font-medium text-blue-800 dark:text-blue-200 leading-relaxed pt-0.5">
+            <div class="text-[13.5px] sm:text-sm font-medium text-blue-800 dark:text-blue-200 leading-relaxed pt-0.5">
               ${escapeHtml(app.idea_box_msg)}
             </div>
           </div>
@@ -165,36 +173,36 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
 
   if (validFaqs.length > 0) {
     faqsHtml = `
-      <section aria-labelledby="faq-heading" class="mb-8 sm:mb-12 px-1 sm:px-4 md:px-6 text-left">
-        <div class="py-8 border-t border-black/5 dark:border-white/5">
-          <div class="flex items-center justify-between mb-6">
-            <div class="flex items-center gap-3">
+      <section aria-labelledby="faq-heading" class="mb-6 sm:mb-10 px-0 sm:px-4 md:px-6 text-left">
+        <div class="py-5 sm:py-7 border-t border-black/5 dark:border-white/5">
+          <div class="flex items-center justify-between mb-4 sm:mb-5">
+            <div class="flex items-center gap-2.5 sm:gap-3">
               <div class="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               </div>
-              <h2 id="faq-heading" class="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
+              <h2 id="faq-heading" class="text-lg sm:text-2xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
                 Frequently Asked Questions
               </h2>
             </div>
-            <span class="text-xs font-semibold text-zinc-500 dark:text-zinc-400 bg-black/5 dark:bg-white/5 px-2.5 py-1 rounded-full">
+            <span class="text-[11px] sm:text-xs font-semibold text-zinc-500 dark:text-zinc-400 bg-black/5 dark:bg-white/5 px-2.5 py-0.5 rounded-full shrink-0">
               ${validFaqs.length} FAQs
             </span>
           </div>
-          <div class="space-y-3 sm:space-y-4">
+          <div class="space-y-2.5 sm:space-y-3.5">
             ${validFaqs.map((faq: any) => `
               <details class="group rounded-xl sm:rounded-2xl border transition-colors duration-200 overflow-hidden bg-slate-50/70 dark:bg-zinc-900/60 border-black/5 dark:border-white/5 open:bg-slate-50 open:dark:bg-zinc-900/90 open:border-blue-200 open:dark:border-blue-900/40 shadow-xs" open>
-                <summary class="list-none [&::-webkit-details-marker]:hidden w-full text-left p-4 sm:p-5 flex items-center justify-between gap-4 cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 select-none">
-                  <h3 class="text-base sm:text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-start gap-3">
+                <summary class="list-none [&::-webkit-details-marker]:hidden w-full min-h-[46px] text-left p-3.5 sm:p-4 flex items-center justify-between gap-3 cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 select-none">
+                  <h3 class="text-[14px] sm:text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-start gap-2.5">
                     <span class="text-blue-600 dark:text-blue-400 font-extrabold shrink-0 select-none">Q.</span>
                     <span class="leading-snug">${escapeHtml(cleanFaqQuestion(faq.question))}</span>
                   </h3>
                   <div class="p-1 rounded-lg transition-transform duration-200 shrink-0 text-zinc-400 dark:text-zinc-500 group-open:rotate-180 group-open:text-blue-600 group-open:dark:text-blue-400 group-open:bg-blue-50 group-open:dark:bg-blue-900/30">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                   </div>
                 </summary>
-                <div class="px-4 sm:px-5 pb-5 pt-1 border-t border-black/5 dark:border-white/5 text-sm sm:text-base text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                  <div class="pl-6 sm:pl-7 pt-2">
-                    <div class="rich-html-boundary prose prose-zinc dark:prose-invert prose-sm sm:prose-base max-w-none w-full break-words overflow-wrap-anywhere whitespace-normal">
+                <div class="px-3.5 sm:px-4 pb-4 pt-1 border-t border-black/5 dark:border-white/5 text-[13.5px] sm:text-[15px] text-zinc-700 dark:text-zinc-300 leading-relaxed">
+                  <div class="pl-0 sm:pl-7 pt-2">
+                    <div class="rich-html-boundary prose prose-zinc dark:prose-invert prose-sm sm:prose-base max-w-none w-full break-words overflow-wrap-anywhere whitespace-normal text-[13.5px] sm:text-[15px]">
                       ${sanitizeHtml(faq.answer)}
                     </div>
                   </div>
@@ -293,8 +301,9 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
     </div>
   `).join('');
 
+  const isRated = typeof ratingVal === 'number' && ratingVal > 0;
   const reviewsSectionHtml = `
-    <div class="px-1 xs:px-2 sm:px-4 md:px-6 mb-6 xs:mb-8">
+    <div class="px-0 sm:px-4 md:px-6 mb-6 xs:mb-8">
       <div id="ratings-and-reviews-section" class="py-8 border-t border-black/5 dark:border-white/5 select-none text-left">
         <div class="flex flex-col gap-6 sm:gap-8">
           <div class="w-full">
@@ -311,7 +320,7 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
                   <div class="flex justify-center gap-0.5 mb-1 text-amber-500">
                     ${summaryStarsHtml}
                   </div>
-                  <div class="text-[9px] xs:text-[10px] font-semibold text-zinc-400 dark:text-zinc-500">
+                  <div class="text-[10px] xs:text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">
                     ${escapeHtml(totalCount.toLocaleString())} ratings
                   </div>
                 </div>
@@ -321,9 +330,50 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
               </div>
               <div class="mt-4 p-3 bg-green-500/5 border border-green-500/10 rounded-xl flex items-start gap-2.5">
                 <svg class="w-4 h-4 text-green-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 12 2 2 4-4"></path></svg>
-                <span class="text-[11px] font-semibold text-green-700 dark:text-green-400 leading-relaxed">
+                <span class="text-xs font-semibold text-green-700 dark:text-green-400 leading-relaxed">
                   Ratings and reviews are contributed by players and moderated for safety and constructive gameplay feedback.
                 </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="w-full">
+            <div class="p-3.5 xs:p-4 sm:p-6 bg-white dark:bg-zinc-900 border border-black/5 dark:border-white/10 rounded-xl xs:rounded-2xl shadow-sm">
+              <div class="flex items-center justify-between gap-2 mb-3 xs:mb-4">
+                <h3 class="text-sm xs:text-base font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
+                  Write a review
+                </h3>
+                <span class="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 tabular-nums">
+                  5 — Excellent
+                </span>
+              </div>
+              <div class="space-y-3.5 xs:space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <span class="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Your rating</span>
+                  <div class="flex items-center gap-0.5" role="group" aria-label="Star rating selector">
+                    ${[1, 2, 3, 4, 5].map(s => `<button type="button" aria-label="Rate ${s} star${s > 1 ? 's' : ''}" class="w-10 h-10 inline-flex items-center justify-center rounded-lg cursor-pointer"><svg class="w-5 h-5 xs:w-[22px] xs:h-[22px] fill-amber-400 text-amber-400" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24"><polygon stroke-linecap="round" stroke-linejoin="round" stroke-width="2" points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></button>`).join('')}
+                  </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div class="sm:col-span-1">
+                    <label for="reviewer-name" class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1.5">Your name</label>
+                    <input id="reviewer-name" name="reviewerName" type="text" placeholder="Display name" class="w-full text-base sm:text-sm font-medium px-3 py-2.5 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/80 rounded-xl outline-none text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 min-h-[44px]" readonly />
+                  </div>
+                  <div class="sm:col-span-2">
+                    <div class="flex items-center justify-between mb-1.5">
+                      <label for="comment" class="block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Review comment</label>
+                      <span class="text-[11px] font-medium text-zinc-400 dark:text-zinc-500 tabular-nums">0/1000</span>
+                    </div>
+                    <textarea id="comment" name="comment" rows="2" placeholder="Share your honest experience with this app..." class="w-full bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/80 rounded-xl p-3 text-base sm:text-sm font-medium text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 outline-none resize-none min-h-[44px]" readonly></textarea>
+                  </div>
+                </div>
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                  <div class="flex-1"></div>
+                  <button type="button" class="flex items-center justify-center gap-2 min-h-[44px] px-5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold text-sm rounded-xl shrink-0 w-full sm:w-auto cursor-pointer">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                    <span>Post Review</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -333,27 +383,27 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
               ${validReviews.length > 0 ? `
                 <div class="flex flex-col gap-3 pb-3 border-b border-black/5 dark:border-white/5">
                   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-                      <button type="button" class="px-3 py-1.5 text-xs font-bold rounded-xl whitespace-nowrap transition-all cursor-pointer bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-sm">
+                    <div class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 -mx-2.5 px-2.5 sm:mx-0 sm:px-0 scrollbar-none">
+                      <button type="button" class="min-h-[38px] px-3.5 py-1.5 text-xs font-bold rounded-xl whitespace-nowrap transition-all cursor-pointer bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-sm">
                         All Reviews
                       </button>
-                      <button type="button" class="px-3 py-1.5 text-xs font-bold rounded-xl whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 dark:bg-emerald-500/10 hover:bg-emerald-500/10">
-                        <svg class="w-3 h-3 fill-current" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                      <button type="button" class="min-h-[38px] px-3.5 py-1.5 text-xs font-bold rounded-xl whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 dark:bg-emerald-500/10 hover:bg-emerald-500/10">
+                        <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
                         Positive
                       </button>
-                      <button type="button" class="px-3 py-1.5 text-xs font-bold rounded-xl whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 bg-rose-500/5 text-rose-600 dark:text-rose-400 dark:bg-rose-500/10 hover:bg-rose-500/10">
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"></circle><line x1="12" y1="8" x2="12" y2="12" stroke-width="2"></line><line x1="12" y1="16" x2="12.01" y2="16" stroke-width="2"></line></svg>
+                      <button type="button" class="min-h-[38px] px-3.5 py-1.5 text-xs font-bold rounded-xl whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 bg-rose-500/5 text-rose-600 dark:text-rose-400 dark:bg-rose-500/10 hover:bg-rose-500/10">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"></circle><line x1="12" y1="8" x2="12" y2="12" stroke-width="2"></line><line x1="12" y1="16" x2="12.01" y2="16" stroke-width="2"></line></svg>
                         Critical
                       </button>
                     </div>
-                    <div class="flex items-center gap-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 shrink-0 select-none">
+                    <div class="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 shrink-0 select-none">
                       <span>Sort:</span>
-                      <div class="flex bg-zinc-100 dark:bg-zinc-800/80 rounded-lg p-0.5">
-                        <button type="button" class="px-2.5 py-1 text-[11px] font-bold rounded-md transition-all cursor-pointer bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm">
+                      <div class="flex bg-zinc-100 dark:bg-zinc-800/80 rounded-xl p-1">
+                        <button type="button" class="min-h-[36px] px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm">
                           Recent
                         </button>
-                        <button type="button" class="px-2.5 py-1 text-[11px] font-bold rounded-md transition-all cursor-pointer flex items-center gap-1 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200">
-                          <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
+                        <button type="button" class="min-h-[36px] px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200">
+                          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
                           <span>Most Helpful</span>
                         </button>
                       </div>
@@ -364,7 +414,7 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
                   ${reviewsCardsHtml}
                   ${canLoadMoreReviews ? `
                     <div class="pt-4 flex flex-col items-center justify-center">
-                      <button type="button" class="px-6 py-2.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-[0.98]">
+                      <button type="button" class="min-h-[42px] px-6 py-2.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-[0.98]">
                         Load More Reviews
                       </button>
                     </div>
@@ -382,16 +432,27 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
     </div>
   `;
 
-  // Screenshots: 9:16 Portrait Gallery (Matching AppScreenshots.tsx)
+  // Screenshots & YouTube Preview Gallery (Matching AppScreenshots.tsx + YouTubePlayer.tsx)
+  const ytVideoId = getYouTubeId(getField(app, 'video_url'));
   let screenshotsHtml = '';
-  if (app.screenshots && Array.isArray(app.screenshots) && app.screenshots.length > 0) {
+  if ((app.screenshots && Array.isArray(app.screenshots) && app.screenshots.length > 0) || ytVideoId) {
     screenshotsHtml = `
       <div class="w-full mb-6">
-        <div class="flex overflow-x-auto hide-scrollbar gap-3 px-4 sm:px-0 pb-3 snap-x items-center -mx-4 sm:-mx-0">
-          ${app.screenshots.map((imgUrl: string, i: number) => {
+        <div class="flex overflow-x-auto hide-scrollbar gap-3 px-2.5 sm:px-4 md:px-6 pb-3 snap-x items-center -mx-2.5 sm:mx-0">
+          ${ytVideoId ? `
+            <button type="button" aria-label="Play video" class="flex-none w-[180px] sm:w-[250px] aspect-[16/9] rounded-xl overflow-hidden snap-center bg-zinc-100 dark:bg-zinc-800 shadow-sm border border-black/5 dark:border-white/10 cursor-pointer relative group flex items-center justify-center text-left">
+              <img src="https://img.youtube.com/vi/${escapeHtml(ytVideoId)}/hqdefault.jpg" alt="Video thumbnail" loading="lazy" width="250" height="140" class="w-full h-full object-cover" />
+              <div class="absolute inset-0 bg-black/30 flex items-center justify-center">
+                <div class="w-12 h-12 rounded-full bg-white/95 text-zinc-900 flex items-center justify-center shadow-lg">
+                  <svg class="w-5 h-5 fill-current ml-0.5" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+                </div>
+              </div>
+            </button>
+          ` : ''}
+          ${(Array.isArray(app.screenshots) ? app.screenshots : []).map((imgUrl: string, i: number) => {
             const shotUrl = optimizeImageUrl(imgUrl, 400);
             return `
-              <button type="button" class="flex-none w-[150px] sm:w-[220px] aspect-[9/16] rounded-xl overflow-hidden snap-center bg-zinc-100 dark:bg-zinc-800 shadow-sm border border-black/5 dark:border-white/10 active:scale-95 transition-transform" aria-label="View screenshot ${i + 1} fullscreen">
+              <button type="button" class="flex-none w-[150px] sm:w-[220px] aspect-[9/16] rounded-xl overflow-hidden snap-center bg-zinc-100 dark:bg-zinc-800 shadow-sm border border-black/5 dark:border-white/10 active:scale-95 transition-transform cursor-pointer" aria-label="View screenshot ${i + 1} fullscreen">
                 <img src="${escapeHtml(shotUrl)}" alt="${escapeHtml(name)} screenshot ${i + 1} - gameplay preview" width="150" height="267" loading="lazy" decoding="async" class="w-full h-full object-cover select-none pointer-events-none" />
               </button>
             `;
@@ -412,34 +473,32 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
 
   if (displaySimilarApps.length > 0) {
     recommendedAppsHtml = `
-      <aside data-nosnippet aria-labelledby="related-apps-heading" class="my-5 xs:my-6 px-1 xs:px-2 sm:px-4 md:px-6 text-left">
+      <aside data-nosnippet aria-labelledby="related-apps-heading" class="my-5 xs:my-6 px-0 sm:px-4 md:px-6 text-left">
         <div class="flex items-center justify-between gap-2 mb-3">
-          <div class="flex items-center gap-2 min-w-0">
-            <h2 id="related-apps-heading" class="text-base xs:text-lg sm:text-xl font-bold flex items-center gap-1.5 xs:gap-2 text-zinc-900 dark:text-zinc-100 truncate">
-              <span>Similar Applications</span>
-              ${similarHeaderCat && similarHeaderCat !== 'All Apps' ? `<span class="text-[10px] xs:text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 xs:px-2.5 py-0.5 rounded-full border border-blue-200/50 dark:border-blue-800/50 truncate">${escapeHtml(similarHeaderCat)}</span>` : ''}
-            </h2>
+          <div class="flex items-center gap-1.5 xs:gap-2 min-w-0">
+            <h2 id="related-apps-heading" class="text-base xs:text-lg sm:text-xl font-bold text-zinc-900 dark:text-zinc-100 truncate">Similar Applications</h2>
+            ${similarHeaderCat && similarHeaderCat !== 'All Apps' ? `<a href="/?tab=${encodeURIComponent(similarHeaderCat)}" class="inline-flex items-center text-[10px] xs:text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 hover:bg-blue-100 active:scale-95 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 px-2 xs:px-2.5 py-0.5 rounded-full border border-blue-200/50 dark:border-blue-800/50 truncate transition-all no-underline shrink-0" title="Browse ${escapeHtml(similarHeaderCat)} category on storefront">${escapeHtml(similarHeaderCat)}</a>` : ''}
           </div>
-          <a href="/?tab=${encodeURIComponent(similarHeaderCat)}" class="inline-flex items-center gap-1.5 px-3 py-1 xs:px-3.5 xs:py-1.5 rounded-full bg-blue-50 hover:bg-blue-100 active:scale-95 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 font-bold text-xs xs:text-xs transition-all border border-blue-200/70 dark:border-blue-800/70 shadow-2xs group shrink-0 no-underline" title="Explore all ${totalCatCount} ${escapeHtml(similarHeaderCat)} apps">
+          <a href="/?tab=${encodeURIComponent(similarHeaderCat)}" class="inline-flex items-center gap-1.5 min-h-[34px] px-3 py-1 rounded-full bg-blue-50 hover:bg-blue-100 active:scale-95 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 font-bold text-xs transition-all border border-blue-200/70 dark:border-blue-800/70 shadow-2xs group shrink-0 no-underline" title="Explore all ${totalCatCount} ${escapeHtml(similarHeaderCat)} apps">
             <span>View all (${totalCatCount})</span>
-            <svg class="w-3 h-3 xs:w-3.5 xs:h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+            <svg class="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
           </a>
         </div>
-        <div class="grid grid-rows-2 grid-flow-col auto-cols-[calc((100%-1.75rem)/4.25)] xs:auto-cols-[calc((100%-2.5rem)/4.25)] sm:auto-cols-[calc((100%-5.25rem)/8)] gap-x-2 xs:gap-x-3 gap-y-3 xs:gap-y-3.5 overflow-x-auto pt-2.5 pb-2 snap-x snap-mandatory touch-pan-y overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" style="-webkit-overflow-scrolling: touch;">
+        <div class="grid grid-rows-2 grid-flow-col auto-cols-[calc((100%-1.75rem)/4.25)] xs:auto-cols-[calc((100%-2.5rem)/4.25)] sm:auto-cols-[calc((100%-5.25rem)/8)] gap-x-2 xs:gap-x-3 gap-y-3 xs:gap-y-3.5 overflow-x-auto pt-2.5 pb-2 -mx-2.5 px-2.5 sm:mx-0 sm:px-0 snap-x snap-mandatory touch-pan-x overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" style="-webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; overscroll-behavior-x: contain;">
           ${displaySimilarApps.slice(0, 16).map((sim) => {
             const simName = getField(sim, 'name');
             const simSlug = getField(sim, 'slug');
-            const simIcon = optimizeImageUrl(getField(sim, 'icon_url') || '', 96);
+            const simIcon = optimizeImageUrl(getField(sim, 'icon_url') || '', 144);
             const simIsHot = checkAppIsHot(sim);
             const simIsNew = checkAppIsNew(sim);
             const imgSrc = escapeHtml(simIcon);
             return `
-              <a href="/app/${encodeURIComponent(simSlug)}" class="flex flex-col items-center justify-start gap-1 xxs:gap-1.5 xs:gap-2 w-full snap-start group shrink-0 active:scale-95 transition-transform duration-150 ease-out no-underline">
+              <a href="/app/${encodeURIComponent(simSlug)}" class="flex flex-col items-center justify-start gap-1.5 xs:gap-2 w-full snap-start group shrink-0 active:scale-95 transition-transform duration-150 ease-out no-underline">
                 <div class="relative inline-block shrink-0">
-                  <img src="${imgSrc}" alt="${escapeHtml(simName)}" width="86" height="86" decoding="async" fetchpriority="low" class="w-[58px] h-[58px] xxs:w-[66px] xxs:h-[66px] xs:w-[76px] xs:h-[76px] sm:w-[86px] sm:h-[86px] rounded-[24%] shadow-[0_2px_8px_rgba(0,0,0,0.08)] object-cover group-hover:scale-105 transition-transform duration-200 block pointer-events-none select-none" loading="lazy" />
-                  ${simIsHot && simIsNew ? '<span class="absolute -top-1.5 -right-1.5 z-20 inline-flex items-center rounded-full overflow-hidden shadow-[0_2px_6px_rgba(0,0,0,0.25)] border border-white dark:border-zinc-900 font-black text-[7.5px] xxs:text-[8px] xs:text-[9px] uppercase tracking-wider leading-none select-none pointer-events-none"><span class="bg-[#d32f2f] text-white px-1 xs:px-1.5 py-0.5">HOT</span><span class="bg-[#008738] text-white px-1 xs:px-1.5 py-0.5">NEW</span></span>' : simIsHot ? '<span class="absolute -top-1.5 -right-1.5 z-20 bg-[#d32f2f] text-white font-black text-[7.5px] xxs:text-[8px] xs:text-[9px] px-1.5 py-0.5 rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.25)] border border-white dark:border-zinc-900 uppercase tracking-wider leading-none select-none pointer-events-none flex items-center justify-center">HOT</span>' : simIsNew ? '<span class="absolute -top-1.5 -right-1.5 z-20 bg-[#008738] text-white font-black text-[7.5px] xxs:text-[8px] xs:text-[9px] px-1.5 py-0.5 rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.25)] border border-white dark:border-zinc-900 uppercase tracking-wider leading-none select-none pointer-events-none flex items-center justify-center">NEW</span>' : ''}
+                  <img src="${imgSrc}" alt="${escapeHtml(simName)}" width="84" height="84" decoding="async" fetchpriority="low" class="w-[60px] h-[60px] xxs:w-[66px] xxs:h-[66px] xs:w-[72px] xs:h-[72px] sm:w-[84px] sm:h-[84px] rounded-[24%] shadow-[0_2px_8px_rgba(0,0,0,0.08)] object-cover group-hover:scale-105 transition-transform duration-200 block pointer-events-none select-none" loading="lazy" />
+                  ${simIsHot && simIsNew ? '<span class="absolute -top-1.5 -right-1.5 z-20 inline-flex items-center rounded-full overflow-hidden shadow-[0_2px_6px_rgba(0,0,0,0.25)] border border-white dark:border-zinc-900 font-black text-[8px] xs:text-[9px] uppercase tracking-wider leading-none select-none pointer-events-none"><span class="bg-[#d32f2f] text-white px-1 xs:px-1.5 py-0.5">HOT</span><span class="bg-[#008738] text-white px-1 xs:px-1.5 py-0.5">NEW</span></span>' : simIsHot ? '<span class="absolute -top-1.5 -right-1.5 z-20 bg-[#d32f2f] text-white font-black text-[8px] xs:text-[9px] px-1.5 py-0.5 rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.25)] border border-white dark:border-zinc-900 uppercase tracking-wider leading-none select-none pointer-events-none flex items-center justify-center">HOT</span>' : simIsNew ? '<span class="absolute -top-1.5 -right-1.5 z-20 bg-[#008738] text-white font-black text-[8px] xs:text-[9px] px-1.5 py-0.5 rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.25)] border border-white dark:border-zinc-900 uppercase tracking-wider leading-none select-none pointer-events-none flex items-center justify-center">NEW</span>' : ''}
                 </div>
-                <span class="text-[9.5px] xxs:text-[10.5px] xs:text-[11.5px] sm:text-[12px] font-semibold text-center text-zinc-800 dark:text-zinc-200 line-clamp-2 w-full px-0.5 leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors pointer-events-none select-none">${escapeHtml(simName)}</span>
+                <span class="text-[11px] sm:text-xs font-semibold text-center text-zinc-800 dark:text-zinc-200 line-clamp-2 w-full px-0.5 leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors pointer-events-none select-none">${escapeHtml(simName)}</span>
               </a>
             `;
           }).join('')}
@@ -449,7 +508,7 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
   }
 
   const relatedNewsSectionHtml = relatedNewsArticles.length > 0 ? `
-    <aside data-nosnippet aria-labelledby="app-related-news-heading" class="px-1 xs:px-2 sm:px-4 md:px-6 mb-6 xs:mb-8 text-left">
+    <aside data-nosnippet aria-labelledby="app-related-news-heading" class="px-0 sm:px-4 md:px-6 mb-6 xs:mb-8 text-left">
       <div class="py-5 border-t border-black/5 dark:border-white/5">
         <h2 id="app-related-news-heading" class="text-base xs:text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-3">
           Related News &amp; Updates
@@ -459,8 +518,8 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
             const rnSlug = (getField(rn, 'slug') || getField(rn, 'id') || '').trim();
             const rnTitle = getField(rn, 'title') || 'News Article';
             return `
-              <a href="/news/${encodeURIComponent(rnSlug)}" class="p-3 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/50 hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80 transition-colors flex items-center justify-between gap-2 no-underline">
-                <span class="text-xs sm:text-sm font-semibold text-zinc-800 dark:text-zinc-200 line-clamp-2">${escapeHtml(rnTitle)}</span>
+              <a href="/news/${encodeURIComponent(rnSlug)}" class="p-3.5 min-h-[52px] rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/50 hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80 transition-colors flex items-center justify-between gap-2.5 no-underline">
+                <span class="text-[13px] sm:text-sm font-semibold text-zinc-800 dark:text-zinc-200 line-clamp-2">${escapeHtml(rnTitle)}</span>
                 <span class="text-xs font-bold text-blue-600 dark:text-blue-400 shrink-0">Read →</span>
               </a>
             `;
@@ -470,118 +529,126 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
     </aside>
   ` : '';
 
+  const safetyStatus = getField(app, 'safety_status', 'Verified') || 'Verified';
+
   // 1:1 Layout Match with AppDetails.tsx
   return `
     <div class="w-full">
       <!-- 1. AppDetailsNavigation -->
-      <div class="flex items-center justify-between gap-2 xs:gap-3 px-1 xs:px-2 sm:px-4 md:px-6 mb-3 xs:mb-4">
-        <a href="/" class="inline-flex items-center gap-1.5 xs:gap-2 text-xs xs:text-sm font-medium text-blue-500 hover:text-blue-600 transition-colors group shrink-0 no-underline">
-          <div class="p-1 xs:p-1.5 rounded-full bg-blue-50 dark:bg-blue-900/20 group-hover:-translate-x-1 transition-transform">
-            <svg class="w-3.5 h-3.5 xs:w-4 xs:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+      <div class="flex items-center justify-between gap-2 xs:gap-3 px-0 sm:px-4 md:px-6 mb-2.5 xs:mb-3.5">
+        <a href="/" class="inline-flex items-center gap-1.5 min-h-[36px] py-1 text-xs xs:text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline transition-colors group shrink-0 no-underline">
+          <div class="p-1 rounded-full bg-blue-50 dark:bg-blue-900/20 group-hover:-translate-x-1 transition-transform">
+            <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
           </div>
           <span>Back to storefront</span>
         </a>
-        <a href="${topNewsHref}" class="inline-flex items-center gap-1 xs:gap-1.5 px-2 xs:px-3 py-1 xs:py-1.5 rounded-full text-[11px] xs:text-xs font-semibold text-zinc-700 dark:text-zinc-200 bg-zinc-100 hover:bg-zinc-200/90 dark:bg-zinc-800/80 dark:hover:bg-zinc-700/80 border border-black/5 dark:border-white/10 transition-all shadow-xs group cursor-pointer active:scale-95 shrink-0 no-underline" title="Read latest news and updates for ${escapeHtml(name)}">
-          <div class="p-0.5 xs:p-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
-            <svg class="w-3 h-3 xs:w-3.5 xs:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path></svg>
+        <a href="${topNewsHref}" class="inline-flex items-center gap-1.5 min-h-[34px] px-2.5 sm:px-3 py-1 rounded-full text-xs font-semibold text-zinc-700 dark:text-zinc-200 bg-zinc-100 hover:bg-zinc-200/90 dark:bg-zinc-800/80 dark:hover:bg-zinc-700/80 border border-black/5 dark:border-white/10 transition-all shadow-xs group cursor-pointer active:scale-95 shrink-0 no-underline" title="Read latest news and updates for ${escapeHtml(name)}">
+          <div class="p-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
+            <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path></svg>
           </div>
           <span>News</span>
-          ${relatedNewsCount > 0 ? `<span class="px-1.5 py-0.2 rounded-full bg-blue-600 text-white text-[9px] xs:text-[10px] font-bold leading-tight">${relatedNewsCount}</span>` : ''}
-          <svg class="w-2.5 h-2.5 xs:w-3 xs:h-3 text-zinc-400 dark:text-zinc-500 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+          ${relatedNewsCount > 0 ? `<span class="px-1.5 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-bold leading-none">${relatedNewsCount}</span>` : ''}
+          <svg class="w-3 h-3 text-zinc-400 dark:text-zinc-500 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
         </a>
       </div>
 
       <!-- 2. Main App Content Wrapper -->
       <div class="w-full">
         <!-- 2.1 AppHeader -->
-        <div class="flex w-full items-center gap-2.5 xxs:gap-3 xs:gap-4 sm:gap-6 mb-3.5 sm:mb-6 px-1 xs:px-2 sm:px-4 md:px-6 mt-1 sm:mt-2 text-left">
-          <div class="relative w-[56px] h-[56px] xxs:w-[66px] xxs:h-[66px] xs:w-[80px] xs:h-[80px] sm:w-[102px] sm:h-[102px] md:w-[116px] md:h-[116px] shrink-0">
-            <div class="w-full h-full rounded-[14px] xxs:rounded-[16px] xs:rounded-[20px] sm:rounded-[24px] overflow-hidden shadow-sm bg-zinc-100 dark:bg-zinc-800 border border-black/5 dark:border-white/10 relative">
+        <div class="flex w-full items-center gap-3 xs:gap-4 sm:gap-6 mb-4 sm:mb-6 px-0 sm:px-4 md:px-6 mt-1 sm:mt-2 text-left">
+          <div class="relative w-[72px] h-[72px] xs:w-[80px] xs:h-[80px] sm:w-[104px] sm:h-[104px] md:w-[116px] md:h-[116px] shrink-0">
+            <div class="w-full h-full rounded-[18px] xs:rounded-[20px] sm:rounded-[24px] overflow-hidden shadow-sm bg-zinc-100 dark:bg-zinc-800 border border-black/5 dark:border-white/10 relative">
               <img src="${escapeHtml(icon)}" alt="${escapeHtml(name)} app icon" itemprop="image" loading="eager" fetchpriority="high" decoding="async" width="116" height="116" class="w-full h-full object-cover block relative z-10" />
             </div>
           </div>
           <div class="flex flex-col justify-center flex-1 min-w-0">
-            <h1 class="text-base xxs:text-lg xs:text-2xl sm:text-3xl md:text-4xl font-black sm:font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100 leading-snug sm:leading-tight mb-0.5 xs:mb-1 break-words">
+            <h1 class="text-lg xs:text-[22px] sm:text-3xl md:text-4xl font-black sm:font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100 leading-snug sm:leading-tight mb-0.5 xs:mb-1 break-words">
               ${escapeHtml(name)}
             </h1>
-            <div class="text-[11px] xxs:text-xs xs:text-sm sm:text-base font-semibold text-blue-600 dark:text-blue-400 mb-0.5 xs:mb-1 truncate">
+            <div class="text-xs xs:text-sm sm:text-base font-semibold text-blue-600 dark:text-blue-400 mb-1 truncate">
               ${escapeHtml(developer)}
             </div>
-            <div class="text-[8px] xxs:text-[9px] xs:text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400 flex flex-wrap items-center gap-x-1.5 xs:gap-x-2.5 gap-y-0.5 mt-0.5 font-medium">
+            <div class="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400 flex flex-wrap items-center gap-x-2 xs:gap-x-2.5 gap-y-1 mt-0.5 font-medium">
               ${(() => {
                 const isAppHot = app.is_hot === true || (app.is_hot && app.is_hot.booleanValue === true);
                 const isAppNew = checkAppIsNew(app);
                 if (isAppHot && isAppNew) {
-                  return '<span class="inline-flex items-center rounded overflow-hidden shadow-xs font-black uppercase tracking-wider text-[8px] xxs:text-[9px] xs:text-[10px]"><span class="bg-[#d32f2f] text-white px-1.5 py-0.5">HOT</span><span class="bg-[#008738] text-white px-1.5 py-0.5">NEW</span></span>';
+                  return '<span class="inline-flex items-center rounded overflow-hidden shadow-xs font-black uppercase tracking-wider text-[9px] xs:text-[10px]"><span class="bg-[#d32f2f] text-white px-1.5 py-0.5">HOT</span><span class="bg-[#008738] text-white px-1.5 py-0.5">NEW</span></span>';
                 }
                 if (isAppHot) {
-                  return '<span class="bg-[#d32f2f] text-white px-1.5 py-0.5 rounded uppercase font-black tracking-wider text-[8px] xxs:text-[9px] xs:text-[10px] shadow-xs">HOT</span>';
+                  return '<span class="bg-[#d32f2f] text-white px-1.5 py-0.5 rounded uppercase font-black tracking-wider text-[9px] xs:text-[10px] shadow-xs">HOT</span>';
                 }
                 if (isAppNew) {
-                  return '<span class="bg-[#008738] text-white px-1.5 py-0.5 rounded uppercase font-black tracking-wider text-[8px] xxs:text-[9px] xs:text-[10px] shadow-xs">NEW</span>';
+                  return '<span class="bg-[#008738] text-white px-1.5 py-0.5 rounded uppercase font-black tracking-wider text-[9px] xs:text-[10px] shadow-xs">NEW</span>';
                 }
                 return '';
               })()}
-              <span class="flex items-center text-emerald-600 dark:text-emerald-400 gap-1 font-semibold">
-                <svg class="w-3 h-3 xxs:w-3.5 xxs:h-3.5 xs:w-4 xs:h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg> Verified
-              </span>
+              ${safetyStatus === 'Verified' ? `
+                <span class="flex items-center text-emerald-600 dark:text-emerald-400 gap-1 font-semibold">
+                  <svg class="w-3.5 h-3.5 xs:w-4 xs:h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg> Verified
+                </span>
+              ` : `
+                <span class="flex items-center text-orange-500 gap-1 font-semibold">
+                  <svg class="w-3.5 h-3.5 xs:w-4 xs:h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M20.618 5.984A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg> ${escapeHtml(safetyStatus)}
+                </span>
+              `}
             </div>
           </div>
         </div>
 
         <!-- 2.2 AppSpecsBar -->
-        <div class="w-full grid grid-cols-4 py-2 xxs:py-2.5 xs:py-3.5 sm:py-4 mb-3 sm:mb-6 border-y border-zinc-100 dark:border-zinc-800/50 bg-zinc-50/10 dark:bg-zinc-900/10">
-          <div class="flex flex-col items-center justify-center px-0.5 xxs:px-1 xs:px-2 text-center min-w-0">
-            <div class="flex items-center gap-0.5 font-extrabold text-[11px] xxs:text-xs xs:text-sm sm:text-base text-zinc-900 dark:text-zinc-100">
-              <span>${escapeHtml(rating)}</span>
-              <span class="text-orange-500 text-xs">★</span>
+        <div class="w-full grid grid-cols-4 py-3 xs:py-3.5 sm:py-4 mb-4 sm:mb-6 border-y border-zinc-100 dark:border-zinc-800/50 bg-zinc-50/10 dark:bg-zinc-900/10">
+          <div class="flex flex-col items-center justify-center px-1 xs:px-2 text-center min-w-0">
+            <div class="flex items-center gap-0.5 font-extrabold text-xs xs:text-sm sm:text-base text-zinc-900 dark:text-zinc-100">
+              <span>${isRated ? escapeHtml(rating) : '--'}</span>
+              <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 ${isRated ? 'fill-current text-orange-500' : 'text-zinc-300 dark:text-zinc-600'}" viewBox="0 0 24 24" fill="${isRated ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
             </div>
-            <div class="text-[7px] xxs:text-[8px] xs:text-[10px] sm:text-[11px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mt-0.5 xs:mt-1 truncate max-w-full">Rating</div>
+            <div class="text-[10px] xs:text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mt-1 truncate max-w-full">${isRated ? 'Rating' : 'Unrated'}</div>
           </div>
-          <div class="flex flex-col items-center justify-center px-0.5 xxs:px-1 xs:px-2 text-center border-l border-zinc-200 dark:border-zinc-800/80 min-w-0">
-            <div class="font-extrabold text-[11px] xxs:text-xs xs:text-sm sm:text-base text-zinc-900 dark:text-zinc-100 truncate max-w-full">${escapeHtml(size)}</div>
-            <div class="text-[7px] xxs:text-[8px] xs:text-[10px] sm:text-[11px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mt-0.5 xs:mt-1">Size</div>
+          <div class="flex flex-col items-center justify-center px-1 xs:px-2 text-center border-l border-zinc-200 dark:border-zinc-800/80 min-w-0">
+            <div class="font-extrabold text-xs xs:text-sm sm:text-base text-zinc-900 dark:text-zinc-100 truncate max-w-full">${escapeHtml(size)}</div>
+            <div class="text-[10px] xs:text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mt-1">Size</div>
           </div>
-          <div class="flex flex-col items-center justify-center px-0.5 xxs:px-1 xs:px-2 text-center border-l border-zinc-200 dark:border-zinc-800/80 min-w-0">
-            <a href="/?tab=${encodeURIComponent(mainCat)}" class="font-extrabold text-[9px] xxs:text-[10px] xs:text-xs sm:text-sm text-blue-600 dark:text-blue-400 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 px-1 xxs:px-1.5 xs:px-2.5 py-0.5 rounded-full leading-none truncate max-w-full transition-colors no-underline" title="View all ${escapeHtml(mainCat)} apps">${escapeHtml(mainCat)}</a>
-            <div class="text-[7px] xxs:text-[8px] xs:text-[10px] sm:text-[11px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mt-0.5 xs:mt-1.5">Type</div>
+          <div class="flex flex-col items-center justify-center px-1 xs:px-2 text-center border-l border-zinc-200 dark:border-zinc-800/80 min-w-0">
+            <a href="/?tab=${encodeURIComponent(mainCat)}" class="inline-flex items-center justify-center min-h-[26px] font-extrabold text-[11px] xs:text-xs sm:text-sm text-blue-600 dark:text-blue-400 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 px-2.5 py-1 rounded-full leading-none truncate max-w-full transition-colors no-underline" title="View all ${escapeHtml(mainCat)} apps">${escapeHtml(mainCat)}</a>
+            <div class="text-[10px] xs:text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mt-1">Type</div>
           </div>
-          <div class="flex flex-col items-center justify-center px-0.5 xxs:px-1 xs:px-2 text-center border-l border-zinc-200 dark:border-zinc-800/80 min-w-0">
-            <div class="font-extrabold text-[11px] xxs:text-xs xs:text-sm sm:text-base text-zinc-900 dark:text-zinc-100 truncate max-w-full">${escapeHtml(version)}</div>
-            <div class="text-[7px] xxs:text-[8px] xs:text-[10px] sm:text-[11px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mt-0.5 xs:mt-1">Version</div>
+          <div class="flex flex-col items-center justify-center px-1 xs:px-2 text-center border-l border-zinc-200 dark:border-zinc-800/80 min-w-0">
+            <div class="font-extrabold text-xs xs:text-sm sm:text-base text-zinc-900 dark:text-zinc-100 truncate max-w-full">${escapeHtml(version)}</div>
+            <div class="text-[10px] xs:text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mt-1">Version</div>
           </div>
         </div>
 
         <!-- 2.3 AppActionButtons -->
-        <div class="flex flex-col sm:flex-row w-full justify-center items-center gap-1.5 xxs:gap-2 xs:gap-3 select-none mb-3 sm:mb-5 px-1 xs:px-2 sm:px-4 md:px-6">
-          <div class="w-full sm:flex-1 transition-transform duration-150">
+        <div class="flex flex-col sm:flex-row w-full justify-center items-center gap-2 xs:gap-2.5 select-none mb-4 sm:mb-5 px-0 sm:px-4 md:px-6">
+          <div class="w-full sm:flex-1">
             <div class="w-full flex flex-col items-center gap-1.5">
               ${Boolean(app.is_coming_soon && (!app.publish_date || new Date(app.publish_date).getTime() > Date.now())) ? `
-                <button type="button" disabled class="w-full bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 font-bold py-2 xxs:py-2.5 px-3 xxs:px-4 xs:px-5 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all text-[11px] xxs:text-xs xs:text-sm h-[38px] xxs:h-[40px] xs:h-[44px] cursor-not-allowed opacity-80">
-                  <span>Coming Soon</span>
+                <button type="button" disabled class="w-full bg-amber-500/10 text-amber-600 dark:text-amber-500 border border-amber-500/20 font-bold py-2.5 px-4 xs:px-5 rounded-xl flex items-center justify-center gap-1.5 cursor-not-allowed text-sm shadow-sm min-h-[44px]">
+                  Coming Soon
                 </button>
               ` : `
-                <button type="button" class="w-full premium-action-btn premium-action-btn-blowing cursor-pointer text-white !text-white font-bold py-2 xxs:py-2.5 px-3 xxs:px-4 xs:px-5 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all text-[11px] xxs:text-xs xs:text-sm shadow-md h-[38px] xxs:h-[40px] xs:h-[44px]">
+                <button type="button" class="w-full premium-action-btn premium-action-btn-blowing cursor-pointer text-white !text-white font-bold py-2.5 px-4 xs:px-5 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all text-sm shadow-md min-h-[44px]">
                   <span class="flex items-center gap-1.5 font-bold text-white !text-white">
                     <span>Download</span>
-                    <svg class="w-3.5 h-3.5 xs:w-4 xs:h-4 text-white !text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                    <svg class="w-4 h-4 arrow-icon arrow-icon-loop text-white !text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                   </span>
                 </button>
               `}
             </div>
           </div>
-          <div class="flex w-full gap-1.5 xxs:gap-2 xs:gap-3 sm:w-auto shrink-0">
-            <div class="flex-1 sm:w-auto sm:min-w-[100px] xxs:sm:min-w-[120px] sm:max-w-[150px]">
-              <button type="button" class="w-full bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100 font-semibold py-2 xxs:py-2.5 px-2 xs:px-3 rounded-xl flex items-center justify-center gap-1 xs:gap-1.5 transition-all text-[11px] xxs:text-xs xs:text-sm border border-black/5 dark:border-white/5 shadow-sm h-[38px] xxs:h-[40px] xs:h-[44px] truncate cursor-pointer">
-                <svg class="w-3 h-3 xs:w-4 xs:h-4 text-blue-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg>
+          <div class="flex w-full gap-2 xs:gap-2.5 sm:w-auto shrink-0">
+            <div class="flex-1 sm:w-auto sm:min-w-[116px] sm:max-w-[144px]">
+              <button type="button" class="w-full bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100 font-semibold py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-colors text-xs sm:text-sm border border-black/5 dark:border-white/5 shadow-xs min-h-[44px] truncate cursor-pointer">
+                <svg class="w-4 h-4 text-blue-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg>
                 <span class="truncate">Share</span>
               </button>
             </div>
-            <div class="flex-1 sm:w-auto sm:min-w-[100px] xxs:sm:min-w-[120px] sm:max-w-[150px]">
-              <a href="/report-removal" class="w-full bg-rose-50 hover:bg-rose-100/80 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-semibold py-2 xxs:py-2.5 px-2 xs:px-3 rounded-xl flex items-center justify-center gap-1 xs:gap-1.5 transition-all text-[11px] xxs:text-xs xs:text-sm border border-rose-200/40 dark:border-rose-900/40 shadow-xs h-[38px] xxs:h-[40px] xs:h-[44px] truncate cursor-pointer no-underline">
-                <svg class="w-3 h-3 xs:w-4 xs:h-4 text-rose-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"></path></svg>
+            <div class="flex-1 sm:w-auto sm:min-w-[116px] sm:max-w-[144px]">
+              <button type="button" class="w-full bg-rose-50 hover:bg-rose-100/80 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-semibold py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-colors text-xs sm:text-sm border border-rose-200/40 dark:border-rose-900/40 shadow-xs min-h-[44px] truncate cursor-pointer">
+                <svg class="w-4 h-4 text-rose-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"></path></svg>
                 <span class="truncate">Flag</span>
-              </a>
+              </button>
             </div>
           </div>
         </div>
@@ -596,16 +663,16 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
 
         <!-- 2.6 AppAboutSection -->
         <div>
-          <section aria-labelledby="app-overview-heading" class="w-full my-3 px-1 xs:px-2 sm:px-4 md:px-6 text-left">
+          <section aria-labelledby="app-overview-heading" class="w-full my-3 px-0 sm:px-4 md:px-6 text-left">
             <div class="py-4 sm:py-6 border-t border-black/5 dark:border-white/5">
               <div class="w-full pb-3 xs:pb-3.5 sm:pb-4 mb-3 xs:mb-4 sm:mb-5 flex items-center justify-between text-left select-none group border-b border-black/5 dark:border-white/5">
-                <div class="flex items-center gap-2 xs:gap-2.5 sm:gap-3 flex-1 pr-2 sm:pr-3">
-                  <div class="w-7 h-7 xs:w-8 xs:h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                    <svg class="w-3.5 h-3.5 xs:w-4 xs:h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                <div class="flex items-center gap-2.5 sm:gap-3 flex-1 pr-2 sm:pr-3">
+                  <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                    <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                   </div>
                   <div>
-                    <h2 id="app-overview-heading" class="text-xs sm:text-base font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">About this app</h2>
-                    <p class="text-[10px] xs:text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Overview & features</p>
+                    <h2 id="app-overview-heading" class="text-sm sm:text-base font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">About this app</h2>
+                    <p class="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Overview &amp; features</p>
                   </div>
                 </div>
               </div>
@@ -628,7 +695,7 @@ export function renderAppDetails(slug: string, apps: any[], _settings: any, samp
                 ${app.release_notes ? `
                   <div class="pt-4 sm:pt-5 border-t border-black/5 dark:border-white/5">
                     <h3 class="text-xs sm:text-sm font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 sm:mb-3">What's New in Version ${escapeHtml(version)}</h3>
-                    <div class="bg-slate-50 dark:bg-zinc-900 rounded-xl p-3 sm:p-4 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap border border-black/5 dark:border-white/5">${escapeHtml(app.release_notes)}</div>
+                    <div class="bg-slate-50 dark:bg-zinc-900 rounded-xl p-3.5 sm:p-4 text-[14px] sm:text-[15px] text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap border border-black/5 dark:border-white/5">${escapeHtml(app.release_notes)}</div>
                   </div>
                 ` : ''}
               </div>

@@ -194,12 +194,23 @@ export function getSizedLogoUrl(
   return trimmed;
 }
 
+export function isPngBytes(bytes?: Uint8Array | null): boolean {
+  return Boolean(
+    bytes &&
+      bytes.byteLength > 64 &&
+      bytes[0] === 0x89 &&
+      bytes[1] === 0x50 &&
+      bytes[2] === 0x4e &&
+      bytes[3] === 0x47
+  );
+}
+
 /**
  * Wraps one or more PNG buffers (e.g. 48x48, 32x32, 16x16) into a spec-compliant
  * Microsoft .ICO container binary (00 00 01 00 header + 16-byte ICONDIRENTRY per image).
  */
 export function wrapPngsInIco(entries: Array<{ size: number; png: Uint8Array }>): Uint8Array {
-  const valid = entries.filter(e => e && e.png && e.png.byteLength > 64);
+  const valid = entries.filter(e => e && isPngBytes(e.png));
   if (valid.length === 0) return new Uint8Array(0);
 
   const count = valid.length;

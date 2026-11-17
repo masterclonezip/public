@@ -52,9 +52,28 @@ export default function AppAboutSection({ app, isFetching }: AppAboutSectionProp
     [&_ol]:my-2.5 [&_ol]:space-y-1.5 [&_ol]:list-decimal [&_ol]:pl-5
     [&_li]:leading-[1.65] [&_li]:pl-1 [&_li::marker]:text-blue-600 dark:[&_li::marker]:text-blue-400 [&_li::marker]:font-bold
     [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500 [&_blockquote]:pl-3.5 [&_blockquote]:py-1.5 [&_blockquote]:my-3 [&_blockquote]:bg-blue-50/50 dark:[&_blockquote]:bg-blue-950/20 [&_blockquote]:rounded-r-xl [&_blockquote]:italic
+    [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-xl [&_table]:block [&_table]:w-full [&_table]:overflow-x-auto [&_pre]:overflow-x-auto
   `.trim().replace(/\s+/g, ' ');
 
   const defaultDescription = `<p>Comprehensive application profile and details for <strong>${app.name}</strong>.</p>`;
+
+  const sanitizedAdminBoxHtml = React.useMemo(
+    () => (app.custom_admin_box_html ? { __html: safeHtml(app.custom_admin_box_html) } : null),
+    [app.custom_admin_box_html]
+  );
+
+  const sanitizedDescriptionHtml = React.useMemo(
+    () => ({ __html: safeHtml(app.description_html, defaultDescription) }),
+    [app.description_html, defaultDescription]
+  );
+
+  const sanitizedFeaturesHtml = React.useMemo(() => {
+    if (!app.features_html) return null;
+    const cleanFeat = app.features_html.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+    const cleanDesc = (app.description_html || '').replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+    if (!cleanFeat || cleanFeat === cleanDesc) return null;
+    return { __html: safeHtml(app.features_html) };
+  }, [app.features_html, app.description_html]);
 
   return (
     <section aria-labelledby="app-overview-heading" className="w-full my-3 px-0 sm:px-4 md:px-6 text-left">
@@ -80,7 +99,7 @@ export default function AppAboutSection({ app, isFetching }: AppAboutSectionProp
         {/* Content Body */}
         <div onClick={handleHtmlClick} className="space-y-4 xs:space-y-5 sm:space-y-6">
             
-            {app.custom_admin_box_html && (
+            {sanitizedAdminBoxHtml && (
               <div className="bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/40 rounded-xl p-3 sm:p-4 shadow-xs">
                 {app.custom_admin_box_heading && (
                   <h3 className="text-sm sm:text-base font-bold mb-2 text-amber-900 dark:text-amber-200">
@@ -89,7 +108,7 @@ export default function AppAboutSection({ app, isFetching }: AppAboutSectionProp
                 )}
                 <div 
                   className={richHtmlContentStyle}
-                  dangerouslySetInnerHTML={{ __html: safeHtml(app.custom_admin_box_html) }}
+                  dangerouslySetInnerHTML={sanitizedAdminBoxHtml}
                 />
               </div>
             )}
@@ -106,22 +125,20 @@ export default function AppAboutSection({ app, isFetching }: AppAboutSectionProp
               <div>
                 <div 
                   className={richHtmlContentStyle}
-                  dangerouslySetInnerHTML={{ __html: safeHtml(app.description_html, defaultDescription) }}
+                  dangerouslySetInnerHTML={sanitizedDescriptionHtml}
                 />
               </div>
             )}
 
             {/* Key Features */}
-            {app.features_html &&
-              app.features_html.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim().toLowerCase() !==
-              (app.description_html || '').replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim().toLowerCase() && (
+            {sanitizedFeaturesHtml && (
               <div className="pt-4 sm:pt-5 border-t border-black/5 dark:border-white/5">
                 <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 sm:mb-3">
                   Key App Features
                 </h3>
                 <div 
                   className={richHtmlContentStyle}
-                  dangerouslySetInnerHTML={{ __html: safeHtml(app.features_html) }}
+                  dangerouslySetInnerHTML={sanitizedFeaturesHtml}
                 />
               </div>
             )}

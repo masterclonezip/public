@@ -2284,6 +2284,25 @@ export function getCachedLiveAppStats(appId?: string, appSlug?: string): {
     };
   }
 
+  // 4. SSR __INITIAL_DATA__.appReviews fallback (0ms hydration parity)
+  if (typeof window !== 'undefined') {
+    const ssrAppRev = (window as any).__INITIAL_DATA__?.appReviews;
+    if (ssrAppRev && ssrAppRev.stats) {
+      const ssrId = String(ssrAppRev.appId || '').toLowerCase().trim();
+      const ssrSlug = String(ssrAppRev.appSlug || '').toLowerCase().trim();
+      const targets = [
+        cleanId,
+        cleanSlug,
+        String(appId || '').toLowerCase().trim(),
+        String(appSlug || '').toLowerCase().trim()
+      ].filter(Boolean);
+      const matches = (ssrId && targets.includes(ssrId)) || (ssrSlug && targets.includes(ssrSlug));
+      if (matches && Number(ssrAppRev.stats.totalReviews ?? ssrAppRev.stats.published ?? 0) >= 0) {
+        return ssrAppRev.stats;
+      }
+    }
+  }
+
   return null;
 }
 
@@ -2337,6 +2356,50 @@ export function getCachedLiveReviews(appId?: string, appSlug?: string): ReviewFe
       nextCursor: publishedList.length > 5 ? '5' : null,
       stats: getCachedLiveAppStats(meta.id, meta.slug)
     };
+  }
+
+  if (typeof window !== 'undefined') {
+    const ssrAppRev = (window as any).__INITIAL_DATA__?.appReviews;
+    if (ssrAppRev && Array.isArray(ssrAppRev.reviews)) {
+      const ssrId = String(ssrAppRev.appId || '').toLowerCase().trim();
+      const ssrSlug = String(ssrAppRev.appSlug || '').toLowerCase().trim();
+      const targets = [
+        meta.id.toLowerCase(),
+        meta.slug.toLowerCase(),
+        String(appId || '').toLowerCase().trim(),
+        String(appSlug || '').toLowerCase().trim()
+      ].filter(Boolean);
+      const matches = (ssrId && targets.includes(ssrId)) || (ssrSlug && targets.includes(ssrSlug));
+      if (matches) {
+        const mappedSsr: PublicReview[] = ssrAppRev.reviews.slice(0, 5).map((r: any) => ({
+          id: r.id,
+          app_id: r.app_id || r.appId || meta.id,
+          appId: r.appId || r.app_id || meta.id,
+          appSlug: r.appSlug || meta.slug,
+          appName: r.appName || meta.name,
+          username: r.userName || r.username || 'Player',
+          userName: r.userName || r.username || 'Player',
+          rating: Number(r.rating) || 5,
+          comment: r.reviewText || r.comment || '',
+          reviewText: r.reviewText || r.comment || '',
+          created_at: formatReviewDate(r.timestamp || r.created_at),
+          timestamp: r.timestamp || new Date().toISOString(),
+          helpful_count: Number(r.helpful_count) || 0,
+          reported: Boolean(r.reported),
+          report_count: Number(r.report_count) || 0,
+          source: r.source || 'community',
+          isPinned: Boolean(r.isPinned),
+          adminReply: r.adminReply || null
+        }));
+        const hasMoreSsr = Boolean(ssrAppRev.hasMore);
+        return {
+          reviews: mappedSsr,
+          hasMore: hasMoreSsr,
+          nextCursor: hasMoreSsr ? String(mappedSsr.length) : null,
+          stats: ssrAppRev.stats || getCachedLiveAppStats(meta.id, meta.slug)
+        };
+      }
+    }
   }
 
   return null;

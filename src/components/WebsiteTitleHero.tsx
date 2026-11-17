@@ -23,8 +23,7 @@ export const WebsiteTitleHero = React.memo(({ settings }: WebsiteTitleHeroProps)
   const subtitle = settings.hero_title_subtitle ?? '';
 
   if (!visible || (!text && !subtitle)) {
-    const fallbackH1 = (settings as any).site_title || '';
-    return <h1 className="sr-only">{fallbackH1}</h1>;
+    return null;
   }
 
   const style = settings.hero_title_style || 'modern';

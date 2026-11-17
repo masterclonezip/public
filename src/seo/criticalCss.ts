@@ -26,34 +26,12 @@ main#main-content{flex:1 1 0%;width:100%;max-width:80rem;margin-left:auto;margin
 
 const CRITICAL_SHELL_CSS = `<style id="server-critical-css">${CRITICAL_SHELL_RULES}</style>`;
 
-let cachedFullCriticalCss: string | null = null;
-
-export function getCriticalCss(hasInlinedViteCss = false): string {
-  if (hasInlinedViteCss) {
-    return CRITICAL_SHELL_CSS;
-  }
-  if (cachedFullCriticalCss !== null) {
-    return cachedFullCriticalCss;
-  }
-  try {
-    const assetsDir = path.resolve(process.cwd(), 'dist', 'assets');
-    if (fs.existsSync(assetsDir)) {
-      const cssFiles = fs.readdirSync(assetsDir).filter((f) => f.endsWith('.css'));
-      if (cssFiles.length > 0) {
-        const combinedCss = cssFiles
-          .map((f) => fs.readFileSync(path.join(assetsDir, f), 'utf-8'))
-          .join('\n');
-        if (combinedCss.trim()) {
-          cachedFullCriticalCss = `<style id="server-critical-css">${combinedCss}\n${CRITICAL_SHELL_RULES}</style>`;
-          return cachedFullCriticalCss;
-        }
-      }
-    }
-  } catch (_) {}
+export function getCriticalCss(_hasInlinedViteCss = false): string {
   return CRITICAL_SHELL_CSS;
 }
 
 export function clearCriticalCssCache(): void {
-  cachedFullCriticalCss = null;
+  // No-op: critical shell CSS is static and outer CSS loads via <link id="vite-inline-css" rel="stylesheet">
 }
+
 

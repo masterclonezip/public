@@ -6,7 +6,7 @@ import zlib from 'zlib';
 import { injectSeoTags, fetchStoreData, cleanRootContainer } from '../src/seoHelper';
 import { generateAllSitemaps, normalizeSitemapHost, escapeXml } from '../src/lib/sitemapGenerator';
 import { formatPageTitle, cleanSettingsMetaTitles, isPublicReadyApp, isPublicReadyNews, resolvePublicSiteDomain } from '../src/lib/seoUtils';
-import { getAllSiteIconUrls, wrapPngsInIco } from '../src/seo/utils';
+import { getAllSiteIconUrls, isPngBytes, wrapPngsInIco } from '../src/seo/utils';
 import { safeDecrypt, safeEncrypt, getAesSecret } from '../src/lib/cryptoUtils';
 
 function decodeCandidateUrl(raw: unknown): string {
@@ -301,8 +301,10 @@ async function syncStaticDataAndSitemaps() {
           { src: '/favicon-48x48.png', sizes: '48x48', type: 'image/png', purpose: 'any' },
           { src: '/favicon-96x96.png', sizes: '96x96', type: 'image/png', purpose: 'any' },
           { src: '/favicon-144x144.png', sizes: '144x144', type: 'image/png', purpose: 'any' },
-          { src: '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-          { src: '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+          { src: '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+          { src: '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
         ],
         theme_color: '#2563eb',
         background_color: '#ffffff',
@@ -346,8 +348,11 @@ async function syncStaticDataAndSitemaps() {
             const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
             if (!res.ok) return;
             const buf = Buffer.from(await res.arrayBuffer());
-            if (buf.length < 100) return;
-            downloadedPngBySize.set(size, new Uint8Array(buf));
+            if (buf.length < 64) return;
+            const u8 = new Uint8Array(buf);
+            if (isPngBytes(u8)) {
+              downloadedPngBySize.set(size, u8);
+            }
             for (const fName of files) {
               fs.writeFileSync(path.join(publicPath, fName), buf);
               if (fs.existsSync(distPath)) {
@@ -404,23 +409,33 @@ async function prerender() {
   try {
     let originalTemplate = cleanRootContainer(fs.readFileSync(indexHtmlPath, 'utf-8'));
 
-    // Inline compiled Vite CSS directly into <head> to eliminate render-blocking CSS network round-trips and prevent FOUC (A1, A2, A10)
+    // Position external compiled Vite CSS <link id="vite-inline-css" rel="stylesheet"> in <head> BEFORE ES module scripts/modulepreload links
+    // so raw HTML remains lean (~30 KB) and the outer CSS stylesheet loads synchronously with zero FOUC or layout shift
+    let outerCssLinks = '';
     originalTemplate = originalTemplate.replace(
       /<link\b[^>]*rel=["']stylesheet["'][^>]*>/gi,
       (fullMatch) => {
-        try {
-          const hrefMatch = fullMatch.match(/href=["']\/?assets\/([^"']+\.css)["']/i);
-          if (hrefMatch && hrefMatch[1]) {
-            const cssFilePath = path.join(distPath, 'assets', hrefMatch[1]);
-            if (fs.existsSync(cssFilePath)) {
-              const cssContent = fs.readFileSync(cssFilePath, 'utf-8');
-              return `<style id="vite-inline-css">${cssContent}</style>`;
-            }
-          }
-        } catch (_) {}
+        if (/href=["']\/?assets\/([^"']+\.css)["']/i.test(fullMatch)) {
+          const taggedLink = fullMatch.includes('id="vite-inline-css"')
+            ? fullMatch
+            : fullMatch.replace(/^<link\b/i, '<link id="vite-inline-css"');
+          outerCssLinks += `${taggedLink}\n    `;
+          return '';
+        }
         return fullMatch;
       }
     );
+    if (outerCssLinks) {
+      const firstModuleTagMatch = originalTemplate.match(/<(?:script\b[^>]*type=["']module["'][^>]*>|link\b[^>]*rel=["']modulepreload["'][^>]*>)/i);
+      if (firstModuleTagMatch && firstModuleTagMatch.index !== undefined) {
+        originalTemplate =
+          originalTemplate.slice(0, firstModuleTagMatch.index) +
+          outerCssLinks +
+          originalTemplate.slice(firstModuleTagMatch.index);
+      } else {
+        originalTemplate = originalTemplate.replace('</head>', `${outerCssLinks}</head>`);
+      }
+    }
 
     // Persist pristine clean SPA template files with empty <div id="root"></div>
     fs.writeFileSync(path.join(distPath, 'template.html'), originalTemplate, 'utf-8');
@@ -549,7 +564,6 @@ async function prerender() {
     await generateRoute('/videos');
     await generateRoute('/about');
     await generateRoute('/developers');
-    await generateRoute('/developer');
     await generateRoute('/contact');
     await generateRoute('/privacy');
     await generateRoute('/report-removal');
@@ -559,9 +573,6 @@ async function prerender() {
     await generateRoute('/ethics');
     await generateRoute('/disclaimer');
     await generateRoute('/faq');
-    await generateRoute('/faqs');
-    await generateRoute('/safety');
-    await generateRoute('/safety-status');
 
     // 6. Generate Master Sitemap Index (sitemap.xml), Sub-Sitemaps, and GZip (.xml.gz) companions
     const host = HOST;
@@ -655,6 +666,8 @@ async function prerender() {
       'favicon-16x16.png',
       'favicon-32x32.png',
       'favicon-48x48.png',
+      'favicon-96x96.png',
+      'favicon-144x144.png',
       'apple-touch-icon.png',
       'apple-touch-icon-precomposed.png',
       'android-chrome-192x192.png',

@@ -1,6 +1,9 @@
 # Cloudflare Pages Redirects & Canonical Routing
 /developer        /developers   301
 /developer/*      /developers/:splat 301
+/faqs             /faq          301
+/video            /videos       301
+/video/*          /videos/:splat 301
 /blogs/*          /             301
 /blog/*           /             301
 /blogs            /             301

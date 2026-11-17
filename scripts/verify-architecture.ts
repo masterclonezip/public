@@ -619,6 +619,77 @@ async function verifyModulesAndLiveServer() {
       hostWwwTest && hostAdminTest && hostHttpTest && canonicalWwwTest && domainNormTest && zeroWwwInGeneratedSitemaps && zeroWwwInDistSitemaps && zeroLegacyHistoryInDist && middlewareRewritesXmlAndHtml,
       `HostNorm(www/admin/http): ${hostWwwTest && hostAdminTest && hostHttpTest}, CanonicalNorm: ${canonicalWwwTest && domainNormTest}, ZeroWwwSitemaps: ${zeroWwwInGeneratedSitemaps && zeroWwwInDistSitemaps}, ZeroLegacyCloneHistory: ${zeroLegacyHistoryInDist}, EdgeMiddleware: ${middlewareRewritesXmlAndHtml}`
     );
+
+    // 8c. Zero Cloaking (Zero sr-only Hidden Links/Headings), 1:1 Route Parity & Outer CSS Layer Verification
+    const { getPagePreRender } = await import('../src/seo/preRenderEngine');
+    const mockCatalog30 = Array.from({ length: 30 }, (_, idx) => ({
+      id: `app-${idx + 1}`,
+      slug: `app-${idx + 1}`,
+      name: `Verified App ${idx + 1}`,
+      category: idx % 2 === 0 ? 'Games' : 'Entertainment',
+      rating: 4.8,
+      version: '1.0.0',
+      size: '45 MB',
+      is_new: idx < 5,
+      sync_to_public: true
+    }));
+    const mockData30 = {
+      apps: mockCatalog30,
+      settings: {
+        site_title: 'Test Platform',
+        categories: ['All Apps', 'Top Charts', 'Categories', 'Games', 'Entertainment'],
+        hero_title_visible: false,
+        hero_title_text: ''
+      },
+      news: [],
+      videos: []
+    };
+    const ssrHome30 = await getPagePreRender('/', mockData30);
+    const ssrNewApps30 = await getPagePreRender('/new-apps', mockData30);
+    const ssrCategories30 = await getPagePreRender('/categories', mockData30);
+    const ssrCatGames30 = await getPagePreRender('/category/games', mockData30);
+    const ssrAppDetail30 = await getPagePreRender('/app/app-1', mockData30);
+
+    const zeroCloakingSrOnly =
+      !/class="sr-only"/i.test(ssrHome30) &&
+      !/class="sr-only"/i.test(ssrNewApps30) &&
+      !/class="sr-only"/i.test(ssrCategories30) &&
+      !/class="sr-only"/i.test(ssrCatGames30) &&
+      !/class="sr-only"/i.test(ssrAppDetail30) &&
+      !/class="sr-only"/i.test(homeDistHtml);
+
+    const similarCatLinkAndIconsOk =
+      ssrAppDetail30.includes('title="Browse Games category on storefront">Games</a>') &&
+      ssrAppDetail30.includes('w-[72px] h-[72px] xs:w-[80px] xs:h-[80px]') &&
+      ssrAppDetail30.includes('w-[60px] h-[60px] xxs:w-[66px] xxs:h-[66px] xs:w-[72px] xs:h-[72px] sm:w-[84px] sm:h-[84px]');
+
+    const visibleDirectoryParityOk =
+      ssrHome30.includes('aria-label="Complete Application Directory"') &&
+      ssrHome30.includes('More Applications in Catalog (6)') &&
+      ssrHome30.includes('/app/app-30') &&
+      ssrCategories30.includes('href="/category/games"') &&
+      ssrNewApps30.includes('Verified App 1') &&
+      similarCatLinkAndIconsOk;
+
+    const cssLinkIdx = homeDistHtml.indexOf('id="vite-inline-css"');
+    const moduleScriptIdx = homeDistHtml.indexOf('<script type="module"');
+    const criticalStyleMatch = homeDistHtml.match(/<style id="server-critical-css">([\s\S]*?)<\/style>/i);
+    const criticalCssBytes = criticalStyleMatch ? Buffer.byteLength(criticalStyleMatch[1], 'utf8') : 999999;
+    const homeDistBytes = Buffer.byteLength(homeDistHtml, 'utf8');
+    const outerCssLayerOk =
+      cssLinkIdx !== -1 &&
+      moduleScriptIdx !== -1 &&
+      cssLinkIdx < moduleScriptIdx &&
+      criticalCssBytes > 200 &&
+      criticalCssBytes < 5000 &&
+      homeDistBytes < 100000;
+
+    record(
+      'SSR-PARITY-CSS',
+      'Zero Cloaking (No sr-only Links/Headings), 1:1 Route SSR Parity, Similar Category Link & Lean Outer CSS Layer',
+      zeroCloakingSrOnly && visibleDirectoryParityOk && outerCssLayerOk,
+      `ZeroSrOnlyCloaking: ${zeroCloakingSrOnly}, VisibleDirectory30Apps: ${visibleDirectoryParityOk}, SimilarCatLink+Icons: ${similarCatLinkAndIconsOk}, OuterCssBeforeJS: ${cssLinkIdx < moduleScriptIdx}, CriticalCssBytes: ${criticalCssBytes}B, DistIndexHtml: ${(homeDistBytes / 1024).toFixed(1)}KB`
+    );
   } catch (isoErr: any) {
     record('SEO-ISOLATION-1..8', 'Zero /moreinfo Leak & Attribution Isolation', false, isoErr?.message || String(isoErr));
   }

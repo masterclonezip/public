@@ -31,7 +31,7 @@ async function startServer() {
         scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://challenges.cloudflare.com", "https://res.cloudinary.com", "https://static.cloudflareinsights.com"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
-        imgSrc: ["'self'", "data:", "blob:", "https://res.cloudinary.com", "https://i.ytimg.com", "https://img.youtube.com", "https://*.googleusercontent.com", "https://challenges.cloudflare.com"],
+        imgSrc: ["'self'", "data:", "blob:", "https:"],
         mediaSrc: ["'self'", "blob:", "https://res.cloudinary.com"],
         frameSrc: ["'self'", "https://challenges.cloudflare.com", "https://www.youtube-nocookie.com", "https://www.youtube.com"],
         connectSrc: ["'self'", "https://api.github.com", "https://res.cloudinary.com", "https://api.cloudinary.com", "https://challenges.cloudflare.com", "https://firestore.googleapis.com", "https://*.firebaseio.com", "https://identitytoolkit.googleapis.com", "https://cloudflareinsights.com", "https://generativelanguage.googleapis.com"],

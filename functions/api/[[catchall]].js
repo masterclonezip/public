@@ -749,67 +749,82 @@ export async function onRequest(context) {
     let videos = Array.isArray(staticData?.videos) ? [...staticData.videos] : [];
 
     const cfg = getEdgeFirestoreConfig();
-    if (cfg.configured && apps.length === 0) {
+    if (cfg.configured) {
       try {
-        const [c0, c1, c2, setDoc, pubSetDoc, secDoc] = await Promise.all([
-          edgeReadDoc('store_data', 'apps_chunk_0').catch(() => ({ exists: false, data: null })),
-          edgeReadDoc('store_data', 'apps_chunk_1').catch(() => ({ exists: false, data: null })),
-          edgeReadDoc('store_data', 'apps_chunk_2').catch(() => ({ exists: false, data: null })),
+        const readAppsFromFirestore = apps.length === 0;
+        const [setDoc, pubSetDoc, c0, c1, c2, secDoc] = await Promise.all([
           edgeReadDoc('store_data', 'settings').catch(() => ({ exists: false, data: null })),
           edgeReadDoc('store_data', 'public_settings').catch(() => ({ exists: false, data: null })),
-          edgeReadDoc('store_data', 'secure_links').catch(() => ({ exists: false, data: null })),
+          readAppsFromFirestore ? edgeReadDoc('store_data', 'apps_chunk_0').catch(() => ({ exists: false, data: null })) : Promise.resolve({ exists: false, data: null }),
+          readAppsFromFirestore ? edgeReadDoc('store_data', 'apps_chunk_1').catch(() => ({ exists: false, data: null })) : Promise.resolve({ exists: false, data: null }),
+          readAppsFromFirestore ? edgeReadDoc('store_data', 'apps_chunk_2').catch(() => ({ exists: false, data: null })) : Promise.resolve({ exists: false, data: null }),
+          readAppsFromFirestore ? edgeReadDoc('store_data', 'secure_links').catch(() => ({ exists: false, data: null })) : Promise.resolve({ exists: false, data: null }),
         ]);
 
-        const fsApps = [];
-        for (const chunk of [c0, c1, c2]) {
-          if (chunk?.exists && Array.isArray(chunk.data?.items)) {
-            fsApps.push(...chunk.data.items);
+        const mergeDefinedSettings = (base, incoming) => {
+          if (!incoming || typeof incoming !== 'object') return base;
+          const next = { ...base };
+          for (const [k, v] of Object.entries(incoming)) {
+            if (v !== undefined && v !== null && v !== '') {
+              next[k] = v;
+            }
           }
-        }
-        if (fsApps.length > 0) {
-          apps = fsApps.filter(isEdgePublicReadyApp);
-        }
+          return next;
+        };
+
         if (pubSetDoc?.exists && pubSetDoc.data) {
-          settings = { ...settings, ...pubSetDoc.data };
+          settings = mergeDefinedSettings(settings, pubSetDoc.data);
         }
         if (setDoc?.exists && setDoc.data) {
-          settings = { ...settings, ...setDoc.data };
+          settings = mergeDefinedSettings(settings, setDoc.data);
         }
 
-        // Prime RAM vault links for instant Gate G7 resolution on this isolate
-        if (secDoc?.exists && secDoc.data) {
-          const secItems = Array.isArray(secDoc.data.items)
-            ? secDoc.data.items
-            : secDoc.data.links || secDoc.data;
-          if (Array.isArray(secItems)) {
-            for (const item of secItems) {
-              if (!item || typeof item !== 'object') continue;
-              const rawLink = item.more_information_url || item.download_url || item.link || item.url;
-              if (typeof rawLink === 'string' && isValidDestinationUrl(rawLink)) {
-                if (item.id) setRamVaultLink(String(item.id), rawLink);
-                if (item.slug) setRamVaultLink(String(item.slug), rawLink);
-              }
+        if (readAppsFromFirestore) {
+          const fsApps = [];
+          for (const chunk of [c0, c1, c2]) {
+            if (chunk?.exists && Array.isArray(chunk.data?.items)) {
+              fsApps.push(...chunk.data.items);
             }
-          } else if (secItems && typeof secItems === 'object') {
-            for (const [k, v] of Object.entries(secItems)) {
-              if (typeof v === 'string' && isValidDestinationUrl(v)) {
-                setRamVaultLink(k, v);
+          }
+          if (fsApps.length > 0) {
+            apps = fsApps.filter(isEdgePublicReadyApp);
+          }
+
+          // Prime RAM vault links for instant Gate G7 resolution on this isolate
+          if (secDoc?.exists && secDoc.data) {
+            const secItems = Array.isArray(secDoc.data.items)
+              ? secDoc.data.items
+              : secDoc.data.links || secDoc.data;
+            if (Array.isArray(secItems)) {
+              for (const item of secItems) {
+                if (!item || typeof item !== 'object') continue;
+                const rawLink = item.more_information_url || item.download_url || item.link || item.url;
+                if (typeof rawLink === 'string' && isValidDestinationUrl(rawLink)) {
+                  if (item.id) setRamVaultLink(String(item.id), rawLink);
+                  if (item.slug) setRamVaultLink(String(item.slug), rawLink);
+                }
+              }
+            } else if (secItems && typeof secItems === 'object') {
+              for (const [k, v] of Object.entries(secItems)) {
+                if (typeof v === 'string' && isValidDestinationUrl(v)) {
+                  setRamVaultLink(k, v);
+                }
               }
             }
           }
-        }
 
-        for (const appItem of apps) {
-          if (!appItem || typeof appItem !== 'object') continue;
-          const rawLink =
-            appItem.more_information_url ||
-            appItem.download_url ||
-            appItem.link ||
-            appItem.url;
-          if (typeof rawLink === 'string' && isValidDestinationUrl(rawLink)) {
-            if (appItem.id) setRamVaultLink(String(appItem.id), rawLink);
-            if (appItem.slug) setRamVaultLink(String(appItem.slug), rawLink);
-            if (appItem.serial_number) setRamVaultLink(String(appItem.serial_number), rawLink);
+          for (const appItem of apps) {
+            if (!appItem || typeof appItem !== 'object') continue;
+            const rawLink =
+              appItem.more_information_url ||
+              appItem.download_url ||
+              appItem.link ||
+              appItem.url;
+            if (typeof rawLink === 'string' && isValidDestinationUrl(rawLink)) {
+              if (appItem.id) setRamVaultLink(String(appItem.id), rawLink);
+              if (appItem.slug) setRamVaultLink(String(appItem.slug), rawLink);
+              if (appItem.serial_number) setRamVaultLink(String(appItem.serial_number), rawLink);
+            }
           }
         }
       } catch (_) {}
