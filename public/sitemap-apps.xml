@@ -1,6 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
+    <loc>https://example.com/app/hindi-777</loc>
+    <lastmod>2026-11-17T17:43:05+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794492175/itb4vqa7tsqnk2dshyem.png</image:loc>
+      <image:title>HINDI 777</image:title>
+    </image:image>
+  </url>
+  <url>
     <loc>https://example.com/app/jeet-spin</loc>
     <lastmod>2026-11-16T18:18:15+00:00</lastmod>
     <changefreq>weekly</changefreq>
@@ -98,16 +108,6 @@
     <image:image>
       <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794334898/jjpgzbibh3m8ambfcxdo.webp</image:loc>
       <image:title>DIWA 777</image:title>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://example.com/app/hindi-777</loc>
-    <lastmod>2026-11-12T14:03:33+00:00</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794492175/itb4vqa7tsqnk2dshyem.png</image:loc>
-      <image:title>HINDI 777</image:title>
     </image:image>
   </url>
   <url>
