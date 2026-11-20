@@ -1,23 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
-    <loc>https://example.com/news/yono-slots-guide-rules-game-modes-controls-tips</loc>
-    <lastmod>2026-11-19T18:45:30+00:00</lastmod>
+    <loc>https://example.com/news/jaiho-91-card-game-guide-rules-modes-and-controls</loc>
+    <lastmod>2026-11-20T17:05:35+00:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
     <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1795113287/ycb8qz7ohjstgone0zid.webp</image:loc>
-      <image:title>Yono Slots Guide: Rules, Game Modes, Controls &amp; Tips</image:title>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1795190405/jucpd9aplmarlm3sz5i7.webp</image:loc>
+      <image:title>JAIHO 91 Card Game Guide: Rules, Modes, and Controls</image:title>
     </image:image>
   </url>
   <url>
     <loc>https://example.com/news/yono-rummy-guide-rules-game-modes-and-features</loc>
-    <lastmod>2026-11-19T17:11:05+00:00</lastmod>
+    <lastmod>2026-11-20T16:07:39+00:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
     <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1795107569/vsktletf6pteih1vwmtb.webp</image:loc>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1795190842/sjnv0vwlkkgj8pzq4kfj.webp</image:loc>
       <image:title>Yono Rummy Guide: Rules, Game Modes, and Features</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://example.com/news/yono-slots-guide-rules-game-modes-controls-tips</loc>
+    <lastmod>2026-11-20T16:04:10+00:00</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1795190641/zr7k1raasracbibxhca2.webp</image:loc>
+      <image:title>Yono Slots Guide: Rules, Game Modes, Controls &amp; Tips</image:title>
     </image:image>
   </url>
 </urlset>
