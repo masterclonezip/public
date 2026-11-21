@@ -695,7 +695,7 @@ export default defineConfig(({mode}) => {
     plugins: [react(), tailwindcss(), adminAuthDevPlugin(env)],
     envPrefix: ['VITE_'],
     define: {
-      __ADMIN_ENABLED__: isAdminBuild,
+      __ADMIN_ENABLED__: false,
       __BUNDLED_PUBLIC_REDIRECTS__: JSON.stringify(bundledPublicRedirects),
       __BUNDLED_OPTIONAL_PUBLIC_FILES__: JSON.stringify(bundledOptionalPublicFiles),
       __APP_BUILD_ENV__: JSON.stringify(resolvedBuildEnv),
