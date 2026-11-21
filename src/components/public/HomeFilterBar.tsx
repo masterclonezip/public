@@ -1,3 +1,4 @@
+import React from 'react';
 import { Star, SlidersHorizontal, ChevronDown } from 'lucide-react';
 
 interface HomeFilterBarProps {
@@ -9,7 +10,7 @@ interface HomeFilterBarProps {
   activeTab: string;
 }
 
-export default function HomeFilterBar({
+const HomeFilterBar = React.memo(function HomeFilterBar({
   ratingFilter,
   setRatingFilter,
   sortBy,
@@ -101,4 +102,7 @@ export default function HomeFilterBar({
       </div>
     </div>
   );
-}
+});
+
+export default HomeFilterBar;
+

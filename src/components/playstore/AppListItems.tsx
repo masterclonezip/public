@@ -191,8 +191,8 @@ export const AppListItem = React.memo(({ app, index }: { app: any; index?: numbe
                 alt={`${app.name} app icon`} 
                 width={76}
                 height={76}
-                loading={index !== undefined && index <= 6 ? "eager" : "lazy"}
-                fetchPriority={index !== undefined && index <= 6 ? "high" : "low"}
+                loading={index !== undefined && index <= 4 ? "eager" : "lazy"}
+                {...(index !== undefined && index <= 4 ? {} : { fetchPriority: "low" as const })}
                 decoding="async"
                 className="w-full h-full object-cover block"
                 onError={(e) => {
@@ -281,12 +281,12 @@ export const TopChartItem = React.memo(({ rank, app }: { rank: number; app: any 
           <div className="w-full h-full rounded-[14px] xs:rounded-[16px] sm:rounded-[20px] overflow-hidden bg-zinc-100 dark:bg-zinc-800 shadow-sm border border-black/5 dark:border-white/10 relative z-10 transition-transform group-hover:-translate-y-0.5 duration-300 flex items-center justify-center">
             {!iconFailed && app.icon_url ? (
               <img 
-                src={getOptimizedImageUrl(app.icon_url, 180)} 
+                src={getOptimizedImageUrl(app.icon_url, 120)} 
                 alt={`${app.name} app icon`} 
                 width={76}
                 height={76}
-                loading={rank <= 8 ? "eager" : "lazy"}
-                fetchPriority={rank <= 8 ? "high" : "low"}
+                loading={rank <= 4 ? "eager" : "lazy"}
+                {...(rank <= 4 ? {} : { fetchPriority: "low" as const })}
                 decoding="async"
                 className="w-full h-full object-cover block"
                 onError={(e) => {

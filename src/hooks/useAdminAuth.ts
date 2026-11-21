@@ -82,12 +82,12 @@ export const useAdminAuth = () => {
           setIsAdminUser(true);
           setCheckingAuth(false);
         }
-        // Background check with server (only invalidate if server explicitly says 403)
+        // Background check with server (invalidate if server rejects token with 401 or 403)
         try {
           const verifyRes = await adminFetch('/api/v1/admin/verify', {
             headers: { Authorization: `Bearer ${token}` }
           });
-          if (verifyRes.status === 403 && isMounted) {
+          if ((verifyRes.status === 401 || verifyRes.status === 403) && isMounted) {
             clearSession();
             setUser(null);
             setIsAdminUser(false);
@@ -115,23 +115,9 @@ export const useAdminAuth = () => {
         setUser(effectiveUser);
         setIsAdminUser(true);
       } else {
-        const userEmail = (effectiveUser.email || currentSession?.email || '').toLowerCase().trim();
-        const configuredEmail = (
-          (typeof process !== 'undefined' && process.env?.VITE_ADMIN_EMAIL) ||
-          (typeof process !== 'undefined' && process.env?.ADMIN_EMAIL) ||
-          import.meta.env?.VITE_ADMIN_EMAIL ||
-          import.meta.env?.ADMIN_EMAIL ||
-          ''
-        ).toLowerCase().trim();
-
-        if ((configuredEmail && userEmail && userEmail === configuredEmail) || token.startsWith('adm_v1.') || token.startsWith('U2FsdGVkX1')) {
-          setUser(effectiveUser);
-          setIsAdminUser(true);
-        } else {
-          clearSession();
-          setUser(null);
-          setIsAdminUser(false);
-        }
+        clearSession();
+        setUser(null);
+        setIsAdminUser(false);
       }
       setCheckingAuth(false);
     };

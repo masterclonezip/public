@@ -19,8 +19,15 @@ export function PublicHeader() {
   const [searchOpen, setSearchOpen] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const { scrolled } = useScrollDirection();
+  const [logoErrorStage, setLogoErrorStage] = useState<0 | 1 | 2>(0);
 
   const resolvedLogoUrl = resolveSiteLogoUrl(settings);
+  useEffect(() => {
+    setLogoErrorStage(0);
+  }, [resolvedLogoUrl]);
+
+  const optimizedLogoUrl = resolvedLogoUrl ? getSizedLogoUrl(resolvedLogoUrl, 240, 'auto', 'c_fit') : '';
+  const activeLogoSrc = logoErrorStage === 0 ? optimizedLogoUrl : resolvedLogoUrl;
   const triggerHaptic = () => {
     if (window.navigator && window.navigator.vibrate) {
       setTimeout(() => {
@@ -98,16 +105,19 @@ export function PublicHeader() {
         <div className="w-full max-w-7xl px-2.5 sm:px-6 lg:px-8 mx-auto relative flex justify-between items-center gap-2">
           <Link to="/" onClick={triggerHaptic} className="flex items-center gap-2 sm:gap-3 group min-w-0">
             <div className="p-0 transition-transform group-hover:scale-[1.03] duration-300 shrink-0">
-              {resolvedLogoUrl ? (
+              {activeLogoSrc && logoErrorStage < 2 ? (
                 <img 
-                  src={getSizedLogoUrl(resolvedLogoUrl, 240, 'auto', 'c_fit')} 
+                  src={activeLogoSrc} 
                   width={40} 
                   height={40} 
                   loading="eager" 
                   fetchPriority="high" 
                   decoding="async" 
                   className="w-9 h-9 sm:w-10 sm:h-10 object-contain drop-shadow-sm" 
-                  alt={`${settings.site_title || 'Official'} Logo`} 
+                  alt={`${settings.site_title || 'Official'} Logo`}
+                  onError={() => {
+                    setLogoErrorStage(prev => (prev === 0 && optimizedLogoUrl !== resolvedLogoUrl ? 1 : 2));
+                  }}
                 />
               ) : (
                 <div className="w-9 h-9 sm:w-10 sm:h-10 bg-blue-500 rounded-xl flex items-center justify-center text-white font-semibold text-sm sm:text-base">

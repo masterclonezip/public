@@ -114,17 +114,21 @@ function ensureServerLedgerLoaded(): Map<string, AdminReviewItem> {
   return serverReviewsMap;
 }
 
-function persistServerLedgerAndStaticBundles() {
+let cachedComputedLedger: {
+  allReviews: AdminReviewItem[];
+  staticBundle: Record<string, any[]>;
+  catalogStatsPayload: any;
+  computedAt: number;
+} | null = null;
+
+function computeServerLedgerStats(forceRecompute = false) {
+  if (!forceRecompute && cachedComputedLedger && Date.now() - cachedComputedLedger.computedAt < 10_000) {
+    return cachedComputedLedger;
+  }
+
   const map = ensureServerLedgerLoaded();
   const catalogApps = getServerCatalogApps();
   const allReviews = Array.from(map.values()).map(r => normalizeAdminReviewRecord(r, catalogApps));
-
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(PERSISTENT_LEDGER_FILE, JSON.stringify(allReviews, null, 2), 'utf8');
-  } catch (_) {}
 
   // Build static reviews bundle (published only, grouped by canonical slug and id)
   const staticBundle: Record<string, any[]> = {};
@@ -261,15 +265,35 @@ function persistServerLedgerAndStaticBundles() {
     appCounts
   };
 
+  const result = {
+    allReviews: validAllReviews,
+    staticBundle,
+    catalogStatsPayload,
+    computedAt: Date.now()
+  };
+  cachedComputedLedger = result;
+  return result;
+}
+
+function persistServerLedgerAndStaticBundles() {
+  const computed = computeServerLedgerStats(true);
+
   try {
-    fs.writeFileSync(STATIC_REVIEWS_FILE, JSON.stringify(staticBundle), 'utf8');
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    fs.writeFileSync(PERSISTENT_LEDGER_FILE, JSON.stringify(computed.allReviews, null, 2), 'utf8');
   } catch (_) {}
 
   try {
-    fs.writeFileSync(CATALOG_STATS_FILE, JSON.stringify(catalogStatsPayload, null, 2), 'utf8');
+    fs.writeFileSync(STATIC_REVIEWS_FILE, JSON.stringify(computed.staticBundle), 'utf8');
   } catch (_) {}
 
-  return { allReviews: validAllReviews, staticBundle, catalogStatsPayload };
+  try {
+    fs.writeFileSync(CATALOG_STATS_FILE, JSON.stringify(computed.catalogStatsPayload, null, 2), 'utf8');
+  } catch (_) {}
+
+  return computed;
 }
 
 // ============================================================================
@@ -449,8 +473,8 @@ communityRouter.get('/api/v1/public/community/reviews', async (req, res) => {
   try {
     const appId = String(req.query.appId || req.query.id || '').trim();
     const appSlug = String(req.query.appSlug || req.query.slug || '').trim();
-    const limit = Math.max(1, Number(req.query.limit) || 15);
-    const cursor = req.query.cursor ? parseInt(String(req.query.cursor), 10) || 0 : 0;
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 15));
+    const cursor = Math.max(0, req.query.cursor ? parseInt(String(req.query.cursor), 10) || 0 : 0);
     const filter = String(req.query.filter || 'all').toLowerCase();
     const sortBy = String(req.query.sortBy || 'recent').toLowerCase();
 
@@ -506,7 +530,7 @@ communityRouter.get('/api/v1/public/community/reviews', async (req, res) => {
 communityRouter.get('/api/v1/public/community/stats/:appId', async (req, res) => {
   try {
     const rawId = String(req.params.appId || '').trim();
-    const { catalogStatsPayload } = persistServerLedgerAndStaticBundles();
+    const { catalogStatsPayload } = computeServerLedgerStats();
     const catalogApps = getServerCatalogApps();
     const meta = resolveCanonicalAppMeta(rawId, rawId, '', catalogApps);
     const stat =
@@ -547,12 +571,37 @@ communityRouter.get('/api/v1/public/community/stats/:appId', async (req, res) =>
 
 communityRouter.post('/api/v1/public/community/reviews', async (req, res) => {
   try {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const appId = String(body.appId || body.app_id || '').trim().slice(0, 120);
+    const appSlug = String(body.appSlug || body.app_slug || '').trim().slice(0, 140);
+    const appName = String(body.appName || body.app_name || '').trim().slice(0, 160);
+    const userName = String(body.userName || body.username || 'Player').trim().slice(0, 80) || 'Player';
+    const reviewText = String(body.reviewText || body.comment || '').trim().slice(0, 2000);
+    const ratingNum = Math.max(1, Math.min(5, Math.round(Number(body.rating) || 5)));
+
+    if (!appId && !appSlug) {
+      return res.status(400).json({ success: false, error: 'Application identifier is required.' });
+    }
+    if (!reviewText) {
+      return res.status(400).json({ success: false, error: 'Review text cannot be empty.' });
+    }
+
     const catalogApps = getServerCatalogApps();
     const ledger = ensureServerLedgerLoaded();
     const record = normalizeAdminReviewRecord({
-      ...req.body,
+      appId,
+      appSlug,
+      appName,
+      userName,
+      rating: ratingNum,
+      reviewText,
       status: 'published',
       source: 'community',
+      isPinned: false,
+      helpful_count: 0,
+      reported: false,
+      report_count: 0,
+      adminReply: null,
       timestamp: new Date().toISOString()
     }, catalogApps);
     ledger.set(record.id, record);
@@ -602,7 +651,7 @@ communityRouter.post('/api/v1/public/community/reviews/report', async (req, res)
 
 communityRouter.get('/api/v1/admin/community/ledger', async (_req, res) => {
   try {
-    const { allReviews, catalogStatsPayload } = persistServerLedgerAndStaticBundles();
+    const { allReviews, catalogStatsPayload } = computeServerLedgerStats();
     res.json({
       success: true,
       reviews: allReviews,
@@ -621,11 +670,11 @@ communityRouter.get('/api/v1/admin/community/reviews', async (req, res) => {
     const search = req.query.search ? String(req.query.search).trim().toLowerCase() : '';
     const sortBy = req.query.sortBy ? String(req.query.sortBy).trim() : 'newest';
     const isPinned = req.query.isPinned !== undefined ? String(req.query.isPinned) : undefined;
-    const limit = Math.max(1, Number(req.query.limit) || 25);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 25));
     const page = Math.max(1, Number(req.query.page) || 1);
 
     const catalogApps = getServerCatalogApps();
-    const { allReviews, catalogStatsPayload } = persistServerLedgerAndStaticBundles();
+    const { allReviews, catalogStatsPayload } = computeServerLedgerStats();
 
     const isAll = !appIdParam || appIdParam.toLowerCase() === 'all';
     const targetMeta = !isAll ? resolveCanonicalAppMeta(appIdParam, appIdParam, '', catalogApps) : null;
@@ -897,7 +946,7 @@ communityRouter.get(['/api/v1/admin/community/health/ping', '/api/v1/public/comm
 
 communityRouter.get('/api/v1/admin/community/app-counts', async (_req, res) => {
   try {
-    const { catalogStatsPayload } = persistServerLedgerAndStaticBundles();
+    const { catalogStatsPayload } = computeServerLedgerStats();
     res.json({
       globalStats: {
         total: catalogStatsPayload.totalReviews,
@@ -918,7 +967,7 @@ communityRouter.get('/api/v1/admin/community/app-counts', async (_req, res) => {
 
 communityRouter.get('/api/v1/admin/community/overview', async (_req, res) => {
   try {
-    const { catalogStatsPayload } = persistServerLedgerAndStaticBundles();
+    const { catalogStatsPayload } = computeServerLedgerStats();
     const communityProjectId = process.env.COMMUNITY_FIREBASE_PROJECT_ID || process.env.VITE_COMMUNITY_FIREBASE_PROJECT_ID || '';
     res.json({
       success: true,
@@ -945,7 +994,7 @@ communityRouter.get('/api/v1/admin/community/overview', async (_req, res) => {
 
 communityRouter.get('/api/v1/admin/community/export-stats', async (_req, res) => {
   try {
-    const { catalogStatsPayload } = persistServerLedgerAndStaticBundles();
+    const { catalogStatsPayload } = computeServerLedgerStats();
     res.json({ success: true, stats: catalogStatsPayload });
   } catch (_) {
     res.json({ success: true, stats: { appCounts: {}, totalReviews: 0 } });
@@ -954,7 +1003,7 @@ communityRouter.get('/api/v1/admin/community/export-stats', async (_req, res) =>
 
 communityRouter.get('/api/v1/admin/community/export-static-reviews', async (_req, res) => {
   try {
-    const { staticBundle } = persistServerLedgerAndStaticBundles();
+    const { staticBundle } = computeServerLedgerStats();
     res.json({ success: true, reviews: staticBundle });
   } catch (_) {
     res.json({ success: true, reviews: {} });

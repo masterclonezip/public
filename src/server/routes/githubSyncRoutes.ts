@@ -2,6 +2,7 @@ import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { getAllSiteIconUrls, isPngBytes, wrapPngsInIco } from '../../seo/utils';
+import { isSafeExternalHttpUrl } from '../security/urlGuard';
 
 export const githubSyncRouter = Router();
 
@@ -43,6 +44,7 @@ githubSyncRouter.get('/api/github-sync/public-core-files', (req, res) => {
       'src/server/crypto.ts',
       'src/server/services/linkService.ts',
       'src/server/security/gateCore.ts',
+      'src/server/security/urlGuard.ts',
       'src/server/routes/securityRoutes.ts',
       'src/server/routes/publicApiRoutes.ts',
       'src/server/routes/seoRoutes.ts',
@@ -181,29 +183,6 @@ githubSyncRouter.post('/api/github-sync/materialize-icons', async (req, res) => 
       return res.json({ success: true, files: [] });
     }
 
-    const isSafeRemoteUrl = (rawUrl: string): boolean => {
-      try {
-        const u = new URL(rawUrl);
-        if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
-        const h = u.hostname.toLowerCase();
-        if (
-          h === 'localhost' ||
-          h === '127.0.0.1' ||
-          h === '0.0.0.0' ||
-          h.startsWith('10.') ||
-          h.startsWith('192.168.') ||
-          /^172\.(1[6-9]|2\d|3[0-1])\./.test(h) ||
-          h.endsWith('.local') ||
-          h.endsWith('.internal')
-        ) {
-          return false;
-        }
-        return true;
-      } catch {
-        return false;
-      }
-    };
-
     const iconTargets: Array<{ size: number; url: string; paths: string[] }> = [
       { size: 16, url: icons.favicon16, paths: ['public/favicon-16x16.png'] },
       { size: 32, url: icons.favicon32, paths: ['public/favicon-32x32.png'] },
@@ -220,7 +199,7 @@ githubSyncRouter.post('/api/github-sync/materialize-icons', async (req, res) => 
 
     await Promise.all(
       iconTargets.map(async ({ size, url, paths }) => {
-        if (!url || !isSafeRemoteUrl(url)) return;
+        if (!url || !isSafeExternalHttpUrl(url)) return;
         try {
           const upstream = await fetch(url, { signal: AbortSignal.timeout(8000) });
           if (!upstream.ok) return;

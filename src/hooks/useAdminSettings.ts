@@ -17,6 +17,12 @@ export const useAdminSettings = (settings: any, news: any[], videos: any[]) => {
   const deletedVideoIdsRef = useRef(new Set<string>());
   const deletedCategoryNamesRef = useRef(new Set<string>());
 
+  const prevBannersSigRef = useRef<string>('');
+  const prevCategoriesSigRef = useRef<string>('');
+  const prevQuickLinksSigRef = useRef<string>('');
+  const prevFaqsSigRef = useRef<string>('');
+  const prevDevelopersSigRef = useRef<string>('');
+
   // Synchronize news directly when fresh server data arrives
   useEffect(() => {
     if (Array.isArray(news)) {
@@ -73,23 +79,44 @@ export const useAdminSettings = (settings: any, news: any[], videos: any[]) => {
     }
   }, [videos, settings?.site_title]);
 
-  // Synchronize settings (banners, categories, faqs, quicklinks, developers)
+  // Synchronize settings per-section only when that specific section changes in settings,
+  // preserving any in-progress unsaved edits in other tabs.
   useEffect(() => {
     if (settings && typeof settings === 'object') {
       if (Array.isArray(settings.banners)) {
-        setBanners(settings.banners.filter((b: any) => !deletedBannerIdsRef.current.has(b.id)));
+        const sig = JSON.stringify(settings.banners);
+        if (sig !== prevBannersSigRef.current) {
+          prevBannersSigRef.current = sig;
+          setBanners(settings.banners.filter((b: any) => !deletedBannerIdsRef.current.has(b.id)));
+        }
       }
       if (Array.isArray(settings.categories)) {
-        setCategoriesList(settings.categories.filter((c: string) => !deletedCategoryNamesRef.current.has(c)));
+        const sig = JSON.stringify(settings.categories);
+        if (sig !== prevCategoriesSigRef.current) {
+          prevCategoriesSigRef.current = sig;
+          setCategoriesList(settings.categories.filter((c: string) => !deletedCategoryNamesRef.current.has(c)));
+        }
       }
       if (Array.isArray(settings.quick_links)) {
-        setQuickLinksList(settings.quick_links);
+        const sig = JSON.stringify(settings.quick_links);
+        if (sig !== prevQuickLinksSigRef.current) {
+          prevQuickLinksSigRef.current = sig;
+          setQuickLinksList(settings.quick_links);
+        }
       }
       if (Array.isArray(settings.website_faqs)) {
-        setWebsiteFaqsList(settings.website_faqs);
+        const sig = JSON.stringify(settings.website_faqs);
+        if (sig !== prevFaqsSigRef.current) {
+          prevFaqsSigRef.current = sig;
+          setWebsiteFaqsList(settings.website_faqs);
+        }
       }
       if (Array.isArray(settings.developers)) {
-        setDevelopersList(settings.developers);
+        const sig = JSON.stringify(settings.developers);
+        if (sig !== prevDevelopersSigRef.current) {
+          prevDevelopersSigRef.current = sig;
+          setDevelopersList(settings.developers);
+        }
       }
     }
   }, [settings]);
@@ -104,7 +131,7 @@ export const useAdminSettings = (settings: any, news: any[], videos: any[]) => {
       image: '',
       link: '/'
     };
-    setBanners(prev => [...prev, newBanner]);
+    setBanners(prev => [newBanner, ...prev]);
   };
 
   const handleBannerChange = (id: string, field: string, value: string) => {
@@ -205,8 +232,11 @@ export const useAdminSettings = (settings: any, news: any[], videos: any[]) => {
   // Categories
   const handleAddCategory = () => {
     const trimmed = newCatInput.trim();
-    if (trimmed && !categoriesList.includes(trimmed)) {
-      setCategoriesList(prev => [...prev, trimmed]);
+    if (trimmed) {
+      deletedCategoryNamesRef.current.delete(trimmed);
+      if (!categoriesList.includes(trimmed)) {
+        setCategoriesList(prev => [...prev, trimmed]);
+      }
       setNewCatInput('');
     }
   };
@@ -219,7 +249,7 @@ export const useAdminSettings = (settings: any, news: any[], videos: any[]) => {
   // Videos
   const handleAddVideo = () => {
     const newId = Math.random().toString(36).substr(2, 9);
-    setVideosList(prev => [...prev, {
+    setVideosList(prev => [{
       id: newId,
       slug: `video-${newId}`,
       title: 'New Video',
@@ -231,7 +261,8 @@ export const useAdminSettings = (settings: any, news: any[], videos: any[]) => {
       seo_description: '',
       seo_keywords: '',
       created_at: new Date().toISOString()
-    }]);
+    }, ...prev]);
+    return newId;
   };
 
   const handleDeleteVideo = (id: string) => {
@@ -246,10 +277,13 @@ export const useAdminSettings = (settings: any, news: any[], videos: any[]) => {
       if (field === 'title' && (!v.slug || v.slug.startsWith('video-') || v.slug === 'new-video')) {
         updated.slug = value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
       }
-      if (field === 'youtube_url') {
-        updated.url = value;
-      } else if (field === 'url') {
+      if (field === 'youtube_url' || field === 'url') {
         updated.youtube_url = value;
+        updated.url = value;
+        const videoIdMatch = String(value || '').match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|shorts\/|watch\?v=|watch\?.+&v=))([^&?/]+)/);
+        if (videoIdMatch && videoIdMatch[1]) {
+          updated.thumbnail = `https://img.youtube.com/vi/${videoIdMatch[1]}/hqdefault.jpg`;
+        }
       }
       if (field === 'seo_title') {
         updated.meta_title = value;
@@ -267,7 +301,7 @@ export const useAdminSettings = (settings: any, news: any[], videos: any[]) => {
 
   // Website FAQs
   const handleAddWebsiteFaq = () => {
-    setWebsiteFaqsList(prev => [...prev, { question: 'New Question', answer: 'New Answer' }]);
+    setWebsiteFaqsList(prev => [{ question: 'New Question', answer: 'New Answer' }, ...prev]);
   };
 
   const handleRemoveWebsiteFaq = (index: number) => {
@@ -288,7 +322,7 @@ export const useAdminSettings = (settings: any, news: any[], videos: any[]) => {
 
   // Quick Links
   const handleAddQuickLink = () => {
-    setQuickLinksList(prev => [...prev, { title: 'New Link', subtitle: 'Description', icon: 'compass', color: 'blue', url: '/' }]);
+    setQuickLinksList(prev => [{ title: 'New Link', subtitle: 'Description', icon: 'compass', color: 'blue', url: '/' }, ...prev]);
   };
 
   const handleRemoveQuickLink = (index: number) => {
@@ -309,7 +343,7 @@ export const useAdminSettings = (settings: any, news: any[], videos: any[]) => {
 
   // Developers
   const handleAddDeveloper = () => {
-    setDevelopersList(prev => [...prev, { name: 'New Developer', role: 'Role', image_url: '', github: '', twitter: '', bio: '' }]);
+    setDevelopersList(prev => [{ name: 'New Developer', role: 'Role', image_url: '', github: '', twitter: '', bio: '' }, ...prev]);
   };
 
   const handleRemoveDeveloper = (index: number) => {

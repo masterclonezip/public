@@ -1,10 +1,14 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { safeDecrypt } from '../lib/cryptoUtils';
 import { mockApps } from '../lib/staticData';
 import { formatPageTitle } from '../lib/seoUtils';
 
+const toSlug = (str: string) =>
+  String(str || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
 export const useAppForm = (editApp: any, editingAppId: string | null, appsList: any[], categories: string[]) => {
   const prevEditingIdRef = useRef<string | null>(null);
+  const slugManuallyEditedRef = useRef<boolean>(false);
 
   const [formFields, setFormFields] = useState<any>({
     name: '',
@@ -50,6 +54,7 @@ export const useAppForm = (editApp: any, editingAppId: string | null, appsList: 
     // Only re-populate form fields when the user actively selects a DIFFERENT app or switches to new app mode
     if (prevEditingIdRef.current !== editingAppId) {
       prevEditingIdRef.current = editingAppId;
+      slugManuallyEditedRef.current = editingAppId !== '';
 
       if (editingAppId !== null && editingAppId !== '') {
         const rawSeoTitle = (editApp?.seo_title || editApp?.meta_title || '').trim();
@@ -164,11 +169,24 @@ export const useAppForm = (editApp: any, editingAppId: string | null, appsList: 
     }
   }, [editingAppId, editApp, categories, appsList.length]);
 
-  const handleFieldChange = (field: string, value: any) => {
-    setFormFields((prev: any) => ({ ...prev, [field]: value }));
-  };
+  const handleFieldChange = useCallback((field: string, value: any) => {
+    if (field === 'slug') {
+      slugManuallyEditedRef.current = Boolean(String(value || '').trim());
+    }
+    setFormFields((prev: any) => {
+      const next = { ...prev, [field]: value };
+      if (
+        field === 'name' &&
+        !slugManuallyEditedRef.current &&
+        (!prev.slug || prev.slug === toSlug(prev.name))
+      ) {
+        next.slug = toSlug(value);
+      }
+      return next;
+    });
+  }, []);
 
-  const handleQuickClean = () => {
+  const handleQuickClean = useCallback(() => {
     setFormFields((prev: any) => ({
       ...prev,
       seo_title: '',
@@ -190,7 +208,7 @@ export const useAppForm = (editApp: any, editingAppId: string | null, appsList: 
       faqs: [],
       screenshots: [],
     }));
-  };
+  }, []);
 
   return {
     formFields,

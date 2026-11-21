@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { AppConfig, GlobalSettings, NewsItem, VideoItem } from '../types';
 import { adminFetch } from '../services/adminAuthService';
 import { writeFirestoreDoc, deleteFirestoreDoc, hydrateFirebaseRuntimeConfig } from '../lib/firebase';
@@ -35,9 +35,19 @@ export function useDataActions(
   setVideos: React.Dispatch<React.SetStateAction<VideoItem[]>>,
   getAdminToken: () => Promise<string>
 ) {
+  const appsRef = useRef<AppConfig[]>(apps);
+  const settingsRef = useRef<GlobalSettings>(settings);
+  const newsRef = useRef<NewsItem[]>(news);
+  const videosRef = useRef<VideoItem[]>(videos);
+
+  useEffect(() => { appsRef.current = apps; }, [apps]);
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
+  useEffect(() => { newsRef.current = news; }, [news]);
+  useEffect(() => { videosRef.current = videos; }, [videos]);
 
   const saveAppSingle = useCallback(async (singleApp: any) => {
-    const brand = settings?.site_title || '';
+    const currentApps = appsRef.current || [];
+    const brand = settingsRef.current?.site_title || '';
     const rawTitle = (singleApp.seo_title || singleApp.meta_title || '').trim();
     const exactAdminTitle = rawTitle ? formatPageTitle(rawTitle, '', brand) : '';
     const nowIso = new Date().toISOString();
@@ -66,8 +76,8 @@ export function useDataActions(
 
     // Precompute the single affected chunk (0 reads, 1 chunk write)
     const chunkSize = 25;
-    const prevNumChunks = Math.max(1, Math.ceil(apps.length / chunkSize));
-    const nextApps = [...apps];
+    const prevNumChunks = Math.max(1, Math.ceil(currentApps.length / chunkSize));
+    const nextApps = [...currentApps];
     let targetIdx = nextApps.findIndex(a => a.id === savedApp.id || (savedApp.slug && a.slug === savedApp.slug));
     const isNewApp = targetIdx < 0;
     if (targetIdx >= 0) {
@@ -80,7 +90,8 @@ export function useDataActions(
     const targetChunkIdx = Math.floor(targetIdx / chunkSize);
     const slice = nextApps.slice(targetChunkIdx * chunkSize, (targetChunkIdx + 1) * chunkSize);
 
-    // Update UI state immediately for zero perceived lag
+    // Update ref and UI state immediately for zero perceived lag and concurrent-save safety
+    appsRef.current = nextApps;
     setApps(nextApps);
 
     // Run targeted 1-chunk Firestore write and single-app server endpoint in PARALLEL
@@ -95,7 +106,7 @@ export function useDataActions(
             updatedAt: nowIso,
             _rest_admin_bypass: ADMIN_BYPASS_KEY
           });
-          if (isNewApp || numChunks !== prevNumChunks || apps.length <= 1) {
+          if (isNewApp || numChunks !== prevNumChunks || currentApps.length <= 1) {
             await writeFirestoreDoc('store_data', 'apps_meta', {
               count: nextApps.length,
               totalApps: nextApps.length,
@@ -147,14 +158,16 @@ export function useDataActions(
     let deletedOnFirestore = false;
     let lastError: string | null = null;
 
+    const currentApps = appsRef.current || [];
     const prevChunkSize = 25;
-    const prevNumChunks = Math.max(1, Math.ceil(apps.length / prevChunkSize));
-    const deletedIdx = apps.findIndex(a => a.id === appId || a.slug === appId);
+    const prevNumChunks = Math.max(1, Math.ceil(currentApps.length / prevChunkSize));
+    const deletedIdx = currentApps.findIndex(a => a.id === appId || a.slug === appId);
     const startChunkIdx = deletedIdx >= 0 ? Math.floor(deletedIdx / prevChunkSize) : 0;
-    const nextApps = apps.filter(a => a.id !== appId && a.slug !== appId);
+    const nextApps = currentApps.filter(a => a.id !== appId && a.slug !== appId);
     const numChunks = Math.max(1, Math.ceil(nextApps.length / prevChunkSize));
     const nowIso = new Date().toISOString();
 
+    appsRef.current = nextApps;
     setApps(nextApps);
 
     await Promise.all([
@@ -228,7 +241,7 @@ export function useDataActions(
     let lastError: string | null = null;
 
     const nowIso = new Date().toISOString();
-    let mergedSettings: any = { ...settings };
+    let mergedSettings: any = { ...(settingsRef.current || {}) };
     let sectionDelta: Record<string, any> = {};
 
     if (section === 'general' || section === 'seo') {
@@ -306,14 +319,23 @@ export function useDataActions(
       throw new Error(lastError || 'Failed to save settings to Firebase database.');
     }
 
-    if (resData && resData.settings && Object.keys(resData.settings).length > 2) {
-      setSettings(resData.settings);
+    if (
+      resData &&
+      resData.settings &&
+      typeof resData.settings === 'object' &&
+      !Array.isArray(resData.settings) &&
+      Object.keys(resData.settings).length > 2
+    ) {
+      const nextSettings = { ...mergedSettings, ...resData.settings };
+      settingsRef.current = nextSettings;
+      setSettings(nextSettings);
     } else {
+      settingsRef.current = mergedSettings;
       setSettings(mergedSettings);
     }
 
     return resData || { success: true, settings: mergedSettings };
-  }, [getAdminToken, setSettings, settings]);
+  }, [getAdminToken, setSettings]);
 
   const saveApps = useCallback(async (newApps: AppConfig[]) => {
     await hydrateFirebaseRuntimeConfig();
@@ -425,6 +447,7 @@ export function useDataActions(
       throw new Error(lastError || 'Failed to save apps catalog to Firebase database.');
     }
 
+    appsRef.current = normalizedApps;
     setApps(normalizedApps);
 
     const secureLinks = normalizedApps
@@ -520,6 +543,7 @@ export function useDataActions(
       throw new Error(lastError || 'Failed to save settings to Firebase database.');
     }
 
+    settingsRef.current = settingsWithTime;
     setSettings(settingsWithTime);
   }, [settings, getAdminToken, setSettings]);
 
@@ -585,6 +609,7 @@ export function useDataActions(
     let savedToFirestore = false;
     let lastError: string | null = null;
 
+    newsRef.current = cleanNews;
     setNews(cleanNews);
 
     await Promise.all([
@@ -673,7 +698,7 @@ export function useDataActions(
       updated_at: now
     };
 
-    const nextNews = [...(news || [])];
+    const nextNews = [...(newsRef.current || [])];
     const targetIdx = nextNews.findIndex(
       (n: any) => n.id === normalizedItem.id || (normalizedItem.slug && n.slug === normalizedItem.slug)
     );
@@ -683,7 +708,8 @@ export function useDataActions(
       nextNews.unshift(normalizedItem);
     }
 
-    // Immediate UI update
+    // Immediate ref & UI update
+    newsRef.current = nextNews;
     setNews(nextNews);
 
     let savedToServer = false;
@@ -739,8 +765,9 @@ export function useDataActions(
 
   const deleteNewsSingle = useCallback(async (newsId: string) => {
     const now = new Date().toISOString();
-    const nextNews = (news || []).filter((n: any) => n.id !== newsId && n.slug !== newsId);
+    const nextNews = (newsRef.current || []).filter((n: any) => n.id !== newsId && n.slug !== newsId);
 
+    newsRef.current = nextNews;
     setNews(nextNews);
 
     let deletedOnServer = false;
@@ -874,6 +901,7 @@ export function useDataActions(
       throw new Error(lastError || 'Failed to save videos to Firebase database.');
     }
 
+    videosRef.current = cleanVideos;
     setVideos(cleanVideos);
   }, [getAdminToken, setVideos, videos, settings?.site_title]);
 

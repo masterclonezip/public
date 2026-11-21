@@ -86,9 +86,54 @@ import rawNewsUtilsTs from '../lib/newsUtils.ts?raw';
 import rawSafeHtmlPublicTs from '../lib/safeHtmlPublic.ts?raw';
 import rawLightFallbackTs from '../lib/lightFallback.ts?raw';
 import rawPreloadHelperTs from '../lib/preloadHelper.ts?raw';
+import rawMainTsx from '../main.tsx?raw';
+
+const OPTIONAL_PUBLIC_CORE_FILES: Record<string, string> =
+  typeof __BUNDLED_OPTIONAL_PUBLIC_FILES__ === 'object' && __BUNDLED_OPTIONAL_PUBLIC_FILES__ !== null
+    ? Object.fromEntries(
+        Object.entries(__BUNDLED_OPTIONAL_PUBLIC_FILES__).filter(
+          ([, content]) => typeof content === 'string' && content.trim().length > 0
+        )
+      )
+    : {};
+
+const mergeNonEmptySettings = (base: Record<string, any> = {}, incoming?: Record<string, any> | null): Record<string, any> => {
+  if (!incoming || typeof incoming !== 'object') return { ...base };
+  const next: Record<string, any> = { ...base };
+  for (const [k, v] of Object.entries(incoming)) {
+    if (v === undefined || v === null) continue;
+    if (typeof v === 'string') {
+      if (v.trim().length > 0 || !next[k] || String(next[k]).trim().length === 0) {
+        next[k] = v;
+      }
+      continue;
+    }
+    if (Array.isArray(v)) {
+      if (v.length > 0 || !Array.isArray(next[k]) || next[k].length === 0) {
+        next[k] = v;
+      }
+      continue;
+    }
+    if (typeof v === 'object') {
+      if (Object.keys(v).length > 0 || !next[k]) {
+        next[k] = v;
+      }
+      continue;
+    }
+    next[k] = v;
+  }
+  if (!String(next.logo_url || '').trim() && String(next.favicon_url || '').trim()) {
+    next.logo_url = next.favicon_url;
+  }
+  if (!String(next.favicon_url || '').trim() && String(next.logo_url || '').trim()) {
+    next.favicon_url = next.logo_url;
+  }
+  return next;
+};
 
 const BUNDLED_PUBLIC_CORE_FILES: Record<string, string> = {
   'index.html': rawIndexHtml,
+  'src/main.tsx': rawMainTsx,
   'functions/_middleware.js': rawMiddlewareJs,
   'functions/api/[[catchall]].js': rawCatchallJs,
   'public/_headers': rawHeadersFile,
@@ -128,6 +173,7 @@ const BUNDLED_PUBLIC_CORE_FILES: Record<string, string> = {
   'src/server/routes/publicApiRoutes.ts': rawPublicApiRoutesTs,
   'src/server/routes/securityRoutes.ts': rawSecurityRoutesTs,
   'src/components/Meta.tsx': rawMetaTsx,
+  ...OPTIONAL_PUBLIC_CORE_FILES,
   'src/contexts/DataContextPublic.tsx': rawDataContextPublicTsx,
   'src/components/ClearanceButton.tsx': rawClearanceButtonTsx,
   'src/hooks/useTurnstileVerification.ts': rawUseTurnstileTs,
@@ -382,11 +428,11 @@ export function useGitHubSync(
         });
 
         let fsSettings: any = {};
-        if (settingsSnap && settingsSnap.exists && settingsSnap.exists()) {
-          fsSettings = { ...fsSettings, ...settingsSnap.data() };
-        }
         if (publicSettingsSnap && publicSettingsSnap.exists && publicSettingsSnap.exists()) {
-          fsSettings = { ...fsSettings, ...publicSettingsSnap.data() };
+          fsSettings = mergeNonEmptySettings(fsSettings, publicSettingsSnap.data());
+        }
+        if (settingsSnap && settingsSnap.exists && settingsSnap.exists()) {
+          fsSettings = mergeNonEmptySettings(fsSettings, settingsSnap.data());
         }
         // Only use separate legacy docs as fallback if settings doesn't already have them
         if ((!fsSettings.website_faqs || fsSettings.website_faqs.length === 0) && faqsSnap && faqsSnap.exists && faqsSnap.exists()) {
@@ -448,7 +494,7 @@ export function useGitHubSync(
           if (firestoreApps.length > 0) {
             liveBackup.apps = firestoreApps;
           }
-          liveBackup.settings = { ...fsSettings, ...(liveBackup.settings || {}) };
+          liveBackup.settings = mergeNonEmptySettings(liveBackup.settings || {}, fsSettings);
           if (fsNews.length > 0) liveBackup.news = fsNews;
           if (fsVideos.length > 0) liveBackup.videos = fsVideos;
         }
@@ -501,11 +547,9 @@ export function useGitHubSync(
     }
     log(`GitHub Sync: Assembled ${targetApps.length} application(s) combining cloud chunks and live admin modifications.`);
 
-    // Target Settings: Live Admin stateSettings is 100% AUTHORITATIVE over stale server backup!
-    const targetSettings = {
-      ...(liveBackup?.settings || {}),
-      ...(stateSettings || {})
-    };
+    // Target Settings: Live Admin stateSettings is 100% AUTHORITATIVE over stale server backup,
+    // while preserving non-empty Firestore fields (such as logo_url / favicon_url) if stateSettings is unhydrated!
+    const targetSettings = mergeNonEmptySettings(liveBackup?.settings || {}, stateSettings || {});
 
     // Explicitly guarantee arrays from stateSettings (developers, faqs, quick_links, categories, banners) take precedence
     if (Array.isArray(stateSettings?.developers)) {

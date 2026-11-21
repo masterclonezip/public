@@ -40,9 +40,24 @@ async function hmacSign(secret, message) {
     .replace(/=+$/, '');
 }
 
+const EPHEMERAL_EDGE_SESSION_SECRET = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+  .map((b) => b.toString(16).padStart(2, '0'))
+  .join('');
+
+function constantTimeEqual(a, b) {
+  const strA = String(a || '');
+  const strB = String(b || '');
+  if (strA.length !== strB.length) return false;
+  let diff = 0;
+  for (let i = 0; i < strA.length; i++) {
+    diff |= strA.charCodeAt(i) ^ strB.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
 async function hmacVerify(secret, message, expectedSig) {
   const actualSig = await hmacSign(secret, message);
-  return actualSig === expectedSig;
+  return constantTimeEqual(actualSig, expectedSig);
 }
 
 function parseAdminConfig(env) {
@@ -68,7 +83,7 @@ async function getAdminSessionSecret(env, configuredPassword) {
     env?.SESSION_SECRET ||
     (configuredPassword
       ? await sha256Hex(configuredPassword + '_salt_admin')
-      : 'default_admin_fallback_secret_key_2026')
+      : EPHEMERAL_EDGE_SESSION_SECRET)
   );
 }
 
@@ -88,10 +103,42 @@ async function generateAdminToken(email, sessionSecret) {
   return `adm_v1.${payloadB64}.${signature}`;
 }
 
-async function verifyAdminToken(token, sessionSecret, configuredEmail) {
+async function verifyEdgeFirebaseIdToken(idToken, env, configuredEmail) {
+  const firebaseApiKey = String(env?.FIREBASE_API_KEY || env?.VITE_FIREBASE_API_KEY || '')
+    .replace(/^["']|["']$/g, '')
+    .trim();
+  if (!firebaseApiKey || !idToken || idToken.split('.').length !== 3) {
+    return { valid: false };
+  }
+  try {
+    const res = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(firebaseApiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      }
+    );
+    if (!res.ok) return { valid: false };
+    const data = await res.json().catch(() => null);
+    const user = Array.isArray(data?.users) ? data.users[0] : null;
+    const verifiedEmail = String(user?.email || '').toLowerCase().trim();
+    if (!verifiedEmail || user?.disabled === true) {
+      return { valid: false };
+    }
+    if (!configuredEmail || constantTimeEqual(verifiedEmail, configuredEmail)) {
+      return { valid: true, email: verifiedEmail };
+    }
+  } catch (_) {}
+  return { valid: false };
+}
+
+async function verifyAdminToken(token, sessionSecret, configuredEmail, env) {
   if (!token) return { valid: false };
   try {
     const raw = token.startsWith('Bearer ') ? token.slice(7).trim() : token.trim();
+    if (!raw) return { valid: false };
+
     if (raw.startsWith('adm_v1.')) {
       const parts = raw.split('.');
       if (parts.length === 3) {
@@ -100,34 +147,89 @@ async function verifyAdminToken(token, sessionSecret, configuredEmail) {
         if (validSig) {
           const binary = atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/'));
           const payload = JSON.parse(decodeURIComponent(escape(binary)));
-          if (payload && payload.exp > Date.now() && payload.role === 'admin') {
-            if (!configuredEmail || payload.email.toLowerCase() === configuredEmail) {
-              return { valid: true, email: payload.email };
+          const payloadEmail = String(payload?.email || '').toLowerCase().trim();
+          if (payload && Number(payload.exp) > Date.now() && payload.role === 'admin' && payloadEmail) {
+            if (!configuredEmail || constantTimeEqual(payloadEmail, configuredEmail)) {
+              return { valid: true, email: payloadEmail };
             }
           }
         }
       }
+      return { valid: false };
     }
+
     if (raw.startsWith('eyJ')) {
-      const parts = raw.split('.');
-      if (parts.length === 3) {
-        const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-        const binary = atob(b64);
-        const payload = JSON.parse(decodeURIComponent(escape(binary)));
-        const tokenEmail = String(payload?.email || '').toLowerCase().trim();
-        const expMs = Number(payload?.exp || 0) * 1000;
-        if (tokenEmail && (!expMs || expMs > Date.now())) {
-          if (!configuredEmail || tokenEmail === configuredEmail) {
-            return { valid: true, email: tokenEmail };
+      return await verifyEdgeFirebaseIdToken(raw, env, configuredEmail);
+    }
+
+    if (raw.startsWith('U2FsdGVkX1')) {
+      const configuredAes = String(env?.AES_SECRET || env?.VITE_AES_SECRET || env?.VAULT_SECRET_KEY || '').trim();
+      if (!configuredAes) return { valid: false };
+      const decrypted = safeDecrypt(raw, configuredAes);
+      if (decrypted && decrypted.startsWith('{')) {
+        const payload = JSON.parse(decrypted);
+        const payloadEmail = String(payload?.email || '').toLowerCase().trim();
+        if (
+          payload &&
+          Number(payload.exp) > Date.now() &&
+          (payload.role === 'admin' || payload.admin === true) &&
+          payloadEmail
+        ) {
+          if (!configuredEmail || constantTimeEqual(payloadEmail, configuredEmail)) {
+            return { valid: true, email: payloadEmail };
           }
         }
       }
-    }
-    if (raw.startsWith('U2FsdGVkX1')) {
-      return { valid: true, email: configuredEmail || 'admin' };
+      return { valid: false };
     }
   } catch (_) {}
   return { valid: false };
+}
+
+function isSafeEdgeExternalUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== 'string') return false;
+  try {
+    const parsed = new URL(rawUrl.trim());
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false;
+    if (parsed.username || parsed.password) return false;
+    const rawHost = parsed.hostname.toLowerCase().trim();
+    const host = rawHost.startsWith('[') && rawHost.endsWith(']') ? rawHost.slice(1, -1) : rawHost;
+    if (
+      !host ||
+      host === 'localhost' ||
+      host === '0.0.0.0' ||
+      host === '::1' ||
+      host.includes(':') ||
+      host.endsWith('.localhost') ||
+      host.endsWith('.local') ||
+      host.endsWith('.internal') ||
+      /^\d+$/.test(host) ||
+      /^0x[0-9a-f]+$/i.test(host) ||
+      !host.includes('.')
+    ) {
+      return false;
+    }
+    const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (ipv4) {
+      const a = Number(ipv4[1]);
+      const b = Number(ipv4[2]);
+      if (
+        a === 0 ||
+        a === 10 ||
+        a === 127 ||
+        (a === 100 && b >= 64 && b <= 127) ||
+        (a === 169 && b === 254) ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168) ||
+        a >= 224
+      ) {
+        return false;
+      }
+    }
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
 
 export async function onRequest(context) {
@@ -215,7 +317,7 @@ export async function onRequest(context) {
       });
     }
 
-    if (normalizedEmail !== configuredEmail) {
+    if (!constantTimeEqual(normalizedEmail, configuredEmail)) {
       return new Response(JSON.stringify({ ok: false, error: 'Invalid administrator email address.' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json; charset=utf-8' },
@@ -223,8 +325,9 @@ export async function onRequest(context) {
     }
 
     const inputHash = await sha256Hex(inputPass);
-    const isDirectMatch = inputPass === configuredPassword;
-    const isHashMatch = inputHash === configuredPassword.toLowerCase();
+    const configuredPassHash = await sha256Hex(configuredPassword);
+    const isDirectMatch = constantTimeEqual(inputHash, configuredPassHash);
+    const isHashMatch = constantTimeEqual(inputHash, configuredPassword.toLowerCase());
 
     if (!isDirectMatch && !isHashMatch) {
       return new Response(JSON.stringify({ ok: false, error: 'Incorrect administrator password.' }), {
@@ -266,7 +369,7 @@ export async function onRequest(context) {
     const token = authHeader.replace(/^Bearer\s+/i, '') || body?.idToken || body?.token;
     const { configuredEmail, configuredPassword } = parseAdminConfig(env);
     const sessionSecret = await getAdminSessionSecret(env, configuredPassword);
-    const { valid, email } = await verifyAdminToken(token, sessionSecret, configuredEmail);
+    const { valid, email } = await verifyAdminToken(token, sessionSecret, configuredEmail, env);
 
     if (valid) {
       return new Response(JSON.stringify({
@@ -290,6 +393,49 @@ export async function onRequest(context) {
     });
   }
 
+  // 3b. Admin Authentication - Google Sign-In Verification (/api/v1/admin/google-login)
+  if (url.pathname === '/api/v1/admin/google-login') {
+    if (request.method !== 'POST') {
+      return new Response(JSON.stringify({ ok: false, error: 'Method Not Allowed' }), {
+        status: 405,
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      });
+    }
+    let body = {};
+    try { body = JSON.parse(rawBody || '{}'); } catch (_) {}
+    const authHeader = headers['authorization'] || '';
+    const idToken = String(body?.idToken || authHeader.replace(/^Bearer\s+/i, '') || '').trim();
+    const { configuredEmail, configuredPassword } = parseAdminConfig(env);
+    const sessionSecret = await getAdminSessionSecret(env, configuredPassword);
+
+    if (!configuredEmail || !idToken) {
+      return new Response(JSON.stringify({ ok: false, error: 'A verified Google sign-in token is required.' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store, private' },
+      });
+    }
+
+    const verified = await verifyEdgeFirebaseIdToken(idToken, env, configuredEmail);
+    if (!verified.valid || !verified.email || !constantTimeEqual(verified.email, configuredEmail)) {
+      return new Response(
+        JSON.stringify({ ok: false, error: 'Access denied: Google account could not be verified as administrator.' }),
+        {
+          status: 401,
+          headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store, private' },
+        }
+      );
+    }
+
+    const token = await generateAdminToken(configuredEmail, sessionSecret);
+    return new Response(JSON.stringify({ ok: true, success: true, token, email: configuredEmail }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+      },
+    });
+  }
+
   // 4. Admin Authentication - Refresh Token
   if (url.pathname === '/api/v1/admin/refresh-token') {
     let body = {};
@@ -298,7 +444,7 @@ export async function onRequest(context) {
     const token = authHeader.replace(/^Bearer\s+/i, '') || body?.idToken || body?.token;
     const { configuredEmail, configuredPassword } = parseAdminConfig(env);
     const sessionSecret = await getAdminSessionSecret(env, configuredPassword);
-    const { valid, email } = await verifyAdminToken(token, sessionSecret, configuredEmail);
+    const { valid, email } = await verifyAdminToken(token, sessionSecret, configuredEmail, env);
 
     if (valid && email) {
       const newToken = await generateAdminToken(email, sessionSecret);
@@ -320,6 +466,33 @@ export async function onRequest(context) {
       status: 200,
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
     });
+  }
+
+  // 6. Edge Admin & GitHub Sync Authentication Guard
+  // All protected /api/v1/admin/* (except /runtime-config needed before sign-in) and /api/github-sync/*
+  // require a valid cryptographically verified admin session token.
+  const isProtectedEdgeAdminRoute =
+    request.method !== 'OPTIONS' &&
+    ((url.pathname.startsWith('/api/v1/admin/') && url.pathname !== '/api/v1/admin/runtime-config') ||
+      url.pathname.startsWith('/api/github-sync/'));
+  if (isProtectedEdgeAdminRoute) {
+    const authHeader = headers['authorization'] || '';
+    const bearerToken = authHeader.replace(/^Bearer\s+/i, '').trim();
+    const { configuredEmail, configuredPassword } = parseAdminConfig(env);
+    const sessionSecret = await getAdminSessionSecret(env, configuredPassword);
+    const authCheck = await verifyAdminToken(bearerToken, sessionSecret, configuredEmail, env);
+    if (!authCheck.valid) {
+      return new Response(
+        JSON.stringify({ ok: false, authorized: false, error: 'Administrator authentication required.' }),
+        {
+          status: 401,
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Cache-Control': 'no-store, private',
+          },
+        }
+      );
+    }
   }
 
   // Public APIs (/api/v1/public/*) are handled below using edgeReadDoc + staticData fallback
@@ -1496,10 +1669,13 @@ export async function onRequest(context) {
   }
 
   if ((url.pathname === '/api/v1/admin/settings/save-section' || url.pathname === '/api/v1/admin/save-settings') && request.method === 'POST') {
+    globalThis.__EDGE_PUBLIC_CATALOG_CACHE__ = null;
+    globalThis.__EDGE_MW_SETTINGS_CACHE__ = null;
     let body = {};
     try { body = JSON.parse(rawBody || '{}'); } catch (_) {}
     if (body?.persistedToFirestore === true) {
-      return new Response(JSON.stringify({ status: 'OK', success: true, settings: body?.settings || body?.data || {} }), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
+      const safeSettings = body?.settings && typeof body.settings === 'object' && !Array.isArray(body.settings) ? body.settings : {};
+      return new Response(JSON.stringify({ status: 'OK', success: true, settings: safeSettings }), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
     }
     try {
       let delta = {};
@@ -1507,13 +1683,14 @@ export async function onRequest(context) {
       const data = body?.data !== undefined ? body.data : body?.settings;
       if (section && section !== 'general' && section !== 'seo' && section !== 'all') {
         delta = { [section]: data, last_updated: new Date().toISOString() };
-      } else if (data && typeof data === 'object') {
+      } else if (data && typeof data === 'object' && !Array.isArray(data)) {
         delta = { ...data, last_updated: new Date().toISOString() };
       }
       await edgeWriteDoc('store_data', 'settings', delta, true);
       const pubDelta = { ...delta };
       delete pubDelta.turnstile_secret_key;
       delete pubDelta.cloudinary_api_secret;
+      delete pubDelta.cloudinary_api_key;
       delete pubDelta.gemini_api_key;
       delete pubDelta.admin_password;
       delete pubDelta.admin_totp_secret;
@@ -1522,7 +1699,8 @@ export async function onRequest(context) {
       if (Array.isArray(delta.quick_links)) await edgeWriteDoc('store_data', 'quick_links', { items: delta.quick_links, count: delta.quick_links.length, updatedAt: new Date().toISOString() }, false);
       if (Array.isArray(delta.developers)) await edgeWriteDoc('store_data', 'developers', { items: delta.developers, count: delta.developers.length, updatedAt: new Date().toISOString() }, false);
 
-      return new Response(JSON.stringify({ status: 'OK', success: true, settings: body?.settings || delta }), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
+      const safeSettings = body?.settings && typeof body.settings === 'object' && !Array.isArray(body.settings) ? body.settings : delta;
+      return new Response(JSON.stringify({ status: 'OK', success: true, settings: safeSettings }), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
     } catch (err) {
       return new Response(JSON.stringify({ status: 'ERROR', success: false, error: err?.message || 'Save settings failed' }), { status: 500, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
     }
@@ -1761,6 +1939,12 @@ export async function onRequest(context) {
     const imagePayload = body?.image_base64 || body?.file || body?.image_url || body?.url;
     if (!imagePayload) {
       return new Response(JSON.stringify({ status: 'ERROR', error: 'Missing image payload' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      });
+    }
+    if (typeof imagePayload === 'string' && /^https?:\/\//i.test(imagePayload.trim()) && !isSafeEdgeExternalUrl(imagePayload.trim())) {
+      return new Response(JSON.stringify({ status: 'ERROR', error: 'Invalid or restricted image URL' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json; charset=utf-8' },
       });

@@ -29,6 +29,14 @@ export function PublicFooter() {
   const { settings } = useData();
   const siteTitle = settings?.site_title || '';
   const resolvedLogoUrl = resolveSiteLogoUrl(settings);
+  const [logoErrorStage, setLogoErrorStage] = React.useState<0 | 1 | 2>(0);
+
+  React.useEffect(() => {
+    setLogoErrorStage(0);
+  }, [resolvedLogoUrl]);
+
+  const optimizedFooterLogo = resolvedLogoUrl ? getSizedLogoUrl(resolvedLogoUrl, 160, 'auto', 'c_fit') : '';
+  const activeFooterLogo = logoErrorStage === 0 ? optimizedFooterLogo : resolvedLogoUrl;
 
   const directoryLinks = [
     { label: 'All Apps', to: '/', icon: LayoutGrid },
@@ -66,15 +74,18 @@ export function PublicFooter() {
               className="text-lg sm:text-xl font-black tracking-tight text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors inline-flex items-center gap-2"
               aria-label={`${siteTitle || 'Homepage'}`}
             >
-              {resolvedLogoUrl && (
+              {activeFooterLogo && logoErrorStage < 2 && (
                 <img
-                  src={getSizedLogoUrl(resolvedLogoUrl, 160, 'auto', 'c_fit')}
+                  src={activeFooterLogo}
                   width={28}
                   height={28}
                   loading="lazy"
                   decoding="async"
                   alt={`${siteTitle || 'Official'} Logo`}
                   className="w-6 h-6 sm:w-7 sm:h-7 object-contain shrink-0"
+                  onError={() => {
+                    setLogoErrorStage(prev => (prev === 0 && optimizedFooterLogo !== resolvedLogoUrl ? 1 : 2));
+                  }}
                 />
               )}
               <span>{siteTitle}</span>

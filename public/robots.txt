@@ -1,3 +1,15 @@
+User-agent: *
+Allow: /
+Allow: /api/v1/public/
+Disallow: /api/
+Disallow: /admin/
+Disallow: /login/
+Disallow: /masterworld/
+Disallow: /moreinfo/
+Disallow: /moreinfo/*
+Disallow: /safety
+Disallow: /safety-status
+
 User-agent: Googlebot
 Allow: /
 Allow: /api/v1/public/
@@ -16,7 +28,115 @@ Allow: /
 User-agent: Google-Favicon
 Allow: /
 
-User-agent: *
+User-agent: Bingbot
+Allow: /
+Allow: /api/v1/public/
+Disallow: /api/
+Disallow: /admin/
+Disallow: /login/
+Disallow: /masterworld/
+Disallow: /moreinfo/
+Disallow: /moreinfo/*
+Disallow: /safety
+Disallow: /safety-status
+
+User-agent: Applebot
+Allow: /
+Allow: /api/v1/public/
+Disallow: /api/
+Disallow: /admin/
+Disallow: /login/
+Disallow: /masterworld/
+Disallow: /moreinfo/
+Disallow: /moreinfo/*
+Disallow: /safety
+Disallow: /safety-status
+
+User-agent: DuckDuckBot
+Allow: /
+Allow: /api/v1/public/
+Disallow: /api/
+Disallow: /admin/
+Disallow: /login/
+Disallow: /masterworld/
+Disallow: /moreinfo/
+Disallow: /moreinfo/*
+Disallow: /safety
+Disallow: /safety-status
+
+User-agent: Baiduspider
+Allow: /
+Allow: /api/v1/public/
+Disallow: /api/
+Disallow: /admin/
+Disallow: /login/
+Disallow: /masterworld/
+Disallow: /moreinfo/
+Disallow: /moreinfo/*
+Disallow: /safety
+Disallow: /safety-status
+
+User-agent: YandexBot
+Allow: /
+Allow: /api/v1/public/
+Disallow: /api/
+Disallow: /admin/
+Disallow: /login/
+Disallow: /masterworld/
+Disallow: /moreinfo/
+Disallow: /moreinfo/*
+Disallow: /safety
+Disallow: /safety-status
+
+User-agent: SemrushBot
+Allow: /
+Allow: /api/v1/public/
+Disallow: /api/
+Disallow: /admin/
+Disallow: /login/
+Disallow: /masterworld/
+Disallow: /moreinfo/
+Disallow: /moreinfo/*
+Disallow: /safety
+Disallow: /safety-status
+
+User-agent: AhrefsBot
+Allow: /
+Allow: /api/v1/public/
+Disallow: /api/
+Disallow: /admin/
+Disallow: /login/
+Disallow: /masterworld/
+Disallow: /moreinfo/
+Disallow: /moreinfo/*
+Disallow: /safety
+Disallow: /safety-status
+
+User-agent: GPTBot
+Allow: /
+Allow: /api/v1/public/
+Disallow: /api/
+Disallow: /admin/
+Disallow: /login/
+Disallow: /masterworld/
+Disallow: /moreinfo/
+Disallow: /moreinfo/*
+Disallow: /safety
+Disallow: /safety-status
+
+User-agent: ClaudeBot
+Allow: /
+Allow: /api/v1/public/
+Disallow: /api/
+Disallow: /admin/
+Disallow: /login/
+Disallow: /masterworld/
+Disallow: /moreinfo/
+Disallow: /moreinfo/*
+Disallow: /safety
+Disallow: /safety-status
+
+User-agent: PerplexityBot
 Allow: /
 Allow: /api/v1/public/
 Disallow: /api/
@@ -29,8 +149,8 @@ Disallow: /safety
 Disallow: /safety-status
 
 Sitemap: https://example.com/sitemap.xml
-Sitemap: https://example.com/sitemap-news.xml
 Sitemap: https://example.com/sitemap-apps.xml
-Sitemap: https://example.com/sitemap-static.xml
-Sitemap: https://example.com/sitemap-videos.xml
+Sitemap: https://example.com/sitemap-news.xml
 Sitemap: https://example.com/sitemap-developers.xml
+Sitemap: https://example.com/sitemap-videos.xml
+Sitemap: https://example.com/sitemap-static.xml

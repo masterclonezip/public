@@ -172,7 +172,7 @@ export default function AdminDashboard() {
         const cleanLogo = String(formSettings.logo_url || '').trim();
         const cleanFavicon = String(formSettings.favicon_url || '').trim();
         const rawDomain = String(formSettings.canonical_domain || '').trim().replace(/\/+$/, '');
-        const cleanDomain = rawDomain && !rawDomain.toLowerCase().includes('yonoappdex.com')
+        const cleanDomain = rawDomain
           ? (rawDomain.startsWith('http://') || rawDomain.startsWith('https://') ? rawDomain : `https://${rawDomain}`).replace(/^(https?:\/\/)(?:www\.|admin\.|masterworld\.)+/i, '$1')
           : '';
         const cleanSiteTitle = String(formSettings.site_title || '').trim();
@@ -347,14 +347,18 @@ export default function AdminDashboard() {
   const handleTogglePublicSync = async (appId: string) => {
     const targetApp = appsList.find(a => a.id === appId);
     if (!targetApp) return;
-    const newStatus = !(targetApp.sync_to_public !== false);
+    const prevStatus = targetApp.sync_to_public !== false;
+    const newStatus = !prevStatus;
     const updatedApp = { ...targetApp, sync_to_public: newStatus, updated_at: new Date().toISOString() };
+    // Immediate optimistic update in Admin list
+    setAppsList(prev => prev.map(a => a.id === appId ? updatedApp : a));
+    triggerHaptic();
     try {
       await saveAppSingle(updatedApp);
-      setAppsList(prev => prev.map(a => a.id === appId ? updatedApp : a));
-      triggerHaptic();
-      toast(newStatus ? `"${targetApp.name}" will sync to public website.` : `"${targetApp.name}" is now Admin Only (unsynced from public).`, 'success');
+      toast(newStatus ? `"${targetApp.name}" is now Live on public website.` : `"${targetApp.name}" is now Draft (Admin Only).`, 'success');
     } catch (err: any) {
+      // Rollback on failure
+      setAppsList(prev => prev.map(a => a.id === appId ? { ...a, sync_to_public: prevStatus } : a));
       toast('Failed to update sync status: ' + (err?.message || 'Error'), 'error');
     }
   };
@@ -520,7 +524,18 @@ export default function AdminDashboard() {
                 setSaving(false);
               }
             }}
-            handleSaveCategories={(e) => { e?.preventDefault?.(); handleSaveSettingsBase({ categories: categoriesList }); }}
+            handleSaveCategories={(e) => {
+              e?.preventDefault?.();
+              const pendingCat = newCatInput.trim();
+              const finalCategories = pendingCat && !categoriesList.includes(pendingCat)
+                ? [...categoriesList, pendingCat]
+                : categoriesList;
+              if (pendingCat) {
+                setCategoriesList(finalCategories);
+                setNewCatInput('');
+              }
+              handleSaveSettingsBase({ categories: finalCategories });
+            }}
             handleSaveQuickLinks={(e) => { e?.preventDefault?.(); handleSaveSettingsBase({ quick_links: quickLinksList }); }}
             handleSaveWebsiteFaqs={(e) => { e?.preventDefault?.(); handleSaveSettingsBase({ website_faqs: websiteFaqsList }); }}
             handleSaveDevelopers={(e) => { e?.preventDefault?.(); handleSaveSettingsBase({ developers: developersList }); }}

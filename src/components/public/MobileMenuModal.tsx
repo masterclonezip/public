@@ -57,6 +57,11 @@ export function MobileMenuModal({
   helplineTelegram
 }: MobileMenuModalProps) {
   const { pathname } = useLocation();
+  const [logoErrorStage, setLogoErrorStage] = React.useState<0 | 1 | 2 | 3>(0);
+
+  useEffect(() => {
+    setLogoErrorStage(0);
+  }, [logoUrl]);
 
   const handleTap = () => {
     safeVibrate(15);
@@ -140,14 +145,27 @@ export function MobileMenuModal({
           className="flex items-center gap-3 group focus:outline-none min-w-0"
         >
           <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 p-0.5 flex items-center justify-center shrink-0 shadow-xs transition-transform group-hover:scale-105">
-            {logoUrl ? (
+            {logoUrl && logoErrorStage < 3 ? (
               <img 
-                src={getTransformedUrl(logoUrl)} 
+                src={
+                  logoErrorStage === 0
+                    ? getTransformedUrl(logoUrl)
+                    : logoErrorStage === 1
+                      ? logoUrl
+                      : '/logo.png'
+                } 
                 alt={`${siteTitle || 'Official'} Logo`} 
                 className="w-full h-full object-contain rounded-lg"
                 loading="lazy" 
                 width={36} 
-                height={36} 
+                height={36}
+                onError={() => {
+                  setLogoErrorStage(prev => {
+                    if (prev === 0 && getTransformedUrl(logoUrl) !== logoUrl) return 1;
+                    if (prev <= 1 && logoUrl !== '/logo.png') return 2;
+                    return 3;
+                  });
+                }}
               />
             ) : (
               <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400" />

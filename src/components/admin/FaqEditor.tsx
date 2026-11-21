@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 
 interface FaqEditorProps {
@@ -8,12 +8,17 @@ interface FaqEditorProps {
 
 export function FaqEditor({ initialFaqs, onChange }: FaqEditorProps) {
   const [faqs, setFaqs] = useState<{ question: string; answer: string }[]>(initialFaqs || []);
+  const lastNotifiedRef = useRef<any>(initialFaqs);
 
   useEffect(() => {
-    setFaqs(initialFaqs || []);
+    if (initialFaqs !== lastNotifiedRef.current) {
+      lastNotifiedRef.current = initialFaqs;
+      setFaqs(initialFaqs || []);
+    }
   }, [initialFaqs]);
 
   const updateAndNotify = (newFaqs: { question: string; answer: string }[]) => {
+    lastNotifiedRef.current = newFaqs;
     setFaqs(newFaqs);
     if (onChange) {
       onChange(newFaqs);
@@ -36,10 +41,12 @@ export function FaqEditor({ initialFaqs, onChange }: FaqEditorProps) {
     updateAndNotify(newFaqs);
   };
 
+  const faqsJson = useMemo(() => JSON.stringify(faqs), [faqs]);
+
   return (
     <div className="space-y-4">
       <h3 className="font-bold text-xs uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Interactive FAQ System</h3>
-      <input type="hidden" name="faqs_json" value={JSON.stringify(faqs)} />
+      <input type="hidden" name="faqs_json" value={faqsJson} />
       {faqs.map((faq, idx) => (
         <div key={idx} className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-200/60 dark:border-slate-800/80 space-y-3 relative">
           <button 

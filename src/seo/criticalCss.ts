@@ -18,6 +18,10 @@ const CRITICAL_SHELL_RULES = `
   a{color:inherit;text-decoration:inherit}
 }
 #root{min-height:100vh;display:flex;flex-direction:column}
+#root>div>header{position:sticky;top:0;z-index:50;height:3.5rem;display:flex;align-items:center;background-color:#ffffff}
+@media (min-width:640px){#root>div>header{height:4rem}}
+@media (prefers-color-scheme:dark){html:not(.light) #root>div>header{background-color:#090d16}}
+html.dark #root>div>header,html[data-theme="dark"] #root>div>header{background-color:#090d16}
 main#main-content{flex:1 1 0%;width:100%;max-width:80rem;margin-left:auto;margin-right:auto}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border-width:0}
 .no-scrollbar::-webkit-scrollbar{display:none}

@@ -135,7 +135,8 @@ export const FeaturedBanner = React.memo(({ items }: BannerProps) => {
             
             if (isJavaScript) return null;
 
-            const hasValidImage = Boolean(item.image) && !failedSlides[i];
+            const rawImage = item.image || item.image_url || '';
+            const hasValidImage = Boolean(rawImage) && !failedSlides[i];
 
             const content = (
               <div className="w-full h-full relative overflow-hidden select-none pointer-events-none bg-gradient-to-br from-slate-900 via-blue-950 to-zinc-900">
@@ -146,16 +147,16 @@ export const FeaturedBanner = React.memo(({ items }: BannerProps) => {
                     {...(i === 0 ? { fetchPriority: "high" as const } : { fetchPriority: "low" as const })}
                     width={800}
                     height={400}
-                    src={getOptimizedImageUrl(item.image, 600)}
-                    srcSet={`${getOptimizedImageUrl(item.image, 400)} 400w, ${getOptimizedImageUrl(item.image, 600)} 600w, ${getOptimizedImageUrl(item.image, 800)} 800w`}
+                    src={getOptimizedImageUrl(rawImage, 600)}
+                    srcSet={`${getOptimizedImageUrl(rawImage, 400)} 400w, ${getOptimizedImageUrl(rawImage, 600)} 600w, ${getOptimizedImageUrl(rawImage, 800)} 800w`}
                     sizes="(max-width: 640px) 100vw, 800px"
                     className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 pointer-events-none"
                     alt={item.title || "Featured banner"}
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
-                      if (item.image && target.src !== item.image && !target.dataset.retried) {
+                      if (rawImage && target.src !== rawImage && !target.dataset.retried) {
                         target.dataset.retried = '1';
-                        target.src = item.image;
+                        target.src = rawImage;
                       } else {
                         setFailedSlides(prev => ({ ...prev, [i]: true }));
                       }

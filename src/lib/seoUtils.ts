@@ -106,19 +106,6 @@ export function cleanSettingsMetaTitles<T extends Record<string, any>>(settings:
       copy[key] = formatPageTitle(copy[key], '', brand);
     }
   }
-  if (typeof copy.site_name === 'string' && copy.site_name.trim().toLowerCase() === 'yonoappdex' && brand.toLowerCase() !== 'yonoappdex') {
-    copy.site_name = brand || '';
-  }
-  for (const domainKey of ['canonical_domain', 'site_domain', 'public_domain', 'domain']) {
-    if (typeof copy[domainKey] === 'string' && copy[domainKey].toLowerCase().includes('yonoappdex.com')) {
-      copy[domainKey] = '';
-    }
-  }
-  for (const iconKey of ['logo_url', 'favicon_url', 'og_image']) {
-    if (typeof copy[iconKey] === 'string' && copy[iconKey].includes('potup3yi/image/upload/v1793499107/vvqemcm3gkjsko5m6unw')) {
-      copy[iconKey] = '';
-    }
-  }
   return copy as T;
 }
 
@@ -271,7 +258,6 @@ export function isValidPublicProductionDomain(rawHost: string): boolean {
       h === 'localhost' ||
       h === '127.0.0.1' ||
       h === 'example.com' ||
-      h === 'yonoappdex.com' ||
       h.endsWith('.pages.dev') ||
       h.endsWith('.workers.dev') ||
       h.endsWith('.run.app') ||

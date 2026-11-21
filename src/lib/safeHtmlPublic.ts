@@ -6,6 +6,7 @@ function sanitizeScopedStyleContent(css: string): string {
     .replace(/<\/style/gi, '')
     .replace(/@import\b[^;]*;?/gi, '')
     .replace(/expression\s*\([^)]*\)/gi, '')
+    .replace(/url\s*\(\s*["']?\s*(?:javascript|vbscript|data\s*:\s*(?:text\/html|image\/svg\+xml))[^)]*\)/gi, 'none')
     .replace(/javascript\s*:/gi, 'blocked:')
     .replace(/vbscript\s*:/gi, 'blocked:')
     .replace(/-moz-binding\s*:[^;\}]+/gi, '')
@@ -76,6 +77,16 @@ function normalizeEmbeddedHtmlHygiene(html: string): string {
         return `<a${newAttrs}>`;
       }
 
+      const normalizedHref = href.replace(/[\u0000-\u0020]+/g, '').toLowerCase();
+      if (
+        normalizedHref.startsWith('javascript:') ||
+        normalizedHref.startsWith('vbscript:') ||
+        normalizedHref.startsWith('data:')
+      ) {
+        const safeAttrs = attrStr.replace(/\s*\bhref\s*=\s*(["'])(.*?)\1/i, '');
+        return `<a${safeAttrs}>`;
+      }
+
       if (/^https?:\/\//i.test(href)) {
         let newAttrs = attrStr;
         if (!/\btarget\s*=/i.test(newAttrs)) {
@@ -103,10 +114,12 @@ function serverSanitize(html: string): string {
     .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
     .replace(/<applet\b[^<]*(?:(?!<\/applet>)<[^<]*)*<\/applet>/gi, '')
     .replace(/<form\b[^<]*(?:(?!<\/form>)<[^<]*)*<\/form>/gi, '')
-    .replace(/\son\w+\s*=\s*(["'][^"']*["']|[^\s>]+)/gi, '')
-    .replace(/javascript:/gi, 'blocked-scheme:')
-    .replace(/vbscript:/gi, 'blocked-scheme:')
-    .replace(/data:\s*text\/html/gi, 'blocked-data:');
+    // Strip unclosed or self-closing dangerous elements as well
+    .replace(/<\/?(?:script|iframe|object|embed|applet|form|base|meta)\b[^>]*>/gi, '')
+    .replace(/\son[a-z]+\s*=\s*(["'][^"']*["']|[^\s>]+)/gi, '')
+    .replace(/j\s*a\s*v\s*a\s*s\s*c\s*r\s*i\s*p\s*t\s*:/gi, 'blocked-scheme:')
+    .replace(/v\s*b\s*s\s*c\s*r\s*i\s*p\s*t\s*:/gi, 'blocked-scheme:')
+    .replace(/data\s*:\s*(?:text\/html|image\/svg\+xml)/gi, 'blocked-data:');
 }
 
 const STRUCTURE_CACHE = new Map<string, string>();

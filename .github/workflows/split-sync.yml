@@ -236,13 +236,13 @@ jobs:
               git config --local --unset-all http.https://github.com/.extraheader 2>/dev/null || true
               git checkout -B "$TARGET_BRANCH" 2>/dev/null || true
 
-              # If syncing to public repo and source staticData.json has an empty apps array, preserve target repo's existing synced catalog, sitemaps & vault
-              mkdir -p /tmp/public_catalog_preserve/sitemaps
+              # If syncing to public repo and source staticData.json has an empty apps array, preserve target repo's existing synced catalog, sitemaps, icons & vault
+              mkdir -p /tmp/public_catalog_preserve/sitemaps /tmp/public_catalog_preserve/icons
               rm -rf /tmp/public_catalog_preserve/*
-              mkdir -p /tmp/public_catalog_preserve/sitemaps
+              mkdir -p /tmp/public_catalog_preserve/sitemaps /tmp/public_catalog_preserve/icons
               if [ "$TYPE" = "public" ] && [ -f "src/lib/staticData.json" ]; then
                 if grep -q '"apps":\s*\[\s*\]' "$SOURCE_DIR/src/lib/staticData.json" 2>/dev/null && ! grep -q '"apps":\s*\[\s*\]' "src/lib/staticData.json" 2>/dev/null; then
-                  echo "Preserving populated public catalog data and sitemaps from target public repo..."
+                  echo "Preserving populated public catalog data, brand icons, and sitemaps from target public repo..."
                   cp -f src/lib/staticData.json /tmp/public_catalog_preserve/staticData.json 2>/dev/null || true
                   cp -f src/lib/staticData.ts /tmp/public_catalog_preserve/staticData.ts 2>/dev/null || true
                   cp -f src/lib/secureVault.ts /tmp/public_catalog_preserve/secureVault.ts 2>/dev/null || true
@@ -252,6 +252,10 @@ jobs:
                   cp -f public/robots.txt /tmp/public_catalog_preserve/sitemaps/robots.txt 2>/dev/null || true
                   cp -f public/site.webmanifest /tmp/public_catalog_preserve/sitemaps/site.webmanifest 2>/dev/null || true
                   cp -f public/opensearch.xml /tmp/public_catalog_preserve/sitemaps/opensearch.xml 2>/dev/null || true
+                  cp -f public/favicon* /tmp/public_catalog_preserve/icons/ 2>/dev/null || true
+                  cp -f public/apple-touch-icon* /tmp/public_catalog_preserve/icons/ 2>/dev/null || true
+                  cp -f public/android-chrome-* /tmp/public_catalog_preserve/icons/ 2>/dev/null || true
+                  cp -f public/logo.png /tmp/public_catalog_preserve/icons/logo.png 2>/dev/null || true
                 fi
               fi
 
@@ -265,6 +269,7 @@ jobs:
                 [ -f "/tmp/public_catalog_preserve/communityCatalogStats.json" ] && cp -f /tmp/public_catalog_preserve/communityCatalogStats.json src/lib/communityCatalogStats.json 2>/dev/null || true
                 [ -f "/tmp/public_catalog_preserve/communityStaticReviews.json" ] && cp -f /tmp/public_catalog_preserve/communityStaticReviews.json src/lib/communityStaticReviews.json 2>/dev/null || true
                 cp -f /tmp/public_catalog_preserve/sitemaps/* public/ 2>/dev/null || true
+                cp -f /tmp/public_catalog_preserve/icons/* public/ 2>/dev/null || true
               fi
 
               # Always strip any stale/deleted turnstile_site_key or turnstile_secret_key from staticData.json and staticData.ts in public repo

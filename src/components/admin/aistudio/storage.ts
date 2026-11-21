@@ -1,5 +1,6 @@
 import { StudioConfig, StagedReview, ChatMessage, AIStudioBrainMemory, BrainDirective, GenerationActionLog } from './types';
 import { getDefaultStartDate, getDefaultEndDate } from './dateEngine';
+import { adminFetch } from '../../../services/adminAuthService';
 
 const STORAGE_KEYS = {
   CONFIG: 'ai_review_studio_config_v1',
@@ -182,7 +183,7 @@ export function saveStudioConfig(config: StudioConfig): StudioConfig {
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 4000);
-    fetch('/api/v1/admin/community/aistudio-settings', {
+    adminFetch('/api/v1/admin/community/aistudio-settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ config: normalized }),
@@ -287,7 +288,7 @@ export function saveBrainMemory(memory: AIStudioBrainMemory): void {
 
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 4000);
-    fetch('/api/v1/admin/community/aistudio-settings', {
+    adminFetch('/api/v1/admin/community/aistudio-settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ brain: updated }),
@@ -313,7 +314,7 @@ export async function loadStudioSettingsFromCloud(): Promise<CloudStudioSettings
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 3500);
-    const res = await fetch('/api/v1/admin/community/aistudio-settings', {
+    const res = await adminFetch('/api/v1/admin/community/aistudio-settings', {
       signal: ctrl.signal
     }).finally(() => clearTimeout(timer));
 

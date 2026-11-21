@@ -205,9 +205,20 @@ export async function syncFromFirestore(): Promise<any> {
 
       const pubParsed = pubSettingsRes?.fields ? parseFirestoreDoc(pubSettingsRes.fields) : {};
       const rawParsed = rawSettingsRes?.fields ? parseFirestoreDoc(rawSettingsRes.fields) : {};
-      const remoteSettings: Record<string, any> = { ...rawParsed, ...pubParsed };
-      if (!remoteSettings.logo_url && rawParsed.logo_url) remoteSettings.logo_url = rawParsed.logo_url;
-      if (!remoteSettings.favicon_url && rawParsed.favicon_url) remoteSettings.favicon_url = rawParsed.favicon_url;
+      const remoteSettings: Record<string, any> = { ...pubParsed };
+      for (const [k, v] of Object.entries(rawParsed)) {
+        if (v === undefined || v === null) continue;
+        if (typeof v === 'string' && v.trim() === '' && typeof remoteSettings[k] === 'string' && remoteSettings[k].trim() !== '') {
+          continue;
+        }
+        remoteSettings[k] = v;
+      }
+      if (!String(remoteSettings.logo_url || '').trim() && String(remoteSettings.favicon_url || '').trim()) {
+        remoteSettings.logo_url = remoteSettings.favicon_url;
+      }
+      if (!String(remoteSettings.favicon_url || '').trim() && String(remoteSettings.logo_url || '').trim()) {
+        remoteSettings.favicon_url = remoteSettings.logo_url;
+      }
       delete remoteSettings.turnstile_secret_key;
       delete remoteSettings.turnstile_site_key;
       delete remoteSettings.cloudinary_api_secret;

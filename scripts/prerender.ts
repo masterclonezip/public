@@ -426,14 +426,22 @@ async function prerender() {
       }
     );
     if (outerCssLinks) {
-      const firstModuleTagMatch = originalTemplate.match(/<(?:script\b[^>]*type=["']module["'][^>]*>|link\b[^>]*rel=["']modulepreload["'][^>]*>)/i);
-      if (firstModuleTagMatch && firstModuleTagMatch.index !== undefined) {
+      const initDataIdx = originalTemplate.indexOf('<!--INITIAL_DATA_SCRIPT-->');
+      if (initDataIdx !== -1) {
         originalTemplate =
-          originalTemplate.slice(0, firstModuleTagMatch.index) +
+          originalTemplate.slice(0, initDataIdx) +
           outerCssLinks +
-          originalTemplate.slice(firstModuleTagMatch.index);
+          originalTemplate.slice(initDataIdx);
       } else {
-        originalTemplate = originalTemplate.replace('</head>', `${outerCssLinks}</head>`);
+        const firstModuleTagMatch = originalTemplate.match(/<(?:script\b[^>]*type=["']module["'][^>]*>|link\b[^>]*rel=["']modulepreload["'][^>]*>)/i);
+        if (firstModuleTagMatch && firstModuleTagMatch.index !== undefined) {
+          originalTemplate =
+            originalTemplate.slice(0, firstModuleTagMatch.index) +
+            outerCssLinks +
+            originalTemplate.slice(firstModuleTagMatch.index);
+        } else {
+          originalTemplate = originalTemplate.replace('</head>', `${outerCssLinks}</head>`);
+        }
       }
     }
 

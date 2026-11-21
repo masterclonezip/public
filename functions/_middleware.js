@@ -1,17 +1,43 @@
 import staticData from '../src/lib/staticData.json';
 
+const EDGE_CLD_TRANSFORM_REGEX =
+  /\/upload\/(?:(?:(?:w|h|c|f|q|b|g|r|e|t|ar|dpr|fl|bo|co|l|u|o|a|x|y|z|dn|dl|cs|pg|ac|af|br|du|eo|fps|ki|so|sp|vc|vs)_[a-zA-Z0-9_.:%-]+)(?:,(?:(?:w|h|c|f|q|b|g|r|e|t|ar|dpr|fl|bo|co|l|u|o|a|x|y|z|dn|dl|cs|pg|ac|af|br|du|eo|fps|ki|so|sp|vc|vs)_[a-zA-Z0-9_.:%-]+))*\/)*/;
+
 function getEdgeSizedLogoUrl(url, size = 192) {
   if (!url || typeof url !== 'string') return '';
   const trimmed = url.trim();
   if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) return '';
   if (trimmed.includes('res.cloudinary.com') && trimmed.includes('/upload/')) {
-    const cleanUrl = trimmed.replace(/\/upload\/(?:(?:[a-z]{1,3}_[a-zA-Z0-9_.:-]+,?)+\/)*/, '/upload/');
+    const cleanUrl = trimmed.replace(EDGE_CLD_TRANSFORM_REGEX, '/upload/');
     if (size > 0) {
       return cleanUrl.replace('/upload/', `/upload/f_png,q_auto:best,w_${size},h_${size},c_pad,b_transparent/`);
     }
     return cleanUrl.replace('/upload/', '/upload/f_png,q_auto:best/');
   }
   return trimmed;
+}
+
+function getEdgeHeaderLogoUrl(url, size = 240) {
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) return '';
+  if (trimmed.includes('res.cloudinary.com') && trimmed.includes('/upload/')) {
+    const cleanUrl = trimmed.replace(EDGE_CLD_TRANSFORM_REGEX, '/upload/');
+    if (size > 0) {
+      return cleanUrl.replace('/upload/', `/upload/f_auto,q_auto:best,w_${size},h_${size},c_fit/`);
+    }
+    return cleanUrl.replace('/upload/', '/upload/f_auto,q_auto:best/');
+  }
+  return trimmed;
+}
+
+function escapeEdgeHtml(unsafe) {
+  return String(unsafe || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 function isPngBytesEdge(bytes) {
@@ -54,6 +80,31 @@ function fromEdgeRestValueSimple(field) {
   return undefined;
 }
 
+const SENSITIVE_EDGE_KEYS = new Set([
+  'turnstile_secret_key',
+  'cloudinary_api_secret',
+  'gemini_api_key',
+  'admin_password',
+  'admin_totp_secret',
+  '_rest_admin_bypass'
+]);
+
+async function fetchEdgeSettingsDoc(projectId, databaseId, apiKey, docId) {
+  const dbs = databaseId && databaseId !== '(default)' ? [databaseId, '(default)'] : ['(default)'];
+  for (const dbId of dbs) {
+    try {
+      const readUrl = new URL(`https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/${encodeURIComponent(dbId)}/documents/store_data/${encodeURIComponent(docId)}`);
+      if (apiKey) readUrl.searchParams.set('key', apiKey);
+      const res = await fetch(readUrl.toString(), { headers: { Accept: 'application/json' } });
+      if (res.ok) {
+        const json = await res.json().catch(() => null);
+        if (json && json.fields) return json.fields;
+      }
+    } catch (_) {}
+  }
+  return null;
+}
+
 async function getEdgePublicSettings(envObj) {
   const base = (staticData && staticData.settings) || {};
   const now = Date.now();
@@ -64,23 +115,30 @@ async function getEdgePublicSettings(envObj) {
   const apiKey = String(envObj?.VITE_FIREBASE_API_KEY || envObj?.FIREBASE_API_KEY || '').trim();
   const databaseId = String(envObj?.VITE_FIREBASE_DATABASE_ID || envObj?.FIREBASE_DATABASE_ID || '(default)').trim() || '(default)';
   let merged = { ...base };
-  if (projectId) {
-    try {
-      const readUrl = new URL(`https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/${encodeURIComponent(databaseId)}/documents/store_data/public_settings`);
-      if (apiKey) readUrl.searchParams.set('key', apiKey);
-      const res = await fetch(readUrl.toString(), { headers: { Accept: 'application/json' } });
-      if (res.ok) {
-        const json = await res.json().catch(() => null);
-        if (json && json.fields) {
-          for (const [k, f] of Object.entries(json.fields)) {
-            const val = fromEdgeRestValueSimple(f);
-            if (val !== undefined && val !== '') {
-              merged[k] = val;
-            }
-          }
-        }
+  const applyFields = (fields) => {
+    if (!fields) return;
+    for (const [k, f] of Object.entries(fields)) {
+      if (SENSITIVE_EDGE_KEYS.has(k)) continue;
+      const val = fromEdgeRestValueSimple(f);
+      if (val !== undefined && val !== '') {
+        merged[k] = val;
       }
-    } catch (_) {}
+    }
+  };
+  if (projectId) {
+    const [pubFields, settingsFields] = await Promise.all([
+      fetchEdgeSettingsDoc(projectId, databaseId, apiKey, 'public_settings'),
+      fetchEdgeSettingsDoc(projectId, databaseId, apiKey, 'settings')
+    ]);
+    // Apply public_settings first as baseline, then authoritative settings second (ignoring empty strings)
+    applyFields(pubFields);
+    applyFields(settingsFields);
+  }
+  if (!String(merged.logo_url || '').trim() && String(merged.favicon_url || '').trim()) {
+    merged.logo_url = merged.favicon_url;
+  }
+  if (!String(merged.favicon_url || '').trim() && String(merged.logo_url || '').trim()) {
+    merged.favicon_url = merged.logo_url;
   }
   globalThis.__EDGE_MW_SETTINGS_CACHE__ = { data: merged, expiresAt: now + 60 * 1000 };
   return merged;
@@ -525,7 +583,7 @@ export async function onRequest(context) {
       (_, prefix, cldUrl, suffix) => {
         let normalized = cldUrl;
         if (normalized.includes('/upload/')) {
-          normalized = normalized.replace(/\/upload\/(?:(?:[a-z]{1,3}_[a-zA-Z0-9_.:-]+,?)+\/)*/, '/upload/w_1200,h_630,c_pad,b_auto,f_jpg,q_auto:good/');
+          normalized = normalized.replace(EDGE_CLD_TRANSFORM_REGEX, '/upload/w_1200,h_630,c_pad,b_auto,f_jpg,q_auto:good/');
           if (/\.(webp|png|jpeg|gif|avif)$/i.test(normalized)) {
             normalized = normalized.replace(/\.(webp|png|jpeg|gif|avif)$/i, '.jpg');
           } else if (!normalized.toLowerCase().endsWith('.jpg')) {
@@ -535,6 +593,74 @@ export async function onRequest(context) {
         return `${prefix}${normalized}${suffix}`;
       }
     );
+
+    // 3b. Unified Brand Logo Healing for HTML responses (runs identically for browsers and crawlers - zero cloaking)
+    const headerFallbackBadgeRegex = /<div class="w-9 h-9 sm:w-10 sm:h-10 bg-blue-500 rounded-xl flex items-center justify-center text-white font-semibold text-sm sm:text-base">[^<]*<\/div>/i;
+    const needsBrandingHeal =
+      !lowerPath.startsWith('/moreinfo') &&
+      !lowerPath.startsWith('/admin') &&
+      !lowerPath.startsWith('/login') &&
+      !lowerPath.startsWith('/masterworld') &&
+      (headerFallbackBadgeRegex.test(html) || /"logo_url"\s*:\s*""/.test(html));
+
+    if (needsBrandingHeal) {
+      const edgeSettings = await getEdgePublicSettings(context.env || {});
+      const envObj = context.env || {};
+      const edgeLogo = String(
+        edgeSettings?.logo_url ||
+          edgeSettings?.favicon_url ||
+          envObj.VITE_SITE_LOGO_URL ||
+          envObj.VITE_SITE_FAVICON_URL ||
+          ''
+      ).trim();
+      const edgeFavicon = String(
+        edgeSettings?.favicon_url ||
+          edgeSettings?.logo_url ||
+          envObj.VITE_SITE_FAVICON_URL ||
+          envObj.VITE_SITE_LOGO_URL ||
+          edgeLogo
+      ).trim();
+      const edgeTitle = String(edgeSettings?.site_title || envObj.VITE_SITE_NAME || '').trim();
+
+      if (edgeLogo.startsWith('http://') || edgeLogo.startsWith('https://')) {
+        const headerImgSrc = getEdgeHeaderLogoUrl(edgeLogo, 240);
+        const footerImgSrc = getEdgeHeaderLogoUrl(edgeLogo, 160);
+        const safeAlt = escapeEdgeHtml(edgeTitle || 'Official');
+
+        html = html.replace(
+          headerFallbackBadgeRegex,
+          `<img src="${escapeEdgeHtml(headerImgSrc)}" width="40" height="40" loading="eager" fetchpriority="high" decoding="async" class="w-9 h-9 sm:w-10 sm:h-10 object-contain drop-shadow-sm" alt="${safeAlt} Logo"/>`
+        );
+
+        html = html.replace(
+          /(<footer\b[\s\S]*?<a href="\/" class="text-lg sm:text-xl font-black[^>]*>\s*)(<span>)/i,
+          `$1<img src="${escapeEdgeHtml(footerImgSrc)}" width="28" height="28" loading="lazy" decoding="async" alt="${safeAlt} Logo" class="w-6 h-6 sm:w-7 sm:h-7 object-contain shrink-0" />$2`
+        );
+
+        html = html.replace(
+          /window\.__INITIAL_DATA__\s*=\s*(\{[\s\S]*?\});\s*(?=<\/script>)/i,
+          (fullMatch, jsonStr) => {
+            try {
+              const parsed = JSON.parse(jsonStr);
+              if (parsed && typeof parsed === 'object') {
+                parsed.settings = parsed.settings && typeof parsed.settings === 'object' ? parsed.settings : {};
+                if (!String(parsed.settings.logo_url || '').trim()) {
+                  parsed.settings.logo_url = edgeLogo;
+                }
+                if (!String(parsed.settings.favicon_url || '').trim()) {
+                  parsed.settings.favicon_url = edgeFavicon || edgeLogo;
+                }
+                if (edgeTitle && !String(parsed.settings.site_title || '').trim()) {
+                  parsed.settings.site_title = edgeTitle;
+                }
+                return `window.__INITIAL_DATA__ = ${JSON.stringify(parsed).replace(/</g, '\\u003c')};`;
+              }
+            } catch (_) {}
+            return fullMatch;
+          }
+        );
+      }
+    }
 
     // Optimize payload for pure Social Preview Scrapers (keep #server-critical-css intact; Applebot retains full CSS)
     const ua = (context.request.headers.get('user-agent') || '').toLowerCase();
@@ -547,6 +673,20 @@ export async function onRequest(context) {
     const headers = new Headers(response.headers);
     headers.delete('content-length');
     headers.delete('content-encoding');
+    headers.delete('etag');
+
+    const isNoStorePath =
+      lowerPath.startsWith('/moreinfo') ||
+      lowerPath.startsWith('/admin') ||
+      lowerPath.startsWith('/login') ||
+      lowerPath.startsWith('/masterworld') ||
+      lowerPath === '/safety' ||
+      lowerPath === '/safety-status';
+    if (!isNoStorePath) {
+      headers.set('Cache-Control', 'public, max-age=0, must-revalidate');
+      headers.set('CDN-Cache-Control', 'public, max-age=60, must-revalidate');
+      headers.set('Cloudflare-CDN-Cache-Control', 'public, max-age=60, must-revalidate');
+    }
 
     return new Response(html, {
       status: response.status,

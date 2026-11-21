@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import ImageUpload from '../ImageUpload';
 
@@ -9,12 +9,17 @@ interface ScreenshotsEditorProps {
 
 export function ScreenshotsEditor({ initialScreenshots, onChange }: ScreenshotsEditorProps) {
   const [urls, setUrls] = useState<string[]>(initialScreenshots || []);
+  const lastNotifiedRef = useRef<any>(initialScreenshots);
 
   useEffect(() => {
-    setUrls(initialScreenshots || []);
+    if (initialScreenshots !== lastNotifiedRef.current) {
+      lastNotifiedRef.current = initialScreenshots;
+      setUrls(initialScreenshots || []);
+    }
   }, [initialScreenshots]);
 
   const updateAndNotify = (newUrls: string[]) => {
+    lastNotifiedRef.current = newUrls;
     setUrls(newUrls);
     if (onChange) {
       onChange(newUrls);
@@ -29,10 +34,12 @@ export function ScreenshotsEditor({ initialScreenshots, onChange }: ScreenshotsE
     updateAndNotify(newUrls);
   };
 
+  const screenshotsJson = useMemo(() => JSON.stringify(urls.filter(Boolean)), [urls]);
+
   return (
     <div className="space-y-4">
       <h3 className="font-bold text-xs uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Screenshots Gallery</h3>
-      <input type="hidden" name="screenshots_json" value={JSON.stringify(urls.filter(Boolean))} />
+      <input type="hidden" name="screenshots_json" value={screenshotsJson} />
       <div className="grid gap-3">
         {urls.map((url, idx) => (
           <div key={idx} className="flex gap-3 items-center bg-slate-50 dark:bg-slate-900/60 p-3 rounded-xl border border-slate-200/60 dark:border-slate-800/80">

@@ -79,7 +79,7 @@ export function renderHome(
     const publishDateVal = getField(app, 'publish_date');
     const isActuallyComingSoon = Boolean(isComingSoonFlag && (!publishDateVal || new Date(publishDateVal).getTime() > Date.now()));
     const isVerified = getField(app, 'safety_status', 'Verified') === 'Verified';
-    const isTopItem = idx <= 6;
+    const isTopItem = idx < 4;
 
     appsHtml += `
       <div class="relative group z-1">
@@ -89,7 +89,7 @@ export function renderHome(
           </div>
           <div class="relative w-[54px] h-[54px] xs:w-[60px] xs:h-[60px] sm:w-[76px] sm:h-[76px] shrink-0">
             <div class="w-full h-full rounded-[14px] xs:rounded-[16px] sm:rounded-[20px] overflow-hidden bg-zinc-100 dark:bg-zinc-800 shadow-sm border border-black/5 dark:border-white/10 relative z-10 transition-transform group-hover:-translate-y-0.5 duration-300 flex items-center justify-center">
-              <img src="${escapeHtml(icon)}" ${isTopItem ? 'loading="eager" fetchpriority="high"' : 'loading="lazy" fetchpriority="low"'} decoding="async" width="76" height="76" class="w-full h-full object-cover block" alt="${escapeHtml(name)} app icon"/>
+              <img src="${escapeHtml(icon)}" ${isTopItem ? 'loading="eager"' : 'loading="lazy" fetchpriority="low"'} decoding="async" width="76" height="76" class="w-full h-full object-cover block" alt="${escapeHtml(name)} app icon"/>
             </div>
             ${isHot && isNew ? `<div class="absolute -top-1.5 -right-1.5 z-20 pointer-events-none"><span class="inline-flex items-center rounded-[6px] xs:rounded-[7px] overflow-hidden shadow-[0_2px_6px_rgba(0,0,0,0.18)] font-black text-[8px] xs:text-[9px] uppercase tracking-wider"><span class="bg-[#d32f2f] text-white px-1.5 py-0.5">HOT</span><span class="bg-[#008738] text-white px-1.5 py-0.5">NEW</span></span></div>` : isHot ? `<div class="absolute -top-1.5 -right-1.5 z-20 pointer-events-none"><span class="bg-[#d32f2f] text-white text-[8px] xs:text-[9px] font-black px-1.5 py-0.5 rounded-[6px] xs:rounded-[8px] shadow-[0_2px_6px_rgba(0,0,0,0.15)] uppercase tracking-wider block">HOT</span></div>` : isNew ? `<div class="absolute -top-1.5 -right-1.5 z-20 pointer-events-none"><span class="bg-[#008738] text-white text-[8px] xs:text-[9px] font-black px-1.5 py-0.5 rounded-[6px] xs:rounded-[8px] shadow-[0_2px_6px_rgba(0,0,0,0.15)] uppercase tracking-wider block">NEW</span></div>` : ''}
           </div>
@@ -285,8 +285,10 @@ export function renderHome(
     </div>
   ` : '';
 
+  const filterBarHeading = isTopChartsTab ? 'Top Charts' : activeTab;
   const filterBarHtml = isCategoriesTab ? '' : `
-    <div class="px-0 mb-2.5 xs:mb-3.5 mt-0.5 xs:mt-1.5 flex flex-wrap items-center gap-2 xs:gap-3 justify-end">
+    <div class="px-0 mb-2.5 xs:mb-3.5 mt-0.5 xs:mt-1.5 flex flex-wrap items-center gap-2 xs:gap-3 ${isHomeTab ? 'justify-end' : 'justify-between'}">
+      ${!isHomeTab ? `<h2 class="text-base xs:text-lg sm:text-xl font-bold text-zinc-900 dark:text-zinc-100 m-0">${escapeHtml(filterBarHeading)}</h2>` : ''}
       <div class="flex items-center gap-1.5 xs:gap-2.5 flex-wrap">
         <div class="relative">
           <div class="flex items-center gap-1.5 min-h-[36px] bg-white dark:bg-zinc-900 border border-black/10 dark:border-white/10 rounded-lg sm:rounded-xl px-2.5 sm:px-3 py-1 shadow-xs text-xs sm:text-[13px] font-medium text-zinc-700 dark:text-zinc-300 select-none">
@@ -360,7 +362,7 @@ export function renderHome(
 
   const remainingApps = isCategoriesTab ? [] : sorted.slice(startIndex + pageSize);
   const fullDirectoryHtml = remainingApps.length > 0 ? `
-    <nav aria-label="Complete Application Directory" data-nosnippet class="mt-8 pt-6 border-t border-zinc-200/80 dark:border-zinc-800/80">
+    <nav aria-label="Complete Application Directory" data-nosnippet class="mt-8 pt-6 border-t border-zinc-200/80 dark:border-zinc-800/80 [contain:layout_style]">
       <h2 class="text-xs sm:text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-3 uppercase tracking-wider">More Applications in Catalog (${remainingApps.length})</h2>
       <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
         ${remainingApps.map((app) => {

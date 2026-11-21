@@ -695,17 +695,40 @@ async function verifyModulesAndLiveServer() {
     const viteCfgSrc = fs.readFileSync(path.resolve(process.cwd(), 'vite.config.ts'), 'utf8');
     const splitSyncYmlSrc = fs.readFileSync(path.resolve(process.cwd(), '.github/workflows/split-sync.yml'), 'utf8');
     const noStaticRedirectsRawImport = !/from\s+['"][^'"]*public\/_redirects\?raw['"]/.test(gitHubSyncHookSrc);
-    const hasBundledRedirectsDefine = viteCfgSrc.includes('__BUNDLED_PUBLIC_REDIRECTS__') && gitHubSyncHookSrc.includes('FALLBACK_PUBLIC_REDIRECTS');
+    const hasBundledRedirectsDefine =
+      viteCfgSrc.includes('__BUNDLED_PUBLIC_REDIRECTS__') &&
+      viteCfgSrc.includes('__BUNDLED_OPTIONAL_PUBLIC_FILES__') &&
+      gitHubSyncHookSrc.includes('FALLBACK_PUBLIC_REDIRECTS');
     const splitSyncIsolationOk =
       splitSyncYmlSrc.includes('"src/hooks/useReviews.ts"') &&
       splitSyncYmlSrc.includes('"src/server/routes/communityRoutes.ts"') &&
       splitSyncYmlSrc.includes('"src/server/routes/reportRoutes.ts"');
 
+    // Automated guard: verify ZERO static ?raw imports in useGitHubSync.ts target any PUBLIC_ONLY_FILES entry
+    const pubBlockMatch = splitSyncYmlSrc.match(/PUBLIC_ONLY_FILES=\(([\s\S]*?)\n\s*\)/);
+    const publicOnlyEntries = pubBlockMatch
+      ? [...pubBlockMatch[1].matchAll(/"([^"]+)"/g)].map((m) => m[1])
+      : [];
+    const brokenRawImports: string[] = [];
+    for (const m of gitHubSyncHookSrc.matchAll(/import\s+\w+\s+from\s+['"]([^'"]+)\?raw['"]/g)) {
+      const resolvedRel = path
+        .relative(process.cwd(), path.resolve(path.resolve(process.cwd(), 'src/hooks'), m[1]))
+        .replace(/\\/g, '/');
+      if (
+        publicOnlyEntries.some((entry) =>
+          entry.endsWith('/') ? resolvedRel.startsWith(entry) : resolvedRel === entry
+        )
+      ) {
+        brokenRawImports.push(resolvedRel);
+      }
+    }
+    const zeroStrippedRawImports = brokenRawImports.length === 0;
+
     record(
       'SPLIT-SYNC-BUILD',
       'Split-Repo (Admin & Public) Build & Isolation Integrity',
-      noStaticRedirectsRawImport && hasBundledRedirectsDefine && splitSyncIsolationOk,
-      `NoStaticRedirectsRawImport: ${noStaticRedirectsRawImport}, OptionalRedirectsDefineFallback: ${hasBundledRedirectsDefine}, SplitSyncRepoIsolation: ${splitSyncIsolationOk}`
+      noStaticRedirectsRawImport && hasBundledRedirectsDefine && splitSyncIsolationOk && zeroStrippedRawImports,
+      `NoStaticRedirectsRawImport: ${noStaticRedirectsRawImport}, OptionalDefinesFallback: ${hasBundledRedirectsDefine}, ZeroStrippedPublicRawImports: ${zeroStrippedRawImports}${brokenRawImports.length ? ` (${brokenRawImports.join(', ')})` : ''}, SplitSyncRepoIsolation: ${splitSyncIsolationOk}`
     );
   } catch (isoErr: any) {
     record('SEO-ISOLATION-1..8', 'Zero /moreinfo Leak & Attribution Isolation', false, isoErr?.message || String(isoErr));

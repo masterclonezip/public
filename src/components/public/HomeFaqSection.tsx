@@ -14,7 +14,7 @@ interface HomeFaqSectionProps {
   searchTerm: string;
 }
 
-export default function HomeFaqSection({ faqs, searchTerm }: HomeFaqSectionProps) {
+const HomeFaqSection = React.memo(function HomeFaqSection({ faqs, searchTerm }: HomeFaqSectionProps) {
   const navigate = useNavigate();
 
   if (searchTerm || !faqs || faqs.length === 0) return null;
@@ -106,4 +106,7 @@ export default function HomeFaqSection({ faqs, searchTerm }: HomeFaqSectionProps
       </div>
     </section>
   );
-}
+});
+
+export default HomeFaqSection;
+

@@ -8,7 +8,7 @@ import fs from 'fs';
 
 import { injectSeoTags, fetchStoreData, resolveAppSlug, cleanRootContainer } from './src/seoHelper';
 import { normalizeNonWwwDomain } from './src/lib/seoUtils';
-import { adminAuthRouter } from './src/server/routes/adminAuthRoutes';
+import { adminAuthRouter, requireAdminAuth } from './src/server/routes/adminAuthRoutes';
 import { communityRouter } from './src/server/routes/communityRoutes';
 import { reportRouter } from './src/server/routes/reportRoutes';
 import { githubSyncRouter } from './src/server/routes/githubSyncRoutes';
@@ -113,14 +113,20 @@ async function startServer() {
     next();
   });
 
-  // Admin routes anti-caching middleware
+  // Admin & GitHub sync routes anti-caching + server-side authentication guard
   app.use('/api/v1/admin', (req, res, next) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
     res.setHeader('Surrogate-Control', 'no-store');
     next();
-  });
+  }, requireAdminAuth);
+
+  app.use('/api/github-sync', (req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    next();
+  }, requireAdminAuth);
 
   // 301 Permanent Redirect: strictly enforce non-www domain for all www requests (SEO canonical consistency)
   app.use((req, res, next) => {
@@ -243,9 +249,16 @@ async function startServer() {
 
   if (process.env.NODE_ENV === "production") {
     // 1. Direct streaming of pre-compressed Brotli & Gzip assets for maximum Pingdom & Lighthouse scores
+    const assetsRoot = path.resolve(distPath, 'assets');
     app.get(/^\/assets\/(.+)$/, (req, res, next) => {
-      const assetFile = req.params[0];
-      const filePath = path.join(distPath, 'assets', assetFile);
+      const assetFile = String(req.params[0] || '');
+      if (!assetFile || assetFile.includes('\0')) {
+        return res.status(400).end();
+      }
+      const filePath = path.resolve(assetsRoot, assetFile);
+      if (!filePath.startsWith(assetsRoot + path.sep)) {
+        return res.status(400).end();
+      }
       const acceptEncoding = (req.headers['accept-encoding'] as string || '').toLowerCase();
       const farFuture = new Date(Date.now() + 31536000000).toUTCString();
 
@@ -303,8 +316,6 @@ async function startServer() {
       index: false,
       redirect: false,
       setHeaders: (res, filePath) => {
-        const farFuture = new Date(Date.now() + 31536000000).toUTCString();
-        res.setHeader('Expires', farFuture);
         res.setHeader('Vary', 'Accept-Encoding');
         if (filePath.endsWith('.html')) {
           const normPath = filePath.replace(/\\/g, '/').toLowerCase();
@@ -317,7 +328,9 @@ async function startServer() {
             res.setHeader('CDN-Cache-Control', 'no-store, private');
             res.setHeader('Cloudflare-CDN-Cache-Control', 'no-store, private');
           } else {
-            res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400');
+            res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+            res.setHeader('CDN-Cache-Control', 'public, max-age=60, must-revalidate');
+            res.setHeader('Cloudflare-CDN-Cache-Control', 'public, max-age=60, must-revalidate');
           }
           res.setHeader(
             'X-Robots-Tag',
@@ -326,6 +339,8 @@ async function startServer() {
               : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'
           );
         } else {
+          const farFuture = new Date(Date.now() + 31536000000).toUTCString();
+          res.setHeader('Expires', farFuture);
           res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         }
       }
@@ -724,20 +739,9 @@ async function startServer() {
       const html = typeof seoResult === 'string' ? seoResult : (seoResult.html || template);
       const statusCode = 200;
 
-      let cacheControl = 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400';
+      let cacheControl = 'public, max-age=0, must-revalidate';
       const reqUrlLower = req.originalUrl.toLowerCase().split('?')[0].replace(/\/+$/, '') || '/';
 
-      if (process.env.NODE_ENV === "production") {
-        if (reqUrlLower === '/' || reqUrlLower === '' || reqUrlLower === '/new-apps' || reqUrlLower.startsWith('/category/') || reqUrlLower.startsWith('/categories')) {
-          cacheControl = 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400';
-        } else if (reqUrlLower.startsWith('/app/')) {
-          cacheControl = 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400';
-        } else if (reqUrlLower.startsWith('/news') || reqUrlLower.startsWith('/videos')) {
-          cacheControl = 'public, max-age=600, s-maxage=7200, stale-while-revalidate=86400';
-        } else if (['/about', '/contact', '/privacy', '/terms', '/ethics', '/disclaimer', '/notice', '/responsibility', '/developers', '/report-removal'].includes(reqUrlLower)) {
-          cacheControl = 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800';
-        }
-      }
       const isDisallowedRoute = isNotFound ||
         reqUrlLower.startsWith('/moreinfo/') ||
         reqUrlLower.startsWith('/moreinfo') ||
@@ -759,7 +763,7 @@ async function startServer() {
 
       const edgeCacheDirective = isDisallowedRoute
         ? 'no-store, private'
-        : 'public, max-age=86400, stale-while-revalidate=604800';
+        : 'public, max-age=60, must-revalidate';
 
       const responseHeaders: Record<string, string> = {
         'Content-Type': 'text/html; charset=utf-8',
@@ -783,8 +787,6 @@ async function startServer() {
       if (isNotFound || isDisallowedRoute) {
         responseHeaders['Pragma'] = 'no-cache';
         responseHeaders['Expires'] = '0';
-      } else {
-        responseHeaders['Expires'] = new Date(Date.now() + 3600000).toUTCString();
       }
 
       res.status(statusCode).set(responseHeaders).send(html);

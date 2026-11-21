@@ -8,6 +8,7 @@ import { generateSha1 } from '../../lib/cryptoUtils';
 import { getAllSiteIconUrls, getEnvLogoUrl, getEnvFaviconUrl } from '../../seo/utils';
 import { loadStudioConfig, saveStudioConfig, normalizeClientModelId } from './aistudio/storage';
 import { verifyStudioConnection } from './aistudio/geminiEngine';
+import { adminFetch } from '../../services/adminAuthService';
 
 interface AdminSettingsTabProps {
   settings: any;
@@ -214,10 +215,7 @@ export const AdminSettingsTab = React.memo(({ settings: rawSettings, handleSaveS
       // Test 3: Backend Server Upload Endpoint Test
       if (!verified) {
         try {
-          const idToken = (await (globalThis as any).firebaseAuthUser?.getIdToken?.()) || undefined;
-          const sigRes = await fetch('/api/v1/admin/upload/signature', {
-            headers: idToken ? { 'Authorization': `Bearer ${idToken}` } : {}
-          });
+          const sigRes = await adminFetch('/api/v1/admin/upload/signature');
           if (sigRes.ok) {
             const sigData = await sigRes.json();
             if (sigData.status === 'OK' && sigData.cloud_name) {

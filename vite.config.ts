@@ -676,12 +676,28 @@ export default defineConfig(({mode}) => {
       ? fs.readFileSync(publicRedirectsPath, 'utf8')
       : '';
 
+  const optionalPublicBundlePaths = [
+    'src/components/public/PublicHeader.tsx',
+    'src/components/public/PublicFooter.tsx',
+    'src/components/public/MobileMenuModal.tsx',
+  ];
+  const bundledOptionalPublicFiles: Record<string, string> = {};
+  if (isAdminBuild) {
+    for (const relPath of optionalPublicBundlePaths) {
+      const fullPath = path.resolve(__dirname, relPath);
+      if (fs.existsSync(fullPath)) {
+        bundledOptionalPublicFiles[relPath] = fs.readFileSync(fullPath, 'utf8');
+      }
+    }
+  }
+
   return {
     plugins: [react(), tailwindcss(), adminAuthDevPlugin(env)],
     envPrefix: ['VITE_'],
     define: {
       __ADMIN_ENABLED__: isAdminBuild,
       __BUNDLED_PUBLIC_REDIRECTS__: JSON.stringify(bundledPublicRedirects),
+      __BUNDLED_OPTIONAL_PUBLIC_FILES__: JSON.stringify(bundledOptionalPublicFiles),
       __APP_BUILD_ENV__: JSON.stringify(resolvedBuildEnv),
       'process.env.NODE_ENV': JSON.stringify(mode === 'production' ? 'production' : (process.env.NODE_ENV || 'development')),
       'process.env.ADMIN_PATH': JSON.stringify(resolvedBuildEnv.ADMIN_PATH || ''),

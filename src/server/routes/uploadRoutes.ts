@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import crypto from 'crypto';
+import { isSafeExternalHttpUrl } from '../security/urlGuard';
 
 const uploadRouter = Router();
 
@@ -13,9 +14,12 @@ function getCloudinaryCredentials() {
 }
 
 // Generate server-signed parameters for high-speed client-side Cloudinary upload
-uploadRouter.get('/api/v1/admin/upload/signature', (req, res) => {
+uploadRouter.get('/api/v1/admin/upload/signature', (_req, res) => {
   try {
     const { cloudName, apiKey, apiSecret, folder } = getCloudinaryCredentials();
+    if (!cloudName || !apiKey || !apiSecret) {
+      return res.status(503).json({ status: 'ERROR', error: 'Cloudinary credentials are not configured on the server.' });
+    }
     const timestamp = Math.round(Date.now() / 1000);
     const strToSign = `folder=${folder}&timestamp=${timestamp}${apiSecret}`;
     const signature = crypto.createHash('sha1').update(strToSign).digest('hex');
@@ -38,6 +42,10 @@ uploadRouter.get('/api/v1/admin/upload/signature', (req, res) => {
 uploadRouter.post('/api/v1/admin/upload', async (req, res) => {
   try {
     const { cloudName, apiKey, apiSecret, folder } = getCloudinaryCredentials();
+    if (!cloudName || !apiKey || !apiSecret) {
+      return res.status(503).json({ status: 'ERROR', error: 'Cloudinary credentials are not configured on the server.' });
+    }
+
     const body = req.body || {};
     const imagePayload = body.image_base64 || body.file || body.image_url || body.url;
 
@@ -63,10 +71,14 @@ uploadRouter.post('/api/v1/admin/upload', async (req, res) => {
       } else {
         fileBlob = new Blob([Buffer.from(imagePayload)], { type: 'image/png' });
       }
-    } else if (typeof imagePayload === 'string' && imagePayload.startsWith('http')) {
+    } else if (typeof imagePayload === 'string' && /^https?:\/\//i.test(imagePayload.trim())) {
+      const targetUrl = imagePayload.trim();
+      if (!isSafeExternalHttpUrl(targetUrl)) {
+        return res.status(400).json({ status: 'ERROR', error: 'Invalid or restricted external image URL' });
+      }
       // URL upload
       const formData = new FormData();
-      formData.append('file', imagePayload);
+      formData.append('file', targetUrl);
       formData.append('api_key', apiKey);
       formData.append('timestamp', String(timestamp));
       formData.append('signature', signature);

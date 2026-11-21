@@ -53,9 +53,10 @@ export const WebsiteTitleHero = React.memo(({ settings }: WebsiteTitleHeroProps)
     colorClasses = 'bg-gradient-to-r from-pink-500 via-fuchsia-600 to-purple-600 bg-clip-text text-transparent';
   }
 
-  // Map CSS Animation class
+  // Map CSS Animation class (suppress entrance animations over already-painted SSR HTML to guarantee zero CLS)
+  const isSsrTakeover = typeof window !== 'undefined' && (window as any).__SSR_PATH__ === (window.location.pathname.toLowerCase().replace(/\/+$/, '') || '/');
   let animClass = '';
-  if (isAnimated && animation !== 'none') {
+  if (isAnimated && animation !== 'none' && !isSsrTakeover) {
     if (animation === 'fade-in') animClass = '';
     else if (animation === 'slide-up') animClass = 'animate-in slide-in-from-bottom-2 duration-300';
     else if (animation === 'bounce-in') animClass = 'animate-in zoom-in-95 duration-300';

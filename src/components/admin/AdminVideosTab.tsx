@@ -3,7 +3,7 @@ import { Video as VideoIcon, Plus, Trash2, LayoutDashboard, Edit2, Save } from '
 
 interface AdminVideosTabProps {
   videosList: any[];
-  handleAddVideo: () => void;
+  handleAddVideo: () => string | void;
   handleDeleteVideo: (id: string) => void;
   handleVideosChange: (id: string, field: string, value: any) => void;
   handleSaveVideos: (e?: any) => void;
@@ -24,9 +24,18 @@ export const AdminVideosTab = React.memo(({
     <div className="animate-fade-in space-y-6">
       <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-6 rounded-2xl border border-black/10 dark:border-white/10 shadow-sm">
         <h2 className="text-xl font-bold flex items-center gap-2 dark:text-white"><VideoIcon className="w-5 h-5 text-blue-500" /> Video Matrix</h2>
-        <button onClick={() => {
-          handleAddVideo();
-        }} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-all"><Plus className="w-4 h-4" /> Add Video</button>
+        <button
+          type="button"
+          onClick={() => {
+            const newId = handleAddVideo();
+            if (typeof newId === 'string' && newId) {
+              setEditingVideoId(newId);
+            }
+          }}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-all cursor-pointer border-0"
+        >
+          <Plus className="w-4 h-4" /> Add Video
+        </button>
       </div>
       <div className="space-y-4">
         {videosList.map((item: any) => (

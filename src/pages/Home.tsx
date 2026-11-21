@@ -3,7 +3,7 @@
  * Features the showcase carousel, real-time download tabs, and categorized app directories.
  */
 
-import { useState, useEffect, useMemo, useDeferredValue, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback, useDeferredValue, useRef } from 'react';
 import { useSearchParams, useLocation, useNavigate, useNavigationType, useParams, Link } from 'react-router-dom';
 import { useData } from '../contexts/DataContextPublic';
 import Meta from '../components/Meta';
@@ -52,22 +52,25 @@ export default function Home() {
 
   const pageFromUrl = parseInt(searchParams.get('page') || '1', 10) || 1;
   const [visibleCount, setVisibleCount] = useState<number>(() => {
-    try {
-      const saved = sessionStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed.visibleCount === 'number' && parsed.visibleCount > 0) {
-          return parsed.visibleCount;
+    if (navType === 'POP') {
+      try {
+        const saved = sessionStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed.visibleCount === 'number' && parsed.visibleCount > 0) {
+            return parsed.visibleCount;
+          }
         }
+      } catch (e) {
+        // Fallback
       }
-    } catch (e) {
-      // Fallback
     }
     return Math.max(ITEMS_PER_PAGE, pageFromUrl * ITEMS_PER_PAGE);
   });
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const tabBarRef = useRef<HTMLDivElement | null>(null);
+  const isInitialScrollMountRef = useRef(true);
 
   const deferredSearchTerm = useDeferredValue(searchTerm);
   const deferredActiveTab = useDeferredValue(activeTab);
@@ -75,12 +78,15 @@ export default function Home() {
   const deferredSortBy = useDeferredValue(sortBy);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && mockApps.length < 50) {
+    if (typeof window !== 'undefined' && mockApps.length < 25) {
       window.dispatchEvent(new Event('open-catalog-route'));
     }
   }, [mockApps.length]);
 
   useEffect(() => {
+    const wasInitialMount = isInitialScrollMountRef.current;
+    isInitialScrollMountRef.current = false;
+
     if (navType === 'POP') {
       try {
         const saved = sessionStorage.getItem(STORAGE_KEY);
@@ -119,7 +125,10 @@ export default function Home() {
         });
         return () => window.cancelAnimationFrame(rafId);
       }
-      window.scrollTo(0, 0);
+      // On initial SSR takeover, avoid yanking the user back to 0 if they already began scrolling
+      if (!wasInitialMount) {
+        window.scrollTo(0, 0);
+      }
     }
   }, [navType, searchParams, categoryParam]);
 
@@ -203,7 +212,7 @@ export default function Home() {
     }
   }, [searchParams, categoryParam, location.pathname, mockSettings.categories]);
 
-  const handleTabSelect = (nextTab: string) => {
+  const handleTabSelect = useCallback((nextTab: string) => {
     setActiveTab(nextTab);
     if (tabBarRef.current && typeof window !== 'undefined') {
       const headerHeight = window.innerWidth >= 640 ? 64 : 56;
@@ -228,7 +237,12 @@ export default function Home() {
     } else {
       navigate(`/?tab=${encodeURIComponent(nextTab)}`, { replace: true });
     }
-  };
+  }, [location.pathname, searchParams, navigate]);
+
+  const handleClearSearch = useCallback(() => {
+    setSearchTerm('');
+    navigate('/', { replace: true });
+  }, [navigate]);
 
   const isInitialFilterMount = useRef(true);
   useEffect(() => {
@@ -239,9 +253,20 @@ export default function Home() {
     setVisibleCount(ITEMS_PER_PAGE);
   }, [deferredSearchTerm, deferredActiveTab, deferredRatingFilter, deferredSortBy]);
 
+  const sortedBaseApps = useMemo(() => {
+    return [...mockApps].sort((a, b) => {
+      const sa = typeof a.serial_number === 'number' && a.serial_number > 0 ? a.serial_number : 999999;
+      const sb = typeof b.serial_number === 'number' && b.serial_number > 0 ? b.serial_number : 999999;
+      return sa - sb;
+    });
+  }, [mockApps]);
+
   const filteredApps = useMemo(() => {
     const term = deferredSearchTerm.toLowerCase().trim();
-    let baseApps = [...mockApps];
+    if (!term && deferredRatingFilter === 'all' && deferredSortBy === 'default') {
+      return sortedBaseApps;
+    }
+    let baseApps = [...sortedBaseApps];
 
     if (deferredRatingFilter !== 'all') {
       const minRating = parseFloat(deferredRatingFilter);
@@ -327,7 +352,7 @@ export default function Home() {
     }
 
     return resultingApps;
-  }, [mockApps, deferredSearchTerm, deferredRatingFilter, deferredSortBy]);
+  }, [sortedBaseApps, deferredSearchTerm, deferredRatingFilter, deferredSortBy]);
 
   const activeTabLower = deferredActiveTab.toLowerCase().trim();
   const isHomeTab = activeTabLower === 'all apps' || 
@@ -429,7 +454,7 @@ export default function Home() {
       )}
 
       {!deferredSearchTerm && (deferredActiveTab.toLowerCase() === 'all apps' || deferredActiveTab.toLowerCase() === 'all' || deferredActiveTab.toLowerCase() === 'home' || deferredActiveTab.toLowerCase() === 'apps') && (
-        <NewAdditions loading={false} apps={filteredApps} />
+        <NewAdditions loading={false} apps={sortedBaseApps} />
       )}
 
       <div ref={tabBarRef} className="h-0 w-full" aria-hidden="true" />
@@ -448,16 +473,13 @@ export default function Home() {
         searchTerm={deferredSearchTerm} 
         filteredApps={filteredApps} 
         visibleCount={visibleCount} 
-        onClearSearch={() => {
-          setSearchTerm('');
-          navigate('/', { replace: true });
-        }} 
+        onClearSearch={handleClearSearch} 
       />
 
       {deferredActiveTab.toLowerCase() === 'top charts' && !deferredSearchTerm && (
         <div className="space-y-1 px-0 sm:px-1">
           {filteredApps.slice(0, visibleCount).map((app, index) => (
-            <TopChartItem key={`${app.id}-${index}`} rank={index + 1} app={app} />
+            <TopChartItem key={app.id || app.slug || index} rank={index + 1} app={app} />
           ))}
           {mockApps.length === 0 && (
             <div className="p-8 text-center bg-zinc-50 dark:bg-zinc-900 rounded-2xl mx-4 mt-8 border border-zinc-200 dark:border-zinc-800">
@@ -476,7 +498,7 @@ export default function Home() {
           <div className="px-0 sm:px-1">
             <div className="space-y-2">
               {tabFilteredApps.slice(0, visibleCount).map((app, index) => (
-                <AppListItem key={`${app.id}-${index}`} app={app} index={index + 1} />
+                <AppListItem key={app.id || app.slug || index} app={app} index={index + 1} />
               ))}
               {tabFilteredApps.length === 0 && (
                 <div className="p-8 text-center bg-zinc-50 dark:bg-zinc-900/60 rounded-2xl mx-1 mt-4 border border-zinc-200/80 dark:border-zinc-800">
@@ -501,7 +523,7 @@ export default function Home() {
         return !isExcluded && !deferredSearchTerm && (
           <div className="animate-fade-in space-y-2 px-0 sm:px-1">
             {tabFilteredApps.length > 0 ? (
-              tabFilteredApps.slice(0, visibleCount).map((app, index) => <AppListItem key={`${app.id}-${index}`} app={app} index={index + 1} />)
+              tabFilteredApps.slice(0, visibleCount).map((app, index) => <AppListItem key={app.id || app.slug || index} app={app} index={index + 1} />)
             ) : (
               <div className="text-center py-12 px-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800">
                 <p className="text-base font-semibold text-zinc-700 dark:text-zinc-200 mb-3">
@@ -576,7 +598,7 @@ export default function Home() {
       )}
 
       {!deferredSearchTerm && activeTabLower !== 'categories' && tabFilteredApps.length > visibleCount && (
-        <nav aria-label="Complete Application Directory" data-nosnippet className="mt-8 pt-6 border-t border-zinc-200/80 dark:border-zinc-800/80">
+        <nav aria-label="Complete Application Directory" data-nosnippet className="mt-8 pt-6 border-t border-zinc-200/80 dark:border-zinc-800/80 [contain:layout_style]">
           <h2 className="text-xs sm:text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-3 uppercase tracking-wider">
             More Applications in Catalog ({tabFilteredApps.length - visibleCount})
           </h2>

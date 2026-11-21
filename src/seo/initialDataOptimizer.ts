@@ -359,6 +359,7 @@ export function optimizeInitialDataForRoute(
         is_featured: Boolean(app.is_featured),
         is_new: Boolean(app.is_new),
         is_hot: Boolean(app.is_hot),
+        ...(app.is_coming_soon ? { is_coming_soon: true } : {}),
         popular: Boolean(app.popular),
         active: app.active !== false,
         tags: Array.isArray(app.tags) ? app.tags : [],
@@ -370,6 +371,7 @@ export function optimizeInitialDataForRoute(
         short_description: typeof app.short_description === 'string' ? app.short_description.slice(0, 150) : '',
         seo_title: app.seo_title || '',
         seo_description: app.seo_description || '',
+        ...(app.seo_keywords ? { seo_keywords: app.seo_keywords } : {}),
         canonical_url: app.canonical_url || '',
         has_secure_link: hasSecureLink,
         link_configured: hasSecureLink,
@@ -479,9 +481,8 @@ export function optimizeInitialDataForRoute(
       }));
 
     optimizedNews = [...fullArticleList, ...fullRecent, ...remainingStubs];
-  } else if (isNewsIndexPage || isHomePage) {
-    const sliceLimit = isHomePage ? 8 : rawNews.length;
-    optimizedNews = rawNews.slice(0, sliceLimit).map((item: any) => mapFullNewsItem(item));
+  } else if (isNewsIndexPage) {
+    optimizedNews = rawNews.map((item: any) => mapFullNewsItem(item));
   } else if (isAppDetailPage && targetApp) {
     optimizedNews = getRelatedNewsForApp(targetApp, rawNews).map((item: any) => ({
       id: item.id,
@@ -493,9 +494,9 @@ export function optimizeInitialDataForRoute(
     }));
   }
 
-  // Optimized Videos: Only include on Home and Video routes to keep initial HTML and JSON.parse ultra-light across all other pages
+  // Optimized Videos: Only include on Video routes to keep Home HTML and JSON.parse ultra-light
   const isVideoPage = cleanPathLower === '/videos' || cleanPathLower.startsWith('/videos/') || cleanPathLower.startsWith('/video/');
-  const rawVideos = (isHomePage || isVideoPage)
+  const rawVideos = isVideoPage
     ? (Array.isArray(data.videos) ? data.videos : (Array.isArray(data.mockVideos) ? data.mockVideos : []))
         .filter((v: any) => v && v.sync_to_public !== false && v.sync_to_public !== 'false' && v.is_published !== false && v.is_draft !== true)
     : [];

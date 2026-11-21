@@ -3,6 +3,7 @@ import zlib from 'zlib';
 import staticData from '../../lib/staticData.json';
 import { fetchStoreData } from '../../seoHelper';
 import { getAllSiteIconUrls, isPngBytes, resolveSiteLogoUrl, wrapPngsInIco } from '../../seo/utils';
+import { isSafeExternalHttpUrl } from '../security/urlGuard';
 import {
   generateMasterSitemapXml,
   generateAppsSitemapXml,
@@ -118,6 +119,9 @@ seoRouter.get(
       // Avoid self-redirect loops when targetUrl points back to the same local static path
       if (targetUrl && targetUrl !== req.path && !targetUrl.endsWith(req.path)) {
         if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
+          if (!isSafeExternalHttpUrl(targetUrl)) {
+            return next();
+          }
           const cacheKey = `${p}::${targetUrl}`;
           const cached = iconBufferCache.get(cacheKey);
           if (cached && cached.expiresAt > Date.now()) {
@@ -129,7 +133,7 @@ seoRouter.get(
             const upstream = await fetch(targetUrl, { signal: AbortSignal.timeout(4000) });
             if (upstream.ok) {
               const rawPng = new Uint8Array(await upstream.arrayBuffer());
-              if (rawPng.byteLength > 64) {
+              if (rawPng.byteLength > 64 && rawPng.byteLength <= 5 * 1024 * 1024) {
                 let outBuf: Buffer;
                 let ct: string;
                 const isIco = rawPng[0] === 0 && rawPng[1] === 0 && rawPng[2] === 1 && rawPng[3] === 0;
@@ -143,6 +147,7 @@ seoRouter.get(
                   outBuf = Buffer.from(rawPng);
                   ct = upstream.headers.get('content-type') || 'image/png';
                 }
+                if (iconBufferCache.size > 64) iconBufferCache.clear();
                 iconBufferCache.set(cacheKey, {
                   buffer: outBuf,
                   contentType: ct,

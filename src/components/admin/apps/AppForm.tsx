@@ -52,8 +52,30 @@ export const AppForm = React.memo(({
     }
   }, [initialFormTab, setActiveFormTab]);
 
+  const screenshotsJson = React.useMemo(
+    () => JSON.stringify(formFields.screenshots || []),
+    [formFields.screenshots]
+  );
+  const faqsJson = React.useMemo(
+    () => JSON.stringify(formFields.faqs || []),
+    [formFields.faqs]
+  );
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      if (!saving) {
+        handleSaveApp(e, formFields);
+      }
+    }
+  };
+
   return (
-    <form onSubmit={(e) => { e.preventDefault(); handleSaveApp(e, formFields); }} className="flex flex-col h-full overflow-hidden">
+    <form
+      onSubmit={(e) => { e.preventDefault(); handleSaveApp(e, formFields); }}
+      onKeyDown={handleKeyDown}
+      className="flex flex-col h-full overflow-hidden"
+    >
       {/* Hidden inputs to guarantee form state is preserved when submitted from any tab */}
       <input type="hidden" name="hidden_rating" value={formFields.rating !== undefined ? formFields.rating : '4.8'} />
       <input type="hidden" name="hidden_review_count" value={formFields.review_count !== undefined ? formFields.review_count : ''} />
@@ -72,8 +94,8 @@ export const AppForm = React.memo(({
       <input type="hidden" name="hidden_idea_box_msg" value={formFields.idea_box_msg || ''} />
       <input type="hidden" name="hidden_custom_admin_box_heading" value={formFields.custom_admin_box_heading || ''} />
       <input type="hidden" name="hidden_custom_admin_box_html" value={formFields.custom_admin_box_html || ''} />
-      <input type="hidden" name="hidden_screenshots_json" value={JSON.stringify(formFields.screenshots || [])} />
-      <input type="hidden" name="hidden_faqs_json" value={JSON.stringify(formFields.faqs || [])} />
+      <input type="hidden" name="hidden_screenshots_json" value={screenshotsJson} />
+      <input type="hidden" name="hidden_faqs_json" value={faqsJson} />
       <input type="hidden" name="hidden_canonical_url" value={formFields.canonical_url || ''} />
       <input type="hidden" name="hidden_target_region" value={formFields.target_region || ''} />
       <input type="hidden" name="hidden_publish_date" value={formFields.publish_date || ''} />

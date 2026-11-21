@@ -166,6 +166,13 @@ export function resolveSiteFaviconUrl(settings?: any): string {
   return sFav || sLogo || getEnvFaviconUrl() || '';
 }
 
+const CLD_TRANSFORM_REGEX =
+  /\/upload\/(?:(?:(?:w|h|c|f|q|b|g|r|e|t|ar|dpr|fl|bo|co|l|u|o|a|x|y|z|dn|dl|cs|pg|ac|af|br|du|eo|fps|ki|so|sp|vc|vs)_[a-zA-Z0-9_.:%-]+)(?:,(?:(?:w|h|c|f|q|b|g|r|e|t|ar|dpr|fl|bo|co|l|u|o|a|x|y|z|dn|dl|cs|pg|ac|af|br|du|eo|fps|ki|so|sp|vc|vs)_[a-zA-Z0-9_.:%-]+))*\/)*/;
+
+function stripCloudinaryTransforms(url: string): string {
+  return url.replace(CLD_TRANSFORM_REGEX, '/upload/');
+}
+
 export function getSizedLogoUrl(
   rawUrl?: string,
   size = 512,
@@ -176,7 +183,7 @@ export function getSizedLogoUrl(
   const trimmed = rawUrl.trim();
   if (!trimmed) return '';
   if (trimmed.includes('res.cloudinary.com') && trimmed.includes('/upload/')) {
-    const cleanUrl = trimmed.replace(/\/upload\/(?:(?:[a-z]{1,3}_[a-zA-Z0-9_.:-]+,?)+\/)*/, '/upload/');
+    const cleanUrl = stripCloudinaryTransforms(trimmed);
     const fmt = format === 'auto' ? 'f_auto' : `f_${format}`;
     if (size <= 0) {
       return cleanUrl.replace('/upload/', `/upload/${fmt},q_auto:best/`);
@@ -306,8 +313,8 @@ export function getOgImageUrl(url?: string, origin = getDefaultOrigin(), isNews 
   if (!url) return '';
   let absUrl = ensureAbsoluteUrl(url, origin);
   if (absUrl.includes('res.cloudinary.com') && absUrl.includes('/upload/')) {
-    // Strip existing transformations cleanly
-    let cleanUrl = absUrl.replace(/\/upload\/(?:(?:[a-z]{1,3}_[a-zA-Z0-9_.:-]+,?)+\/)*/, '/upload/');
+    // Strip existing transformations cleanly while preserving folder segments
+    let cleanUrl = stripCloudinaryTransforms(absUrl);
     // Social crawlers (WhatsApp, Facebook, Twitter, iMessage) strictly require .jpg or .png extension in URL
     if (/\.(webp|png|jpeg|gif|avif)$/i.test(cleanUrl)) {
       cleanUrl = cleanUrl.replace(/\.(webp|png|jpeg|gif|avif)$/i, '.jpg');
@@ -329,7 +336,7 @@ export function getOgSquareImageUrl(url?: string, origin = getDefaultOrigin()): 
   if (!url) return '';
   let absUrl = ensureAbsoluteUrl(url, origin);
   if (absUrl.includes('res.cloudinary.com') && absUrl.includes('/upload/')) {
-    let cleanUrl = absUrl.replace(/\/upload\/(?:(?:[a-z]{1,3}_[a-zA-Z0-9_.:-]+,?)+\/)*/, '/upload/');
+    let cleanUrl = stripCloudinaryTransforms(absUrl);
     if (/\.(webp|png|jpeg|gif|avif)$/i.test(cleanUrl)) {
       cleanUrl = cleanUrl.replace(/\.(webp|png|jpeg|gif|avif)$/i, '.jpg');
     } else if (!cleanUrl.toLowerCase().endsWith('.jpg')) {
@@ -347,7 +354,7 @@ export function getOptimizedImageUrl(url?: string, width = 160): string {
   if (!url) return '';
   // Cloudinary dynamic optimization: strip only transformation parameters while preserving folder paths & version segments
   if (url.includes('res.cloudinary.com') && url.includes('/upload/')) {
-    const cleanUrl = url.replace(/\/upload\/(?:(?:[a-z]{1,3}_[a-zA-Z0-9_.:-]+,?)+\/)*/, '/upload/');
+    const cleanUrl = stripCloudinaryTransforms(url);
     if (width > 0) {
       return cleanUrl.replace('/upload/', `/upload/f_auto,q_auto,w_${width}/`);
     }

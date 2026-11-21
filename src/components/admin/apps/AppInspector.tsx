@@ -17,6 +17,7 @@ import {
 import { safeHtml } from '../../../lib/safeHtml';
 import { exportAppToPdf } from '../../../lib/appPdfExport';
 import { getCachedLiveAppStats } from '../../../lib/communityFirebase';
+import { getOptimizedImageUrl } from '../../../seo/utils';
 
 interface AppInspectorProps {
   selectedApp: any;
@@ -52,6 +53,7 @@ export const AppInspector = ({
   };
 
   useEffect(() => {
+    let isCancelled = false;
     if (selectedApp?.id) {
       setLiveStats(null);
       // Fast instantaneous read from local atomic cache
@@ -72,12 +74,15 @@ export const AppInspector = ({
           return null;
         })
         .then(data => {
-          if (data && data.success && data.stats) {
+          if (!isCancelled && data && data.success && data.stats) {
             setLiveStats(data.stats);
           }
         })
         .catch(err => console.error("Error fetching live stats for inspector:", err));
     }
+    return () => {
+      isCancelled = true;
+    };
   }, [selectedApp?.id, selectedApp?.slug]);
 
   if (!selectedApp) {
@@ -119,7 +124,7 @@ export const AppInspector = ({
 
         <div className="flex items-center gap-3.5 w-full">
           <img 
-            src={selectedApp.icon_url || '/logo.png'} 
+            src={getOptimizedImageUrl(selectedApp.icon_url || '/logo.png', 112)} 
             loading="lazy"
             width={56}
             height={56}

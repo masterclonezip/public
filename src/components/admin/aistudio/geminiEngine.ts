@@ -18,6 +18,7 @@ import {
   loadStudioConfig
 } from './storage';
 import siteBrainSnapshot from '../../../lib/aiStudioBrain.json';
+import { adminFetch } from '../../../services/adminAuthService';
 
 export function buildFailoverModelChain(primaryModel?: string): string[] {
   const norm = normalizeClientModelId(primaryModel);
@@ -382,6 +383,9 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: nu
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    if (url.startsWith('/api/')) {
+      return await adminFetch(url, { ...options, signal: controller.signal });
+    }
     return await fetch(url, { ...options, signal: controller.signal });
   } finally {
     clearTimeout(timer);

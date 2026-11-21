@@ -61,13 +61,19 @@ export const AdminCategoriesTab = React.memo(({
                 type="text" 
                 value={newCatInput}
                 onChange={(e) => setNewCatInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newCatInput.trim()) {
+                    e.preventDefault();
+                    onAdd();
+                  }
+                }}
                 className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm dark:text-white focus:ring-2 focus:ring-blue-500 transition-all"
-                placeholder="e.g., Finance, Gaming, Utilities"
+                placeholder="e.g., Finance, Gaming, Utilities (Press Enter to add)"
               />
               <button 
                 type="button" 
                 onClick={onAdd}
-                className="px-6 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-lg transition-colors border border-slate-200 dark:border-slate-700"
+                className="px-6 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-lg transition-colors border border-slate-200 dark:border-slate-700 cursor-pointer"
               >
                 Add
               </button>

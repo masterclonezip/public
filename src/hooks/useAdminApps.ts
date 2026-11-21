@@ -31,6 +31,7 @@ export const useAdminApps = (apps: any[], loading: boolean, isAdminUser: boolean
   const [appsList, setAppsList] = useState<any[]>(() => (Array.isArray(apps) && apps.length > 0 ? apps : (mockApps || [])));
   const [fetchFailed, setFetchFailed] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const loadingVaultRef = useRef(false);
   const cachedSecureMapRef = useRef(new Map<string, string>());
   const deletedAppIdsRef = useRef(new Set<string>());
 
@@ -66,7 +67,8 @@ export const useAdminApps = (apps: any[], loading: boolean, isAdminUser: boolean
 
   // 1. Initial vault links loader (O(N) with cached crypto)
   useEffect(() => {
-    if (!loading && isAdminUser === true && !isInitialized) {
+    if (!loading && isAdminUser === true && !isInitialized && !loadingVaultRef.current) {
+      loadingVaultRef.current = true;
       const loadVault = async () => {
         try {
           const secureMap = new Map<string, string>();
@@ -153,12 +155,17 @@ export const useAdminApps = (apps: any[], loading: boolean, isAdminUser: boolean
           .map(a => {
             const existingApp = (a.id && existingById.get(String(a.id))) || (a.slug && existingBySlug.get(String(a.slug).toLowerCase()));
             const staticFallback = (a.id && STATIC_BY_ID.get(String(a.id))) || (a.slug && STATIC_BY_SLUG.get(String(a.slug).toLowerCase()));
-            const rawLink = a.more_information_url || a.encrypted_link || existingApp?.more_information_url || '';
+            const explicitlyClearedLink = a.more_information_url === '' && !a.encrypted_link;
+            const rawLink = explicitlyClearedLink
+              ? ''
+              : (a.more_information_url || a.encrypted_link || existingApp?.more_information_url || '');
             const preservedCipher = (rawLink && typeof rawLink === 'string' && rawLink.startsWith('U2FsdGVkX1'))
               ? rawLink
               : ((a.encrypted_link && typeof a.encrypted_link === 'string' && a.encrypted_link.startsWith('U2FsdGVkX1')) ? a.encrypted_link : '');
             const decryptedFromLink = fastDecryptCached(rawLink);
-            const link = decryptedFromLink || secureMap.get(a.id) || (a.slug && secureMap.get(a.slug)) || '';
+            const link = explicitlyClearedLink
+              ? ''
+              : (decryptedFromLink || secureMap.get(a.id) || (a.slug && secureMap.get(a.slug)) || '');
             if (link) {
               if (a.id && !secureMap.has(a.id)) secureMap.set(a.id, link);
               if (a.slug && !secureMap.has(a.slug)) secureMap.set(a.slug, link);

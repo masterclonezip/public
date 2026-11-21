@@ -185,6 +185,46 @@ const mergeUniqueNews = (baseList: NewsItem[], incomingList: NewsItem[]): NewsIt
   return Array.from(map.values());
 };
 
+const isPopulatedSettingValue = (val: unknown): boolean => {
+  if (val === undefined || val === null) return false;
+  if (typeof val === 'string') return val.trim().length > 0;
+  if (Array.isArray(val)) return val.length > 0;
+  if (typeof val === 'object') return Object.keys(val as Record<string, unknown>).length > 0;
+  return true;
+};
+
+const mergeSettingsPreservingNonEmpty = (
+  base: GlobalSettings,
+  incoming?: Partial<GlobalSettings> | null
+): GlobalSettings => {
+  if (!incoming || typeof incoming !== 'object') return base;
+  const next: any = { ...base };
+  for (const [k, v] of Object.entries(incoming)) {
+    if (v === undefined || v === null) continue;
+    if (k === 'social_links' && typeof v === 'object' && !Array.isArray(v)) {
+      const mergedSocial: Record<string, any> = { ...((next.social_links as any) || {}) };
+      for (const [sk, sv] of Object.entries(v as Record<string, any>)) {
+        if (typeof sv === 'string' ? sv.trim().length > 0 || !mergedSocial[sk] : sv !== undefined && sv !== null) {
+          mergedSocial[sk] = sv;
+        }
+      }
+      next.social_links = mergedSocial;
+      continue;
+    }
+    if (isPopulatedSettingValue(v) || !isPopulatedSettingValue(next[k])) {
+      next[k] = v;
+    }
+  }
+  // Normalize logo_url <-> favicon_url fallback inside merged settings
+  if (!String(next.logo_url || '').trim() && String(next.favicon_url || '').trim()) {
+    next.logo_url = next.favicon_url;
+  }
+  if (!String(next.favicon_url || '').trim() && String(next.logo_url || '').trim()) {
+    next.favicon_url = next.logo_url;
+  }
+  return next as GlobalSettings;
+};
+
 const getInitialCache = () => {
   try {
     if (typeof window !== 'undefined' && (window as any).__INITIAL_DATA__) {
@@ -213,7 +253,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   
   const [settings, setSettings] = useState<GlobalSettings>(() => {
     if (initialCache?.settings && Object.keys(initialCache.settings).length > 0) {
-      return { ...mockSettings, ...initialCache.settings };
+      return mergeSettingsPreservingNonEmpty(mockSettings, initialCache.settings);
     }
     return mockSettings;
   });
@@ -271,7 +311,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (res.ok) {
         const payload = await res.json();
         if (payload?.settings && Object.keys(payload.settings).length > 0) {
-          setSettings(prev => ({ ...prev, ...payload.settings }));
+          setSettings(prev => mergeSettingsPreservingNonEmpty(prev, payload.settings));
         }
       }
     } catch (_e) {
@@ -350,7 +390,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (backup.settings && Object.keys(backup.settings).length > 0) {
               setSettings(prev => {
                 const prevStr = JSON.stringify(prev);
-                const nextObj = { ...prev, ...backup.settings };
+                const nextObj = mergeSettingsPreservingNonEmpty(prev, backup.settings);
                 return JSON.stringify(nextObj) === prevStr ? prev : nextObj;
               });
             }
@@ -404,25 +444,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setNews(prev => mergeUniqueNews(prev, full.news));
     }
     if (full.settings && typeof full.settings === 'object' && Object.keys(full.settings).length > 0) {
-      setSettings(prev => ({
+      const mergedStatic = {
         ...mockSettings,
         ...full.settings,
-        ...prev,
-        banners: (Array.isArray(prev?.banners) && prev.banners.length > 0) ? prev.banners : (full.settings.banners || []),
-        website_faqs: (Array.isArray(prev?.website_faqs) && prev.website_faqs.length > 0) ? prev.website_faqs : (full.settings.website_faqs || []),
-        developers: (Array.isArray((prev as any)?.developers) && (prev as any).developers.length > 0) ? (prev as any).developers : (full.settings.developers || []),
-        hero_title_text: prev?.hero_title_text || full.settings.hero_title_text || '',
-        hero_title_subtitle: prev?.hero_title_subtitle || full.settings.hero_title_subtitle || '',
-        about_content: (prev as any)?.about_content || full.settings.about_content || full.settings.about_us || '',
-        contact_content: (prev as any)?.contact_content || full.settings.contact_content || '',
-        privacy_content: (prev as any)?.privacy_content || full.settings.privacy_content || full.settings.privacy_policy || '',
-        terms_content: (prev as any)?.terms_content || full.settings.terms_content || full.settings.terms_conditions || '',
-        disclaimer_text: (prev as any)?.disclaimer_text || full.settings.disclaimer_text || '',
-        dmca_content: (prev as any)?.dmca_content || full.settings.dmca_content || '',
-        ethics_content: (prev as any)?.ethics_content || full.settings.ethics_content || '',
-        notice_content: (prev as any)?.notice_content || full.settings.notice_content || '',
-        responsibility_content: (prev as any)?.responsibility_content || full.settings.responsibility_content || ''
-      }));
+        about_content: full.settings.about_content || full.settings.about_us || '',
+        privacy_content: full.settings.privacy_content || full.settings.privacy_policy || '',
+        terms_content: full.settings.terms_content || full.settings.terms_conditions || ''
+      };
+      setSettings(prev => mergeSettingsPreservingNonEmpty(mergedStatic, prev));
     }
     if (Array.isArray(full.videos) && full.videos.length > 0) {
       setVideos(prev => (prev.length >= full.videos.length ? prev : full.videos));
@@ -443,29 +472,47 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const isNewsRoute = p === '/news' || isNewsDetail;
 
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let idleId: number | undefined;
+    const cancelPrewarm = () => {
+      if (timer) clearTimeout(timer);
+      if (idleId !== undefined && typeof window !== 'undefined' && typeof (window as any).cancelIdleCallback === 'function') {
+        (window as any).cancelIdleCallback(idleId);
+      }
+    };
+
     if (!isGateway) {
-      timer = setTimeout(() => {
-        if (isAppDetail || isNewsDetail) {
-          // Strictly isolate detail pages: pre-warm the static dataset singleton in memory for 0ms next-click navigation,
-          // WITHOUT dumping 230+ unrelated apps into React state on /app/:slug or /news/:slug!
+      const hasSsrCatalog = isCatalog && apps.length >= 25;
+      const runPrewarm = () => {
+        if (isAppDetail || isNewsDetail || hasSsrCatalog) {
+          // Pre-warm the static dataset singleton in memory for 0ms next-click navigation,
+          // WITHOUT triggering a redundant full-page React re-render over already-hydrated SSR state.
           loadFullStaticDataset().catch(() => {});
         } else {
           loadFullStaticDataset().then(hydrateFromStaticDataset).catch(() => {});
         }
-      }, 150);
+      };
+
+      if (hasSsrCatalog && typeof window !== 'undefined' && typeof (window as any).requestIdleCallback === 'function') {
+        idleId = (window as any).requestIdleCallback(runPrewarm, { timeout: 2500 });
+      } else {
+        timer = setTimeout(runPrewarm, hasSsrCatalog ? 1500 : 150);
+      }
     }
 
-    if (isNewsRoute) {
-      if (news.length === 0) {
-        fetchBackupData(true);
-      }
-    } else if (!isAppDetail && (apps.length === 0 || (isCatalog && apps.length < 50))) {
+    const missingBranding =
+      !String(settings?.logo_url || '').trim() ||
+      !String(settings?.favicon_url || '').trim() ||
+      !String(settings?.site_title || '').trim();
+
+    if (isNewsRoute && news.length === 0) {
+      fetchBackupData(true);
+    } else if (!isGateway && !isAppDetail && (apps.length === 0 || (isCatalog && apps.length < 25))) {
       fetchBackupData(false);
+    } else if (!isGateway && missingBranding) {
+      fetchSettings();
     }
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [apps.length, news.length, fetchBackupData, hydrateFromStaticDataset]);
+    return cancelPrewarm;
+  }, [apps.length, news.length, settings?.logo_url, settings?.favicon_url, settings?.site_title, fetchBackupData, fetchSettings, hydrateFromStaticDataset]);
 
   // Ensure full catalog is hydrated ONLY when navigating to a catalog listing route or opening global search
   const routeFetchDoneRef = React.useRef(false);

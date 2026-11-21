@@ -10,6 +10,7 @@ import {
   Edit3
 } from 'lucide-react';
 import { useAppFilters } from '../hooks/useAppFilters';
+import { getOptimizedImageUrl } from '../seo/utils';
 import { AppForm } from './admin/apps/AppForm';
 import { AppInspector } from './admin/apps/AppInspector';
 
@@ -29,6 +30,8 @@ const AppsTab = React.memo(({ appsList, editingAppId, setEditingAppId, handleDel
     setStatusFilter,
     categoryFilter,
     setCategoryFilter,
+    sortBy,
+    setSortBy,
     filteredApps
   } = useAppFilters(appsList);
 
@@ -36,7 +39,7 @@ const AppsTab = React.memo(({ appsList, editingAppId, setEditingAppId, handleDel
   
   React.useEffect(() => {
     setDisplayLimit(25);
-  }, [searchQuery, statusFilter, categoryFilter]);
+  }, [searchQuery, statusFilter, categoryFilter, sortBy]);
 
   const selectedApp = useMemo(
     () => appsList.find((a: any) => a.id === selectedAppId) || appsList[0],
@@ -149,16 +152,28 @@ const AppsTab = React.memo(({ appsList, editingAppId, setEditingAppId, handleDel
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-1.5">
+              <div className="grid grid-cols-12 gap-1.5">
                 <select 
                   value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
+                  className="col-span-5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl px-2 py-1.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer truncate"
                 >
-                  <option value="all">📁 All Categories</option>
+                  <option value="all">📁 Categories</option>
                   {categories?.map((cat: string) => (
                     <option key={cat} value={cat.toLowerCase()}>{cat}</option>
                   ))}
+                </select>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="col-span-5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl px-2 py-1.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer truncate"
+                  title="Sort or filter applications"
+                >
+                  <option value="default">⚡ Default</option>
+                  <option value="updated">🕒 Latest Updated</option>
+                  <option value="serial">🔢 Sort #</option>
+                  <option value="name">🔤 Name A–Z</option>
+                  <option value="missing_info">⚠️ Needs Info</option>
                 </select>
                 <button 
                   type="button"
@@ -166,10 +181,12 @@ const AppsTab = React.memo(({ appsList, editingAppId, setEditingAppId, handleDel
                     setSearchQuery('');
                     setCategoryFilter('all');
                     setStatusFilter('all');
+                    setSortBy('default');
                   }}
-                  className="w-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60 rounded-xl px-2.5 py-1.5 text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer"
+                  title="Reset Filters"
+                  className="col-span-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60 rounded-xl px-1.5 py-1.5 text-[11px] font-semibold flex items-center justify-center cursor-pointer"
                 >
-                  <RefreshCw className="w-3 h-3" /> Reset
+                  <RefreshCw className="w-3 h-3" />
                 </button>
               </div>
             </div>
@@ -204,7 +221,7 @@ const AppsTab = React.memo(({ appsList, editingAppId, setEditingAppId, handleDel
                         }`}
                       >
                         <img 
-                          src={app.icon_url || '/logo.png'} 
+                          src={getOptimizedImageUrl(app.icon_url || '/logo.png', 80)} 
                           loading="lazy"
                           width={40}
                           height={40}

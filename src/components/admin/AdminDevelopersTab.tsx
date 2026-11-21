@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Save } from 'lucide-react';
 import ImageUpload from '../ImageUpload';
 
 interface AdminDevelopersTabProps {
@@ -20,22 +20,31 @@ export const AdminDevelopersTab: React.FC<AdminDevelopersTabProps> = ({
   saving,
 }) => {
   return (
-    <div className="animate-fade-in space-y-6">
-      <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-4">
+    <form onSubmit={handleSaveDevelopers} className="animate-fade-in space-y-6">
+      <div className="flex flex-wrap justify-between items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Developers Management</h2>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Developers Management ({developersList.length})</h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Configure profile details of developers on the team page.</p>
         </div>
-        <button 
-          type="button"
-          onClick={handleAddDeveloper} 
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 font-semibold text-xs transition-all cursor-pointer border-0 shadow-sm"
-        >
-          <Plus className="w-4 h-4" /> Add Developer
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            type="button"
+            onClick={handleAddDeveloper} 
+            className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-white px-4 py-2 rounded-xl flex items-center gap-2 font-semibold text-xs transition-all cursor-pointer border-0"
+          >
+            <Plus className="w-4 h-4" /> Add Developer
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-xl flex items-center gap-2 font-semibold text-xs transition-all cursor-pointer border-0 shadow-sm"
+          >
+            <Save className="w-3.5 h-3.5" /> {saving ? 'Saving...' : 'Sync Developers'}
+          </button>
+        </div>
       </div>
       
-      <form onSubmit={handleSaveDevelopers} className="space-y-6">
+      <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {developersList.map((dev: any, index: number) => (
             <div key={`developer-${index}`} className="bg-slate-50/50 dark:bg-slate-800/30 border border-slate-200/60 dark:border-slate-800/60 rounded-xl p-5 shadow-sm relative animate-fade-in">
@@ -83,9 +92,9 @@ export const AdminDevelopersTab: React.FC<AdminDevelopersTabProps> = ({
         </div>
         
         <button type="submit" disabled={saving} className="min-h-[46px] px-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm tracking-wide rounded-xl shadow-sm transition-all cursor-pointer border-0 ml-auto block">
-          Sync Developers to Live
+          {saving ? 'Saving...' : 'Sync Developers to Live'}
         </button>
-      </form>
-    </div>
+      </div>
+    </form>
   );
 };

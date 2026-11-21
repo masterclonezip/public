@@ -27,6 +27,7 @@ import ImageUpload from '../ImageUpload';
 import { SeoFieldWithLimit } from './SeoFieldWithLimit';
 import { adminFetch } from '../../services/adminAuthService';
 import { safeHtml, structureHtmlFragment } from '../../lib/safeHtmlPublic';
+import { getOptimizedImageUrl } from '../../seo/utils';
 
 interface AdminNewsTabProps {
   newsList: any[];
@@ -197,6 +198,11 @@ export const AdminNewsTab: React.FC<AdminNewsTabProps> = ({
   // Clean collapsible sections for optional settings (keeps mobile screen 100% uncluttered)
   const [showSeoSection, setShowSeoSection] = useState(false);
   const [showAuthorSection, setShowAuthorSection] = useState(false);
+  const [displayLimit, setDisplayLimit] = useState(24);
+
+  React.useEffect(() => {
+    setDisplayLimit(24);
+  }, [searchQuery, statusFilter]);
 
   const htmlTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -561,8 +567,9 @@ export const AdminNewsTab: React.FC<AdminNewsTabProps> = ({
           </button>
         </div>
       ) : (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3">
-          {filteredNews.map((item) => {
+          {filteredNews.slice(0, displayLimit).map((item) => {
             const cover = item.logo_url || item.image_url || '';
             const linkedApp = item.related_app_id
               ? appsList.find((a) => a.id === item.related_app_id || a.slug === item.related_app_id)
@@ -582,7 +589,7 @@ export const AdminNewsTab: React.FC<AdminNewsTabProps> = ({
                   <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 overflow-hidden shrink-0 flex items-center justify-center">
                     {cover ? (
                       <img
-                        src={cover}
+                        src={getOptimizedImageUrl(cover, 120)}
                         alt=""
                         loading="lazy"
                         className="w-full h-full object-cover"
@@ -729,6 +736,16 @@ export const AdminNewsTab: React.FC<AdminNewsTabProps> = ({
             );
           })}
         </div>
+        {filteredNews.length > displayLimit && (
+          <button
+            type="button"
+            onClick={() => setDisplayLimit((prev) => prev + 24)}
+            className="w-full py-2.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-2xl transition-colors cursor-pointer border border-slate-200 dark:border-slate-800 shadow-2xs"
+          >
+            Load More Articles ({filteredNews.length - displayLimit} remaining)
+          </button>
+        )}
+        </>
       )}
 
       {/* =====================================================================
@@ -738,6 +755,14 @@ export const AdminNewsTab: React.FC<AdminNewsTabProps> = ({
         <div className="fixed inset-0 z-[999999] bg-slate-950/60 backdrop-blur-xs flex items-stretch sm:items-center justify-center sm:p-3 animate-fade-in">
           <form
             onSubmit={handleSaveDraftToFirebase}
+            onKeyDown={(e) => {
+              if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                e.preventDefault();
+                if (!saving) {
+                  handleSaveDraftToFirebase(e);
+                }
+              }
+            }}
             className="bg-white dark:bg-slate-900 w-full sm:max-w-3xl h-[100dvh] sm:h-[94dvh] sm:rounded-2xl border-0 sm:border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden"
           >
             {/* Clean Top Bar: Back Button + Title + Live/Pin + SAVE Button */}

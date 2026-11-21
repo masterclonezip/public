@@ -722,20 +722,28 @@ export async function injectSeoTags(template: string, urlPath: string, hostUrl?:
     .replace(/<script>window\.(?:__SSR_PATH__|__INITIAL_DATA__)[\s\S]*?<\/script>/gi, '')
     .replace(/<style\s+id=["']server-critical-css["']>[\s\S]*?<\/style>/gi, '');
 
+  let extractedViteCssLink = '';
   if (!finalHtml.includes('id="vite-inline-css"')) {
     if (/<link\b[^>]*rel=["']stylesheet["'][^>]*href=["'][^"']*\/assets\/[^"']+\.css["'][^>]*>/i.test(finalHtml)) {
       finalHtml = finalHtml.replace(
         /<link\b([^>]*rel=["']stylesheet["'][^>]*href=["'][^"']*\/assets\/[^"']+\.css["'][^>]*)>/i,
-        '<link id="vite-inline-css"$1>'
+        (_m, attrs) => {
+          extractedViteCssLink = `<link id="vite-inline-css"${attrs}>`;
+          return '';
+        }
       );
     } else if (!finalHtml.includes('href="/src/index.css"')) {
-      finalHtml = finalHtml.replace(
-        '</head>',
-        '    <link id="vite-inline-css" rel="stylesheet" href="/src/index.css" />\n  </head>'
-      );
+      extractedViteCssLink = '<link id="vite-inline-css" rel="stylesheet" href="/src/index.css" />';
+    }
+  } else {
+    const existingCssMatch = finalHtml.match(/<link\b[^>]*id=["']vite-inline-css["'][^>]*>/i);
+    const initMarkerIdx = finalHtml.indexOf('<!--INITIAL_DATA_SCRIPT-->');
+    if (existingCssMatch && existingCssMatch.index !== undefined && initMarkerIdx !== -1 && existingCssMatch.index > initMarkerIdx) {
+      extractedViteCssLink = existingCssMatch[0];
+      finalHtml = finalHtml.replace(existingCssMatch[0], '');
     }
   }
-  const hasInlinedViteCss = finalHtml.includes('id="vite-inline-css"');
+  const hasInlinedViteCss = Boolean(extractedViteCssLink) || finalHtml.includes('id="vite-inline-css"');
   const criticalCss = getCriticalCss(hasInlinedViteCss);
 
   // Inject seoTags (title, description, and critical OpenGraph/Twitter tags) at the VERY TOP of <head>
@@ -753,8 +761,9 @@ export async function injectSeoTags(template: string, urlPath: string, hostUrl?:
     }
   }
 
-  // Inject critical CSS and initialDataScript near the end of <head> so styles & payloads never block OpenGraph parsing
-  const trailingHeadPayload = `${criticalCss ? criticalCss + '\n    ' : ''}${initialDataScript}`;
+  // Place outer CSS stylesheet + critical CSS immediately before window.__INITIAL_DATA__ so styles load alongside raw HTML
+  const cssPrefix = `${extractedViteCssLink ? extractedViteCssLink + '\n    ' : ''}${criticalCss ? criticalCss + '\n    ' : ''}`;
+  const trailingHeadPayload = `${cssPrefix}${initialDataScript}`;
   if (finalHtml.includes('<!--INITIAL_DATA_SCRIPT-->')) {
     finalHtml = finalHtml.replace('<!--INITIAL_DATA_SCRIPT-->', trailingHeadPayload);
   } else if (finalHtml.includes('</head>')) {

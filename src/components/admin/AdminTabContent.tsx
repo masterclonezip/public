@@ -17,6 +17,7 @@ import { AdminDevelopersTab } from './AdminDevelopersTab';
 import AdminReviewsTab from './AdminReviewsTab';
 import AdminReportsTab from './AdminReportsTab';
 import AdminAIReviewStudioTab from './AdminAIReviewStudioTab';
+import { adminFetch } from '../../services/adminAuthService';
 
 interface TabErrorBoundaryProps {
   tabName: string;
@@ -382,7 +383,7 @@ export const AdminTabContent = ({
               currentConfig.updatedAt = Date.now();
               localStorage.setItem('ai_review_studio_config_v1', JSON.stringify(currentConfig));
               localStorage.setItem('admin_ai_studio_config', JSON.stringify(currentConfig));
-              fetch('/api/v1/admin/community/aistudio-settings', {
+              adminFetch('/api/v1/admin/community/aistudio-settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ config: currentConfig })

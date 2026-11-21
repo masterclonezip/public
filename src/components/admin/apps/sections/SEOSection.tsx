@@ -13,10 +13,41 @@ export const SEOSection = ({ formFields, handleFieldChange }: SEOSectionProps) =
   const isTitleOver = (formFields.seo_title || '').length > 58;
   const isDescOver = (formFields.seo_description || '').length > 155;
 
+  const handleAutoFillFromApp = () => {
+    const cleanName = String(formFields.name || '').trim();
+    if (cleanName && !String(formFields.seo_title || '').trim()) {
+      handleFieldChange('seo_title', cleanName.slice(0, 58));
+    }
+    const rawHtml = String(formFields.description_html || formFields.features_html || '').trim();
+    if (rawHtml && !String(formFields.seo_description || '').trim()) {
+      const plainText = rawHtml
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (plainText) {
+        handleFieldChange('seo_description', plainText.slice(0, 155));
+      }
+    }
+    if (formFields.icon_url && !String(formFields.og_image_url || '').trim()) {
+      handleFieldChange('og_image_url', formFields.icon_url);
+    }
+  };
+
   return (
     <div className="animate-fade-in space-y-5">
       <div>
-        <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">Live Google SERP Simulator Preview</label>
+        <div className="flex items-center justify-between gap-2 mb-1.5">
+          <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400">Live Google SERP Simulator Preview</label>
+          <button
+            type="button"
+            onClick={handleAutoFillFromApp}
+            className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800/60 transition-all cursor-pointer bg-transparent"
+            title="Fill empty SEO fields from the app's existing name, description, and icon"
+          >
+            ✨ Auto-Fill Empty Fields from App Info
+          </button>
+        </div>
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs max-w-full font-sans">
           <div className="text-[12px] text-slate-500 dark:text-slate-400 font-normal truncate flex items-center gap-1">
             <span>{typeof window !== 'undefined' ? window.location.origin : ((import.meta as any).env?.VITE_PUBLIC_DOMAIN || 'https://example.com')}</span>

@@ -3,6 +3,40 @@ import { AppConfig, GlobalSettings, NewsItem, VideoItem } from '../types';
 import { adminFetch } from '../services/adminAuthService';
 import { isFirebaseReal, hydrateFirebaseRuntimeConfig, readFirestoreDoc } from '../lib/firebase';
 
+const mergeNonEmptySettings = <T extends Record<string, any>>(base: T, incoming?: Record<string, any> | null): T => {
+  if (!incoming || typeof incoming !== 'object') return base;
+  const next: Record<string, any> = { ...(base || {}) };
+  for (const [k, v] of Object.entries(incoming)) {
+    if (v === undefined || v === null) continue;
+    if (typeof v === 'string') {
+      if (v.trim().length > 0 || !next[k] || String(next[k]).trim().length === 0) {
+        next[k] = v;
+      }
+      continue;
+    }
+    if (Array.isArray(v)) {
+      if (v.length > 0 || !Array.isArray(next[k]) || next[k].length === 0) {
+        next[k] = v;
+      }
+      continue;
+    }
+    if (typeof v === 'object') {
+      if (Object.keys(v).length > 0 || !next[k]) {
+        next[k] = v;
+      }
+      continue;
+    }
+    next[k] = v;
+  }
+  if (!String(next.logo_url || '').trim() && String(next.favicon_url || '').trim()) {
+    next.logo_url = next.favicon_url;
+  }
+  if (!String(next.favicon_url || '').trim() && String(next.logo_url || '').trim()) {
+    next.favicon_url = next.logo_url;
+  }
+  return next as T;
+};
+
 export function useDataSync() {
   const initialData = (typeof window !== 'undefined' && (window as any).__INITIAL_DATA__) || null;
 
@@ -77,7 +111,7 @@ export function useDataSync() {
           setApps(data.apps);
         }
         if (data.settings && typeof data.settings === 'object' && Object.keys(data.settings).length > 0) {
-          setSettings(data.settings);
+          setSettings(prev => mergeNonEmptySettings(prev || ({} as GlobalSettings), data.settings));
         }
         if (Array.isArray(data.news)) {
           setNews(data.news);
@@ -149,29 +183,35 @@ export function useDataSync() {
             }
 
             let loadedSettings: any = {};
-            if (settingsSnap.exists && settingsSnap.data) {
-              loadedSettings = { ...loadedSettings, ...settingsSnap.data };
+            if (publicSettingsSnap.exists && publicSettingsSnap.data) {
+              loadedSettings = mergeNonEmptySettings(loadedSettings, publicSettingsSnap.data);
               loadedFromDirectFirestore = true;
             }
-            if (publicSettingsSnap.exists && publicSettingsSnap.data) {
-              loadedSettings = { ...loadedSettings, ...publicSettingsSnap.data };
+            if (settingsSnap.exists && settingsSnap.data) {
+              loadedSettings = mergeNonEmptySettings(loadedSettings, settingsSnap.data);
               loadedFromDirectFirestore = true;
             }
             if (faqsSnap.exists && faqsSnap.data) {
-              if (Array.isArray(faqsSnap.data.items)) loadedSettings.website_faqs = faqsSnap.data.items;
+              if (Array.isArray(faqsSnap.data.items) && (!Array.isArray(loadedSettings.website_faqs) || loadedSettings.website_faqs.length === 0)) {
+                loadedSettings.website_faqs = faqsSnap.data.items;
+              }
               loadedFromDirectFirestore = true;
             }
             if (devsSnap.exists && devsSnap.data) {
-              if (Array.isArray(devsSnap.data.items)) loadedSettings.developers = devsSnap.data.items;
+              if (Array.isArray(devsSnap.data.items) && (!Array.isArray(loadedSettings.developers) || loadedSettings.developers.length === 0)) {
+                loadedSettings.developers = devsSnap.data.items;
+              }
               loadedFromDirectFirestore = true;
             }
             if (linksSnap.exists && linksSnap.data) {
-              if (Array.isArray(linksSnap.data.items)) loadedSettings.quick_links = linksSnap.data.items;
+              if (Array.isArray(linksSnap.data.items) && (!Array.isArray(loadedSettings.quick_links) || loadedSettings.quick_links.length === 0)) {
+                loadedSettings.quick_links = linksSnap.data.items;
+              }
               loadedFromDirectFirestore = true;
             }
 
             if (Object.keys(loadedSettings).length > 0) {
-              setSettings(prev => ({ ...prev, ...loadedSettings }));
+              setSettings(prev => mergeNonEmptySettings(prev || ({} as GlobalSettings), loadedSettings));
               loadedFromDirectFirestore = true;
             }
 

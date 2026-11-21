@@ -1,8 +1,21 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import { verifyTOTPToken } from '../../lib/totp';
+import { safeDecrypt, getAesSecret } from '../../lib/cryptoUtils';
 
 export const adminAuthRouter = Router();
+
+// Per-process ephemeral fallback secret (never hardcoded in source)
+const EPHEMERAL_SESSION_SECRET = crypto.randomBytes(32).toString('hex');
+
+// Short-TTL in-memory cache for server-verified Firebase ID tokens (keyed by SHA-256 hash)
+const verifiedFirebaseTokenCache = new Map<string, { email: string; expiresAt: number }>();
+
+function safeEqualString(a: string, b: string): boolean {
+  const hashA = crypto.createHash('sha256').update(a).digest();
+  const hashB = crypto.createHash('sha256').update(b).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
+}
 
 // Helper to resolve configured admin credentials
 function getAdminConfig() {
@@ -22,12 +35,19 @@ function getAdminConfig() {
     process.env.JWT_SECRET ||
     process.env.ADMIN_SESSION_SECRET ||
     process.env.SESSION_SECRET ||
-    (configuredPassword ? crypto.createHash('sha256').update(configuredPassword + '_salt_admin').digest('hex') : 'default_admin_fallback_secret_key_2026')
+    (configuredPassword
+      ? crypto.createHash('sha256').update(configuredPassword + '_salt_admin').digest('hex')
+      : EPHEMERAL_SESSION_SECRET)
   );
 
   const totpSecret = process.env.ADMIN_TOTP_SECRET || process.env.TOTP_SECRET || '';
+  const firebaseApiKey = (
+    process.env.FIREBASE_API_KEY ||
+    process.env.VITE_FIREBASE_API_KEY ||
+    ''
+  ).replace(/^["']|["']$/g, '').trim();
 
-  return { configuredEmail, configuredPassword, sessionSecret, totpSecret };
+  return { configuredEmail, configuredPassword, sessionSecret, totpSecret, firebaseApiKey };
 }
 
 // Generates a cryptographically signed HMAC-SHA256 session token
@@ -44,65 +64,179 @@ function generateToken(email: string): string {
   return `adm_v1.${payloadB64}.${signature}`;
 }
 
-// Verifies the HMAC-SHA256 token, Firebase JWT, or offline token and checks expiration
-function verifyToken(token: string): { valid: boolean; email?: string } {
-  if (!token) return { valid: false };
+// Verifies a Firebase ID token against Google Identity Toolkit server-side
+async function verifyFirebaseIdToken(idToken: string): Promise<{ valid: boolean; email?: string }> {
+  if (!idToken || !idToken.startsWith('eyJ') || idToken.split('.').length !== 3) {
+    return { valid: false };
+  }
+  const { firebaseApiKey, configuredEmail } = getAdminConfig();
+  if (!firebaseApiKey) {
+    return { valid: false };
+  }
+
+  const cacheKey = crypto.createHash('sha256').update(idToken).digest('hex');
+  const cached = verifiedFirebaseTokenCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    if (!configuredEmail || cached.email === configuredEmail) {
+      return { valid: true, email: cached.email };
+    }
+    return { valid: false };
+  }
+
+  try {
+    const res = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(firebaseApiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+        signal: AbortSignal.timeout(5000)
+      }
+    );
+    if (!res.ok) return { valid: false };
+    const data: any = await res.json().catch(() => null);
+    const user = Array.isArray(data?.users) ? data.users[0] : null;
+    const verifiedEmail = String(user?.email || '').toLowerCase().trim();
+    if (!verifiedEmail || user?.disabled === true) {
+      return { valid: false };
+    }
+
+    if (verifiedFirebaseTokenCache.size > 100) verifiedFirebaseTokenCache.clear();
+    verifiedFirebaseTokenCache.set(cacheKey, {
+      email: verifiedEmail,
+      expiresAt: Date.now() + 2 * 60 * 1000
+    });
+
+    if (!configuredEmail || verifiedEmail === configuredEmail) {
+      return { valid: true, email: verifiedEmail };
+    }
+  } catch (_) {}
+
+  return { valid: false };
+}
+
+// Synchronous check for server-signed adm_v1 HMAC tokens and AES-encrypted offline session tokens
+function verifyLocalAdminToken(token: string): { valid: boolean; email?: string } {
+  if (!token || typeof token !== 'string') return { valid: false };
   try {
     const raw = token.startsWith('Bearer ') ? token.slice(7).trim() : token.trim();
+    if (!raw) return { valid: false };
     const { sessionSecret, configuredEmail } = getAdminConfig();
 
-    // 1. Verify v1 signed HMAC token
+    // 1. Verify v1 signed HMAC-SHA256 token
     if (raw.startsWith('adm_v1.')) {
       const parts = raw.split('.');
       if (parts.length === 3) {
         const [, payloadB64, sig] = parts;
         const expectedSig = crypto.createHmac('sha256', sessionSecret).update(payloadB64).digest('base64url');
-        
-        // Constant-time comparison to prevent timing attacks
+
         const sigBuf = Buffer.from(sig);
         const expSigBuf = Buffer.from(expectedSig);
         if (sigBuf.length === expSigBuf.length && crypto.timingSafeEqual(sigBuf, expSigBuf)) {
           const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf-8'));
-          if (payload && payload.exp > Date.now() && payload.role === 'admin') {
-            if (!configuredEmail || payload.email.toLowerCase() === configuredEmail) {
-              return { valid: true, email: payload.email };
+          const payloadEmail = String(payload?.email || '').toLowerCase().trim();
+          if (payload && Number(payload.exp) > Date.now() && payload.role === 'admin' && payloadEmail) {
+            if (!configuredEmail || payloadEmail === configuredEmail) {
+              return { valid: true, email: payloadEmail };
             }
           }
         }
       }
+      return { valid: false };
     }
 
-    // 2. Verify Firebase JWT token (eyJ...)
-    if (raw.startsWith('eyJ')) {
-      const parts = raw.split('.');
-      if (parts.length === 3) {
-        const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8'));
-        const tokenEmail = String(payload?.email || '').toLowerCase().trim();
-        const expMs = Number(payload?.exp || 0) * 1000;
-        if (tokenEmail && (!expMs || expMs > Date.now())) {
-          if (!configuredEmail || tokenEmail === configuredEmail) {
-            return { valid: true, email: tokenEmail };
+    // 2. Verify AES-encrypted offline session token ONLY if AES_SECRET decrypts a valid structured payload
+    if (raw.startsWith('U2FsdGVkX1')) {
+      const configuredAesSecret = String(
+        process.env.AES_SECRET || process.env.VITE_AES_SECRET || process.env.VAULT_SECRET_KEY || ''
+      ).trim();
+      if (!configuredAesSecret) return { valid: false };
+      const decrypted = safeDecrypt(raw, configuredAesSecret || getAesSecret());
+      if (decrypted && decrypted.startsWith('{')) {
+        const payload = JSON.parse(decrypted);
+        const payloadEmail = String(payload?.email || '').toLowerCase().trim();
+        if (
+          payload &&
+          Number(payload.exp) > Date.now() &&
+          (payload.role === 'admin' || payload.admin === true) &&
+          payloadEmail
+        ) {
+          if (!configuredEmail || payloadEmail === configuredEmail) {
+            return { valid: true, email: payloadEmail };
           }
         }
       }
-    }
-
-    // 3. Verify legacy secure token if signature matches
-    if (raw.startsWith('adm_sec_')) {
-      const decoded = JSON.parse(Buffer.from(raw.slice(8), 'base64').toString('utf-8'));
-      if (decoded && decoded.exp > Date.now() && decoded.role === 'admin') {
-        if (!configuredEmail || decoded.email.toLowerCase() === configuredEmail) {
-          return { valid: true, email: decoded.email };
-        }
-      }
-    }
-
-    // 4. Verify AES offline session token
-    if (raw.startsWith('U2FsdGVkX1')) {
-      return { valid: true, email: configuredEmail || 'admin' };
+      return { valid: false };
     }
   } catch (_) {}
   return { valid: false };
+}
+
+export async function verifyAdminTokenAsync(token: string): Promise<{ valid: boolean; email?: string }> {
+  if (!token || typeof token !== 'string') return { valid: false };
+  const raw = token.startsWith('Bearer ') ? token.slice(7).trim() : token.trim();
+  if (!raw) return { valid: false };
+
+  const localCheck = verifyLocalAdminToken(raw);
+  if (localCheck.valid) return localCheck;
+
+  if (raw.startsWith('eyJ')) {
+    return verifyFirebaseIdToken(raw);
+  }
+
+  return { valid: false };
+}
+
+// Public auth-lifecycle paths that handle their own authentication or return public Firebase client config
+const ADMIN_AUTH_EXEMPT_PATHS = new Set([
+  '/api/v1/admin/login',
+  '/api/v1/admin/auth/login',
+  '/api/v1/admin/google-login',
+  '/api/v1/admin/verify',
+  '/api/v1/admin/verify-session',
+  '/api/v1/admin/auth/me',
+  '/api/v1/admin/auth/check-session',
+  '/api/v1/admin/refresh-token',
+  '/api/v1/admin/logout',
+  '/api/v1/admin/auth/logout',
+  '/api/v1/admin/runtime-config'
+]);
+
+/**
+ * Express middleware protecting all /api/v1/admin/* and /api/github-sync/* routes.
+ * Requires a cryptographically valid signed session token or server-verified Firebase ID token.
+ */
+export async function requireAdminAuth(req: Request, res: Response, next: NextFunction) {
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+  const fullPath = `${req.baseUrl || ''}${req.path || ''}`.replace(/\/+$/, '') || '/';
+  if (ADMIN_AUTH_EXEMPT_PATHS.has(fullPath)) {
+    return next();
+  }
+
+  const authHeader = String(req.headers.authorization || '');
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+
+  if (!token) {
+    return res.status(401).json({
+      ok: false,
+      authorized: false,
+      error: 'Administrator authentication required.'
+    });
+  }
+
+  const verified = await verifyAdminTokenAsync(token);
+  if (!verified.valid) {
+    return res.status(401).json({
+      ok: false,
+      authorized: false,
+      error: 'Invalid or expired administrator session.'
+    });
+  }
+
+  (req as any).adminEmail = verified.email;
+  return next();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -130,11 +264,11 @@ const handleLogin = (req: any, res: any) => {
       });
     }
 
-    if (normalizedEmail !== configuredEmail) {
+    if (!safeEqualString(normalizedEmail, configuredEmail)) {
       return res.status(401).json({ ok: false, error: 'Invalid administrator email address.' });
     }
 
-    // 2. Verify Password
+    // 2. Verify Password (constant-time)
     if (!configuredPassword) {
       return res.status(500).json({
         ok: false,
@@ -143,8 +277,8 @@ const handleLogin = (req: any, res: any) => {
     }
 
     const inputHash = crypto.createHash('sha256').update(inputPass).digest('hex');
-    const isDirectMatch = inputPass === configuredPassword;
-    const isHashMatch = inputHash === configuredPassword.toLowerCase();
+    const isDirectMatch = safeEqualString(inputPass, configuredPassword);
+    const isHashMatch = safeEqualString(inputHash, configuredPassword.toLowerCase());
 
     if (!isDirectMatch && !isHashMatch) {
       return res.status(401).json({ ok: false, error: 'Incorrect administrator password.' });
@@ -182,10 +316,10 @@ adminAuthRouter.post('/api/v1/admin/auth/login', handleLogin);
 // ─────────────────────────────────────────────────────────────────────────────
 // VERIFY ENDPOINTS
 // ─────────────────────────────────────────────────────────────────────────────
-const handleVerify = (req: any, res: any) => {
+const handleVerify = async (req: any, res: any) => {
   const authHeader = req.headers.authorization || '';
   const token = authHeader.replace(/^Bearer\s+/i, '') || req.body?.idToken || req.body?.token;
-  const { valid, email } = verifyToken(token);
+  const { valid, email } = await verifyAdminTokenAsync(token);
 
   if (valid) {
     return res.json({ authorized: true, valid: true, authenticated: true, role: 'admin', email });
@@ -201,14 +335,24 @@ adminAuthRouter.get('/api/v1/admin/auth/me', handleVerify);
 adminAuthRouter.get('/api/v1/admin/auth/check-session', handleVerify);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GOOGLE AUTH VERIFICATION ENDPOINT
+// GOOGLE AUTH VERIFICATION ENDPOINT (Server-side Firebase ID token check)
 // ─────────────────────────────────────────────────────────────────────────────
-adminAuthRouter.post('/api/v1/admin/google-login', (req, res) => {
+adminAuthRouter.post('/api/v1/admin/google-login', async (req, res) => {
   const { configuredEmail } = getAdminConfig();
-  const reqEmail = (req.body?.email || '').toLowerCase().trim();
+  const authHeader = String(req.headers.authorization || '');
+  const idToken = String(req.body?.idToken || authHeader.replace(/^Bearer\s+/i, '') || '').trim();
 
-  if (!configuredEmail || reqEmail !== configuredEmail) {
-    return res.status(401).json({ ok: false, error: 'Access denied: Google account is not configured as administrator.' });
+  if (!configuredEmail) {
+    return res.status(401).json({ ok: false, error: 'Administrator email is not configured on the server.' });
+  }
+
+  if (!idToken) {
+    return res.status(401).json({ ok: false, error: 'A verified Google sign-in token is required.' });
+  }
+
+  const verified = await verifyFirebaseIdToken(idToken);
+  if (!verified.valid || !verified.email || !safeEqualString(verified.email, configuredEmail)) {
+    return res.status(401).json({ ok: false, error: 'Access denied: Google account could not be verified as administrator.' });
   }
 
   const token = generateToken(configuredEmail);
@@ -223,10 +367,10 @@ adminAuthRouter.post('/api/v1/admin/google-login', (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // REFRESH & LOGOUT
 // ─────────────────────────────────────────────────────────────────────────────
-adminAuthRouter.post('/api/v1/admin/refresh-token', (req, res) => {
+adminAuthRouter.post('/api/v1/admin/refresh-token', async (req, res) => {
   const authHeader = req.headers.authorization || '';
-  const token = authHeader.replace(/^Bearer\s+/i, '');
-  const { valid, email } = verifyToken(token);
+  const token = authHeader.replace(/^Bearer\s+/i, '') || req.body?.idToken || req.body?.token;
+  const { valid, email } = await verifyAdminTokenAsync(token);
   if (!valid || !email) {
     return res.status(401).json({ ok: false, error: 'Cannot refresh invalid token.' });
   }
@@ -234,9 +378,9 @@ adminAuthRouter.post('/api/v1/admin/refresh-token', (req, res) => {
   return res.json({ ok: true, token: newToken, expiresAt: Date.now() + 55 * 60 * 1000 });
 });
 
-adminAuthRouter.post('/api/v1/admin/logout', (req, res) => {
+adminAuthRouter.post('/api/v1/admin/logout', (_req, res) => {
   return res.json({ success: true, ok: true });
 });
-adminAuthRouter.post('/api/v1/admin/auth/logout', (req, res) => {
+adminAuthRouter.post('/api/v1/admin/auth/logout', (_req, res) => {
   return res.json({ success: true, ok: true });
 });

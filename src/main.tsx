@@ -21,43 +21,22 @@ if (typeof window !== 'undefined' && window.location.search && window.location.s
   } catch (_) {}
 }
 
-// Force wipe old mock/static data from local storage cache
+// One-time cleanup of legacy local storage keys on version bump
 const CACHE_VERSION = '5.0';
-if (typeof window !== 'undefined' && window.localStorage) {
-  if (localStorage.getItem('platform_cache_version') !== CACHE_VERSION) {
-    localStorage.removeItem('platform_apps');
-    localStorage.removeItem('platform_settings');
-    localStorage.removeItem('platform_news');
-    localStorage.removeItem('platform_blogs');
-    localStorage.removeItem('platform_videos');
-    localStorage.removeItem('platform_public_data');
-    localStorage.removeItem('platform_cache');
-    localStorage.removeItem('cached_firestore_data');
-    localStorage.removeItem('platform_firestore_cache');
-    localStorage.removeItem('platform_public_data_cache');
-  }
-}
-
-// Live listener for system dark/light mode preference changes
-if (typeof window !== 'undefined' && window.matchMedia) {
+if (typeof window !== 'undefined') {
   try {
-    const mql = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleThemeChange = (e: MediaQueryListEvent | MediaQueryList) => {
-      const storedTheme = localStorage.getItem('theme');
-      if (!storedTheme) {
-        if (e.matches) {
-          document.documentElement.classList.add('dark');
-          document.documentElement.setAttribute('data-theme', 'dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-          document.documentElement.setAttribute('data-theme', 'light');
-        }
-      }
-    };
-    if (mql.addEventListener) {
-      mql.addEventListener('change', handleThemeChange);
-    } else if ((mql as any).addListener) {
-      (mql as any).addListener(handleThemeChange);
+    if (window.localStorage && localStorage.getItem('platform_cache_version') !== CACHE_VERSION) {
+      localStorage.removeItem('platform_apps');
+      localStorage.removeItem('platform_settings');
+      localStorage.removeItem('platform_news');
+      localStorage.removeItem('platform_blogs');
+      localStorage.removeItem('platform_videos');
+      localStorage.removeItem('platform_public_data');
+      localStorage.removeItem('platform_cache');
+      localStorage.removeItem('cached_firestore_data');
+      localStorage.removeItem('platform_firestore_cache');
+      localStorage.removeItem('platform_public_data_cache');
+      localStorage.setItem('platform_cache_version', CACHE_VERSION);
     }
   } catch (_) {}
 }
@@ -93,6 +72,53 @@ if (typeof window !== 'undefined') {
 
   window.addEventListener('error', handleChunkError);
   window.addEventListener('unhandledrejection', handleChunkError);
+
+  const reloadOnceForMissingStylesheet = () => {
+    try {
+      const cssReloadKey = 'global_css_err_reload';
+      if (!sessionStorage.getItem(cssReloadKey)) {
+        sessionStorage.setItem(cssReloadKey, 'true');
+        window.location.reload();
+      }
+    } catch (_) {}
+  };
+
+  window.addEventListener(
+    'error',
+    (event: Event) => {
+      const target = event.target as HTMLLinkElement | null;
+      if (
+        target &&
+        target.tagName === 'LINK' &&
+        target.rel === 'stylesheet' &&
+        (target.id === 'vite-inline-css' || (typeof target.href === 'string' && target.href.includes('/assets/')))
+      ) {
+        reloadOnceForMissingStylesheet();
+      }
+    },
+    true
+  );
+
+  const verifyPrimaryStylesheetLoaded = () => {
+    try {
+      const cssLink = document.getElementById('vite-inline-css') as HTMLLinkElement | null;
+      if (
+        cssLink &&
+        cssLink.rel === 'stylesheet' &&
+        typeof cssLink.href === 'string' &&
+        cssLink.href.includes('/assets/') &&
+        !cssLink.sheet
+      ) {
+        reloadOnceForMissingStylesheet();
+      }
+    } catch (_) {}
+  };
+
+  if (document.readyState === 'complete') {
+    verifyPrimaryStylesheetLoaded();
+  } else {
+    window.addEventListener('load', verifyPrimaryStylesheetLoaded, { once: true });
+  }
 }
 
 const rootEl = document.getElementById('root');
