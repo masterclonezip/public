@@ -724,11 +724,52 @@ async function verifyModulesAndLiveServer() {
     }
     const zeroStrippedRawImports = brokenRawImports.length === 0;
 
+    // Automated Cloudflare Worker global-scope guard:
+    // Ensure importing functions/api/[[catchall]].js & functions/_middleware.js never calls disallowed global-scope APIs
+    let edgeWorkerGlobalScopeOk = true;
+    let edgeWorkerGlobalScopeErr = '';
+    const origGetRandomValues = globalThis.crypto?.getRandomValues?.bind(globalThis.crypto);
+    const origSetTimeout = globalThis.setTimeout;
+    const origSetInterval = globalThis.setInterval;
+    const origFetch = globalThis.fetch;
+    try {
+      const throwDisallowed = (op: string) => () => {
+        throw new Error(`Disallowed global-scope operation during Worker init: ${op}`);
+      };
+      if (globalThis.crypto) {
+        Object.defineProperty(globalThis.crypto, 'getRandomValues', {
+          value: throwDisallowed('crypto.getRandomValues'),
+          configurable: true,
+          writable: true,
+        });
+      }
+      (globalThis as any).setTimeout = throwDisallowed('setTimeout');
+      (globalThis as any).setInterval = throwDisallowed('setInterval');
+      (globalThis as any).fetch = throwDisallowed('fetch');
+
+      await import(`../functions/api/[[catchall]].js?cfcheck=${Date.now()}`);
+      await import(`../functions/_middleware.js?cfcheck=${Date.now()}`);
+    } catch (workerInitErr: any) {
+      edgeWorkerGlobalScopeOk = false;
+      edgeWorkerGlobalScopeErr = workerInitErr?.message || String(workerInitErr);
+    } finally {
+      if (globalThis.crypto && origGetRandomValues) {
+        Object.defineProperty(globalThis.crypto, 'getRandomValues', {
+          value: origGetRandomValues,
+          configurable: true,
+          writable: true,
+        });
+      }
+      globalThis.setTimeout = origSetTimeout;
+      globalThis.setInterval = origSetInterval;
+      globalThis.fetch = origFetch;
+    }
+
     record(
       'SPLIT-SYNC-BUILD',
-      'Split-Repo (Admin & Public) Build & Isolation Integrity',
-      noStaticRedirectsRawImport && hasBundledRedirectsDefine && splitSyncIsolationOk && zeroStrippedRawImports,
-      `NoStaticRedirectsRawImport: ${noStaticRedirectsRawImport}, OptionalDefinesFallback: ${hasBundledRedirectsDefine}, ZeroStrippedPublicRawImports: ${zeroStrippedRawImports}${brokenRawImports.length ? ` (${brokenRawImports.join(', ')})` : ''}, SplitSyncRepoIsolation: ${splitSyncIsolationOk}`
+      'Split-Repo (Admin & Public) Build, Worker Init & Isolation Integrity',
+      noStaticRedirectsRawImport && hasBundledRedirectsDefine && splitSyncIsolationOk && zeroStrippedRawImports && edgeWorkerGlobalScopeOk,
+      `NoStaticRedirectsRawImport: ${noStaticRedirectsRawImport}, OptionalDefinesFallback: ${hasBundledRedirectsDefine}, ZeroStrippedPublicRawImports: ${zeroStrippedRawImports}${brokenRawImports.length ? ` (${brokenRawImports.join(', ')})` : ''}, EdgeWorkerGlobalScopeSafe: ${edgeWorkerGlobalScopeOk}${edgeWorkerGlobalScopeErr ? ` (${edgeWorkerGlobalScopeErr})` : ''}, SplitSyncRepoIsolation: ${splitSyncIsolationOk}`
     );
   } catch (isoErr: any) {
     record('SEO-ISOLATION-1..8', 'Zero /moreinfo Leak & Attribution Isolation', false, isoErr?.message || String(isoErr));

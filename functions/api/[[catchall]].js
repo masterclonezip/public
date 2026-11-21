@@ -40,9 +40,16 @@ async function hmacSign(secret, message) {
     .replace(/=+$/, '');
 }
 
-const EPHEMERAL_EDGE_SESSION_SECRET = Array.from(crypto.getRandomValues(new Uint8Array(32)))
-  .map((b) => b.toString(16).padStart(2, '0'))
-  .join('');
+// Lazily initialized inside request handlers (Cloudflare Workers forbid crypto.getRandomValues in global scope)
+let ephemeralEdgeSessionSecret = '';
+function getEphemeralEdgeSessionSecret() {
+  if (!ephemeralEdgeSessionSecret) {
+    ephemeralEdgeSessionSecret = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+  return ephemeralEdgeSessionSecret;
+}
 
 function constantTimeEqual(a, b) {
   const strA = String(a || '');
@@ -83,7 +90,7 @@ async function getAdminSessionSecret(env, configuredPassword) {
     env?.SESSION_SECRET ||
     (configuredPassword
       ? await sha256Hex(configuredPassword + '_salt_admin')
-      : EPHEMERAL_EDGE_SESSION_SECRET)
+      : getEphemeralEdgeSessionSecret())
   );
 }
 
