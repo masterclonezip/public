@@ -1,23 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <sitemap>
-    <loc>https://example.com/sitemap-apps.xml</loc>
+    <loc>https://yonoappdex.com/sitemap-apps.xml</loc>
+    <lastmod>2026-11-20T17:18:58+00:00</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>https://yonoappdex.com/sitemap-static.xml</loc>
+    <lastmod>2026-11-06T03:20:42+00:00</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>https://yonoappdex.com/sitemap-news.xml</loc>
+    <lastmod>2026-11-20T17:13:25+00:00</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>https://yonoappdex.com/sitemap-videos.xml</loc>
     <lastmod>2026-09-01T00:00:00+00:00</lastmod>
   </sitemap>
   <sitemap>
-    <loc>https://example.com/sitemap-static.xml</loc>
-    <lastmod>2026-09-01T00:00:00+00:00</lastmod>
-  </sitemap>
-  <sitemap>
-    <loc>https://example.com/sitemap-news.xml</loc>
-    <lastmod>2026-09-01T00:00:00+00:00</lastmod>
-  </sitemap>
-  <sitemap>
-    <loc>https://example.com/sitemap-videos.xml</loc>
-    <lastmod>2026-09-01T00:00:00+00:00</lastmod>
-  </sitemap>
-  <sitemap>
-    <loc>https://example.com/sitemap-developers.xml</loc>
+    <loc>https://yonoappdex.com/sitemap-developers.xml</loc>
     <lastmod>2026-09-01T00:00:00+00:00</lastmod>
   </sitemap>
 </sitemapindex>
