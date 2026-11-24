@@ -1,6 +1,36 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
+    <loc>https://yonoappdex.com/app/jaiho-spin</loc>
+    <lastmod>2026-11-24T18:06:56+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794851258/etmeztsiwnibt4vg2eam.png</image:loc>
+      <image:title>JAIHO SPIN</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/spin-rummy</loc>
+    <lastmod>2026-11-24T18:04:15+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794851125/enhkduij8r86cs7fmgc6.png</image:loc>
+      <image:title>SPIN RUMMY</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://yonoappdex.com/app/1-2-3-rummy</loc>
+    <lastmod>2026-11-24T17:43:47+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794851369/ultmvahm81mtaqoayekg.png</image:loc>
+      <image:title>1 2 3 RUMMY</image:title>
+    </image:image>
+  </url>
+  <url>
     <loc>https://yonoappdex.com/app/777-game</loc>
     <lastmod>2026-11-22T18:19:31+00:00</lastmod>
     <changefreq>weekly</changefreq>
@@ -51,26 +81,6 @@
     </image:image>
   </url>
   <url>
-    <loc>https://yonoappdex.com/app/1-2-3-rummy</loc>
-    <lastmod>2026-11-16T17:49:31+00:00</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794851369/ultmvahm81mtaqoayekg.png</image:loc>
-      <image:title>1 2 3 RUMMY</image:title>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://yonoappdex.com/app/jaiho-spin</loc>
-    <lastmod>2026-11-16T17:48:00+00:00</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794851258/etmeztsiwnibt4vg2eam.png</image:loc>
-      <image:title>JAIHO SPIN</image:title>
-    </image:image>
-  </url>
-  <url>
     <loc>https://yonoappdex.com/app/saga-slots</loc>
     <lastmod>2026-11-16T17:46:28+00:00</lastmod>
     <changefreq>weekly</changefreq>
@@ -78,16 +88,6 @@
     <image:image>
       <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794851169/kv3r8lev0axvlgzyhtti.png</image:loc>
       <image:title>SAGA SLOTS</image:title>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://yonoappdex.com/app/spin-rummy</loc>
-    <lastmod>2026-11-16T17:45:31+00:00</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1794851125/enhkduij8r86cs7fmgc6.png</image:loc>
-      <image:title>SPIN RUMMY</image:title>
     </image:image>
   </url>
   <url>
