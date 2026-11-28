@@ -1,6 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
+    <loc>https://yonoappdex.com/app/every-77</loc>
+    <lastmod>2026-11-28T17:00:18+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793546491/vtwuonharlo6opxo1nsm.webp</image:loc>
+      <image:title>EVER 777</image:title>
+    </image:image>
+  </url>
+  <url>
     <loc>https://yonoappdex.com/app/jaiho-spin</loc>
     <lastmod>2026-11-24T18:06:56+00:00</lastmod>
     <changefreq>weekly</changefreq>
@@ -38,16 +48,6 @@
     <image:image>
       <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793597622/yzjijduiceeuy1gngztc.webp</image:loc>
       <image:title>777 GAME</image:title>
-    </image:image>
-  </url>
-  <url>
-    <loc>https://yonoappdex.com/app/every-77</loc>
-    <lastmod>2026-11-20T17:18:58+00:00</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-    <image:image>
-      <image:loc>https://res.cloudinary.com/potup3yi/image/upload/f_auto,q_auto,w_800/v1793546491/vtwuonharlo6opxo1nsm.webp</image:loc>
-      <image:title>EVER 777</image:title>
     </image:image>
   </url>
   <url>
